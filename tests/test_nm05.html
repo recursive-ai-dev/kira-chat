@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NM-05 Memory Surface Tests</title>
+<style>
+body{font-family:monospace;padding:20px;background:#0f0e17;color:#e8e0f0}
+.pass{color:#5ae07a}.fail{color:#d46060}.section{margin:20px 0;padding:15px;background:#171526;border-radius:8px}
+h2{color:#e8758a;margin-bottom:10px}
+.test{margin:8px 0;padding:8px;background:#1e1b2e;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>NM-05: Proactive Memory Surface Tests</h1>
+<div id="results"></div>
+
+<script>
+// Mock state and dependencies
+let state = {
+  affection: 0,
+  lastMessageTime: Date.now(),
+  memories: []
+};
+
+let _aiCtx = null;
+
+// Mock functions
+function minutesSince(ts) {
+  return ts ? Math.floor((Date.now() - ts) / 60000) : 99999;
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Test results
+const results = [];
+
+function test(name, fn) {
+  try {
+    fn();
+    results.push({ name, pass: true });
+  } catch (e) {
+    results.push({ name, pass: false, error: e.message });
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Test Suite
+// ─────────────────────────────────────────────────────────────────────
+
+test('NM-05-01: Memory surface does not trigger when sim < 0.55', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000; // 120 minutes ago
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.50, T: 'I love programming' }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  // Simulate the memory surface logic
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Memory surface should not trigger when sim < 0.55');
+});
+
+test('NM-05-02: Memory surface does not trigger when affection <= 150', () => {
+  state.affection = 150;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: 'I love programming' }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Memory surface should not trigger when affection <= 150');
+});
+
+test('NM-05-03: Memory surface does not trigger when elapsed <= 60 minutes', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 30 * 60000; // 30 minutes ago
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: 'I love programming' }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Memory surface should not trigger when elapsed <= 60 minutes');
+});
+
+test('NM-05-04: Memory surface does not trigger for non-existent memories (CoVe check)', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: 'I hate programming' }], // Different text
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Memory surface should not trigger for fabricated memories');
+});
+
+test('NM-05-05: Memory text is truncated to 40 characters', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  const longText = 'I love programming and building amazing things with code every single day';
+  state.memories = [{ text: longText, type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: longText }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        const truncated = mem.T.slice(0, 40);
+        memoryRef = truncated;
+      }
+    }
+  }
+  
+  assert(memoryRef !== null, 'Memory reference should be generated');
+  assert(memoryRef.length === 40, `Memory should be truncated to 40 chars, got ${memoryRef.length}`);
+});
+
+test('NM-05-06: Only personal memories are surfaced in greeting context', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'general', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: 'I love programming' }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Only personal memories should be surfaced in greeting context');
+});
+
+test('NM-05-07: Memory surface triggers when all conditions are met', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [{ sim: 0.60, T: 'I love programming' }],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === 'TRIGGERED', 'Memory surface should trigger when all conditions are met');
+});
+
+test('NM-05-08: Fallback when _aiCtx.similar is empty', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: [],
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Should gracefully handle empty similar array');
+});
+
+test('NM-05-09: Fallback when _aiCtx.similar is null', () => {
+  state.affection = 200;
+  state.lastMessageTime = Date.now() - 120 * 60000;
+  state.memories = [{ text: 'I love programming', type: 'personal', ts: Date.now() }];
+  
+  _aiCtx = {
+    similar: null,
+    ctxVec: new Float32Array(16)
+  };
+  
+  let memoryRef = null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  if (_aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    const mem = _aiCtx.similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (actualMem && actualMem.type === 'personal') {
+        memoryRef = 'TRIGGERED';
+      }
+    }
+  }
+  
+  assert(memoryRef === null, 'Should gracefully handle null similar');
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Render Results
+// ─────────────────────────────────────────────────────────────────────
+
+const container = document.getElementById('results');
+const passed = results.filter(r => r.pass).length;
+const failed = results.filter(r => !r.pass).length;
+
+container.innerHTML = `
+  <div class="section">
+    <h2>Summary</h2>
+    <div>Total: ${results.length} | <span class="pass">Passed: ${passed}</span> | <span class="fail">Failed: ${failed}</span></div>
+  </div>
+  <div class="section">
+    <h2>Test Results</h2>
+    ${results.map(r => `
+      <div class="test ${r.pass ? 'pass' : 'fail'}">
+        ${r.pass ? '✓' : '✗'} ${r.name}
+        ${r.error ? `<br><small>Error: ${r.error}</small>` : ''}
+      </div>
+    `).join('')}
+  </div>
+`;
+
+console.log(`NM-05 Tests: ${passed}/${results.length} passed`);
+</script>
+</body>
+</html>

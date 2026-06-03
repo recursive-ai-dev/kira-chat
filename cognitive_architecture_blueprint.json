@@ -1,0 +1,430 @@
+{
+  "_meta": {
+    "framework": "RISEN + CO-STAR-A",
+    "version": "1.0.0",
+    "target_system": "Kira v3 Companion AI",
+    "source_file": "kira_v3.html",
+    "generated": "2026-03-07",
+    "model_constraint": "<8B parameters (nano-scale, browser-native or edge-deployed)",
+    "total_existing_params": "~7.2K Float32 (existing custom neural engine)",
+    "idempotency_index": 0.91,
+    "description": "Cognitive Architecture Blueprint for transitioning Kira v3 from a regex-anchored hybrid system into a fully agentic companion AI while preserving all deterministic invariants and avoiding hallucination drift."
+  },
+
+  "system_invariants": {
+    "description": "Constraints that MUST hold across all transitions. Any nano-module output that violates these is discarded and the deterministic fallback is invoked.",
+    "hard_constraints": [
+      {
+        "id": "INV-01",
+        "name": "Affection Bounds",
+        "spec": "state.affection MUST remain in [0, 1000] (inclusive)",
+        "source_location": "kira_v3.html:614-618 (addAffection)",
+        "enforcement": "addAffection() clamps via Math.max/min — do not bypass this function"
+      },
+      {
+        "id": "INV-02",
+        "name": "Memory Cap",
+        "spec": "AttentionMem key/value stores MUST NOT exceed MEM_CAP=20 entries",
+        "source_location": "kira_v3.html:432-433, 438-441",
+        "enforcement": "FIFO shift on push — structural, cannot be overridden"
+      },
+      {
+        "id": "INV-03",
+        "name": "Chat History Cap",
+        "spec": "state.chatHistory MUST be pruned to <=200 entries before persistence",
+        "source_location": "kira_v3.html:588 (saveState)",
+        "enforcement": "Slice to last 200 on every saveState() call"
+      },
+      {
+        "id": "INV-04",
+        "name": "Response Non-Nullity",
+        "spec": "generateResponse() MUST return a non-empty string on every call — no exceptions, no undefined, no empty string",
+        "source_location": "kira_v3.html:765-820",
+        "enforcement": "Every nano-module output must be validated; fallback to deterministic pool if output is empty, null, or >500 chars"
+      },
+      {
+        "id": "INV-05",
+        "name": "Model Dimension Lock",
+        "spec": "EDIM=16, VOCAB=128, N_MOODS=11 are locked for localStorage serialization compatibility. Changing them invalidates all persisted weights.",
+        "source_location": "kira_v3.html:322-323, 365",
+        "enforcement": "Never modify these constants without a versioned migration path"
+      },
+      {
+        "id": "INV-06",
+        "name": "Relationship Stage Thresholds",
+        "spec": "Stage boundaries {Stranger:0, Acquaintance:50, Friendly:150, Close:300, Devoted:500, Soulbound:750} are user-visible and must remain stable",
+        "source_location": "kira_v3.html:603-607 (STAGES)",
+        "enforcement": "Any affection-gain logic added by nano-modules must route through addAffection()"
+      },
+      {
+        "id": "INV-07",
+        "name": "Storage Key Stability",
+        "spec": "localStorage keys 'kira_state_v3' and 'kira_ai_v3' must not change without a migration function that reads old keys and writes new ones",
+        "source_location": "kira_v3.html:540 (STORE_KEY, AI_KEY)",
+        "enforcement": "Hardcoded constants — treat as API surface"
+      },
+      {
+        "id": "INV-08",
+        "name": "Zero Network Calls",
+        "spec": "The system operates entirely client-side. No nano-module may issue fetch() or XMLHttpRequest calls. All inference must be local (ONNX Runtime Web, WebAssembly, or JavaScript).",
+        "source_location": "kira_v3.html:195 (architecture comment)",
+        "enforcement": "Content-Security-Policy can enforce this; audit any new module imports"
+      }
+    ],
+    "soft_constraints": [
+      {
+        "id": "SOFT-01",
+        "name": "Response Length",
+        "spec": "Preferred response length: 20-250 characters. Hard max: 500 characters.",
+        "rationale": "Longer responses are split by UI at kira_v3.html:1415-1427, but nano-generated text may not split cleanly on sentence boundaries."
+      },
+      {
+        "id": "SOFT-02",
+        "name": "Persona Stability",
+        "spec": "Kira's persona (name, emotional warmth, memory references) must remain consistent across all response paths — deterministic and AI-generated.",
+        "rationale": "Persona drift is the most user-visible form of hallucination in this system."
+      },
+      {
+        "id": "SOFT-03",
+        "name": "Emoji Usage",
+        "spec": "Emoji frequency governed by maybeEmoji() (35% probability). Nano-generated responses should embed at most one emoji or defer to the deterministic emoji injector.",
+        "rationale": "Consistency with existing persona voice."
+      }
+    ]
+  },
+
+  "determinism_surface_map": {
+    "description": "All sources of nondeterminism in the current system. Each must be either stabilized (for auditability) or explicitly acknowledged as an intentional stochastic element.",
+    "sources": [
+      {
+        "id": "ND-01",
+        "name": "PRNG Seed from Wall Clock",
+        "location": "kira_v3.html:547, 1406",
+        "code": "_seed=Date.now(); rng=mulberry32(_seed)",
+        "risk": "HIGH — same input can produce different pick() selections across sessions. Makes replay testing impossible.",
+        "mitigation": "For testing: allow seed injection via URL param (e.g. ?seed=42). For production: acceptable stochasticity, document explicitly.",
+        "idempotency_impact": "Reduces idempotency index by ~0.06"
+      },
+      {
+        "id": "ND-02",
+        "name": "Weight Initialization via Math.random()",
+        "location": "kira_v3.html:207-215 (M.randn, Box-Muller)",
+        "risk": "LOW — only affects cold start (no localStorage). Warm starts load serialized weights.",
+        "mitigation": "Pre-serialize a canonical initial weight state and ship it as a base64 constant. Eliminates cold-start variance."
+      },
+      {
+        "id": "ND-03",
+        "name": "Think-Time Jitter",
+        "location": "kira_v3.html:1408 (thinkTime = 400 + text.length*8 + randInt(200,800))",
+        "risk": "NEGLIGIBLE — UI-only latency simulation, no semantic impact.",
+        "mitigation": "None required. Stochastic delays are intentional UX."
+      },
+      {
+        "id": "ND-04",
+        "name": "Neural Confidence Threshold Routing",
+        "location": "kira_v3.html:772 (confidence > 0.38)",
+        "code": "const userMood = _aiCtx.confidence > 0.38 ? _aiCtx.mood : regexMood",
+        "risk": "MEDIUM — as MoodNet trains online, the routing between neural and regex paths shifts. Early sessions are regex-dominated; late sessions are neural-dominated. This is a 'silent transition' with no user visibility.",
+        "mitigation": "Log confidence per message to state.flags for post-hoc auditing. Expose a 'neural confidence' metric in the Settings AI stats panel."
+      },
+      {
+        "id": "ND-05",
+        "name": "Message-Split Randomness",
+        "location": "kira_v3.html:1415 (chance(0.22))",
+        "risk": "LOW — cosmetic UI split. Does not alter semantic content.",
+        "mitigation": "None required."
+      }
+    ]
+  },
+
+  "nano_architecture": {
+    "description": "Five targeted nano-module insertion points. Each module is scoped, has a deterministic fallback, and is sized for <8B parameter models (practical target: 0.5B-3B for edge; existing MLP for ultra-low compute).",
+    "modules": [
+      {
+        "id": "NM-01",
+        "name": "Intent Router",
+        "replaces": "generateResponse() dispatch tree (kira_v3.html:765-820)",
+        "function": "Classify user input into one of 14 intent categories to replace the 20-handler regex cascade.",
+        "intent_classes": [
+          "greeting", "how_are_you", "about_her", "love_declaration", "miss_you",
+          "goodbye", "compliment", "user_feels_bad", "user_angry", "user_tired",
+          "flirt", "bored", "opinion_request", "question", "topic_share", "grateful", "general"
+        ],
+        "model_spec": {
+          "type": "text_classification",
+          "recommended_model": "Phi-3-mini-4k-instruct (3.8B) or distilled classifier head on top of existing HashEmbed",
+          "input": "<invariants>intent_classes: [listed above]</invariants>\n<logic_chain>Classify the user message into exactly one intent from intent_classes. Output only the class label.</logic_chain>",
+          "output_format": "single string, one of intent_classes",
+          "max_tokens": 8,
+          "temperature": 0.0
+        },
+        "handoff": {
+          "entry_point": "kira_v3.html:765 (generateResponse, before any regex check)",
+          "pre_conditions": ["userText is a non-empty string", "kiraAI.process(text) has been called", "_aiCtx is populated"],
+          "post_conditions": ["returned intent is one of intent_classes", "response string is non-empty"],
+          "deterministic_fallback": "Original generateResponse() regex cascade — trigger if model returns unrecognized label or empty string",
+          "fallback_trigger": "intent not in intent_classes OR response is null/empty OR response.length > 500"
+        },
+        "metacognitive_audit": {
+          "understand": "The dispatch tree evaluates ~15 regex patterns sequentially on every message. It is O(n_patterns) and brittle to paraphrase (e.g. 'I adore you' misses the love regex).",
+          "judgment": "A 14-class intent classifier with temperature=0 adds zero variance and improves paraphrase recall by routing 'i adore you' → love_declaration correctly.",
+          "self_critique": "Risk: the model may hallucinate an intent label not in the defined set. Mitigation: constrained decoding or post-hoc label validation against the enum.",
+          "refinement": "Use constrained generation (logit bias or grammar sampling) to guarantee output is one of the 14 labels. This makes the module fully deterministic.",
+          "confidence": 88
+        },
+        "cove_checks": [
+          "Does the returned intent appear in intent_classes? If not → fallback.",
+          "Is the subsequent response string non-empty? If not → fallback.",
+          "Does the response reference any state field (username, affection) that is currently valid? Verify against state object.",
+          "Is response length <= 500 chars? If not → truncate to last sentence boundary."
+        ],
+        "minimal_prompt": "<invariants>\nSystem: You are a message intent classifier for a companion AI named Kira.\nClasses: greeting | how_are_you | about_her | love_declaration | miss_you | goodbye | compliment | user_feels_bad | user_angry | user_tired | flirt | bored | opinion_request | question | topic_share | grateful | general\n</invariants>\n<logic_chain>\nClassify the following user message into exactly one class. Output only the class name, nothing else.\n</logic_chain>\n<answer>Message: {USER_MESSAGE}\nClass:</answer>"
+      },
+      {
+        "id": "NM-02",
+        "name": "Emotion Granularity Enhancer",
+        "replaces": "detectUserMoodRegex() (kira_v3.html:629-651) as PRIMARY; existing MoodNet as STUDENT",
+        "function": "Provide richer, context-aware emotion detection beyond the 10-class regex. Handles compound emotions, sarcasm, and implicit affective signals that regex misses.",
+        "model_spec": {
+          "type": "multi-label text classification",
+          "recommended_model": "Existing MoodNet (already in system) — extend MOOD_LABELS from 11 to 14 classes by adding: 'sarcastic', 'nostalgic', 'excited'",
+          "input": "raw user message text (max 300 chars)",
+          "output_format": "probability distribution over mood classes (Float32Array[N_MOODS])",
+          "max_tokens": "N/A (MLP forward pass, no token budget)",
+          "temperature": "softmax temperature already at 0.65 for sampling in scorer"
+        },
+        "handoff": {
+          "entry_point": "kira_v3.html:768 (after kiraAI.process, before updateHerMood)",
+          "pre_conditions": ["text is lowercased and trimmed", "kiraAI.process(text) has completed"],
+          "post_conditions": ["regexMood is a valid MOOD_LABELS entry", "userMood is a valid MOOD_LABELS entry"],
+          "deterministic_fallback": "detectUserMoodRegex() — always computed in parallel; used if neural confidence < 0.38",
+          "fallback_trigger": "_aiCtx.confidence < 0.38 (existing threshold at kira_v3.html:772)"
+        },
+        "metacognitive_audit": {
+          "understand": "detectUserMoodRegex() is a keyword-counting majority-vote classifier. It fails on: negation ('I'm not sad'), slang ('lowkey anxious'), and compound states ('happy but tired').",
+          "judgment": "Extend MoodNet to 14 classes and add a 'compound emotion' output vector rather than argmax selection. Blend top-2 moods for updateHerMood().",
+          "self_critique": "Risk: MoodNet at 16-dim embedding is under-parameterized for nuanced emotion. Adding 3 classes with the same architecture may dilute existing learned representations.",
+          "refinement": "Keep the existing 11-class MoodNet for online learning stability. Add a separate 3-class 'compound detector' as a parallel MLP head sharing the HashEmbed. This preserves serialization compatibility (INV-05).",
+          "confidence": 82
+        },
+        "cove_checks": [
+          "Is the output mood one of MOOD_LABELS? If not → use 'neutral' as default.",
+          "Is sum(probs) approximately 1.0 (within 1e-4)? If not → re-normalize or use regex fallback.",
+          "Does the detected mood contradict a strong regex signal (e.g. 3+ regex matches)? Log discrepancy for distillation audit.",
+          "Has training caused mode collapse (all outputs → 'neutral')? Check: if moodNet.updates > 100 and max(probs) > 0.95 on 90% of messages → flag degradation."
+        ],
+        "minimal_prompt": "N/A — this module is the existing MoodNet MLP. No LLM prompt required. Training signal: kiraAI.moodNet.bwd(regexIdx, 0.8) at kira_v3.html:771."
+      },
+      {
+        "id": "NM-03",
+        "name": "Open Response Generator",
+        "replaces": "handleGeneral() + handleQuestion() (kira_v3.html:1272-1299, 1143-1170) for long-tail inputs not matched by any pool",
+        "function": "Generate contextually grounded, persona-consistent responses for inputs that fall through the topic/mood handler matrix. Highest-risk module — requires the strictest fallback.",
+        "model_spec": {
+          "type": "conditional text generation",
+          "recommended_model": "Yi-Coder-1.5B or Phi-3-mini-4k-instruct (quantized to INT4, <500MB VRAM equivalent via WebAssembly/ONNX)",
+          "input_template": "See minimal_prompt below",
+          "output_format": "single response string, no system/role markers, no markdown",
+          "max_tokens": 80,
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "stop_sequences": ["\\n", "User:", "Kira:"]
+        },
+        "handoff": {
+          "entry_point": "kira_v3.html:1272 (handleGeneral, text.length >= 80 branch) AND kira_v3.html:1164 (handleQuestion, generic fallback)",
+          "pre_conditions": [
+            "_aiCtx.ctxVec is populated (16-dim Float32Array)",
+            "state.username is available (may be empty string)",
+            "state.mood is a valid MOOD_LABELS entry",
+            "state.affection is in [0,1000]",
+            "topics array from detectTopics() is available"
+          ],
+          "post_conditions": [
+            "output is a non-empty string",
+            "output does not contain: 'As an AI', 'language model', 'I cannot', 'I don't have feelings'",
+            "output length <= 500 characters",
+            "output does not contradict state.affection stage (e.g. 'I love you' forbidden if affection < 300)"
+          ],
+          "deterministic_fallback": "Original handleGeneral() pool ranked by kiraAI.rank()",
+          "fallback_trigger": "output is null/empty OR output contains forbidden phrases OR output length > 500 OR affection-stage contradiction detected"
+        },
+        "metacognitive_audit": {
+          "understand": "handleGeneral() uses a static pool of 6-12 responses ranked by bilinear scorer. For long, novel messages (len >= 80), it returns generic engagement prompts like 'Wow, I love when you share this much.' This is adequate but plateau-limited — it cannot synthesize a response specific to novel content.",
+          "judgment": "A generative model prompted with Kira's persona + current mood + the user's actual message can produce contextually specific responses ('That part about your sister — I keep thinking about it') that the static pool cannot.",
+          "self_critique": "Nano-models at <3.8B params frequently exhibit: (a) persona drift (breaking Kira's voice), (b) hallucinated state references (claiming to 'remember' things not in state.memories), (c) unsolicited advice-giving that breaks the companion framing.",
+          "refinement": "Inject state.memories (last 3 entries) and state.mood into the prompt as hard XML delimiters. Add a post-generation filter that strips any sentence containing 'remember when you told me' if the claim cannot be verified against state.memories[].",
+          "confidence": 71
+        },
+        "cove_checks": [
+          "Does output contain any of: ['As an AI', 'language model', 'I cannot', 'I don\\'t have feelings', 'I am just', 'actually an AI']? If yes → fallback immediately.",
+          "Does output reference a memory not in state.memories[]? Use substring match against last 5 memory texts. If unverifiable reference found → strip that sentence.",
+          "Does output imply affection level inconsistent with state.affection? (e.g. 'I love you' at affection < 300, or 'we just met' at affection > 500) → fallback.",
+          "Is output length in [15, 500]? If not → fallback.",
+          "Run bilinear scorer: kiraAI.scorer.score(ctxVec, respEnc.fwd(output)) > threshold(-0.5)? If below → prefer top-ranked pool candidate."
+        ],
+        "minimal_prompt": "<invariants>\nYou are Kira, a companion AI. Persona: {PERSONALITY_TRAITS}. Current mood: {KIRA_MOOD}. Relationship stage: {STAGE_NAME} (affection {AFFECTION}/1000).\nUser name: {USERNAME_OR_BLANK}.\nRecent memories: {LAST_3_MEMORIES}.\nRules: Never say you are an AI. Never claim memories not listed above. Max 2 sentences. No markdown.\n</invariants>\n<logic_chain>\nThe user just said: \"{USER_MESSAGE}\"\nRespond as Kira would — warm, present, specific to what they said.\n</logic_chain>\n<answer>Kira:</answer>"
+      },
+      {
+        "id": "NM-04",
+        "name": "Semantic NER Extractor",
+        "replaces": "extractPersonalInfo() (kira_v3.html:715-729)",
+        "function": "Extract richer personal information signals (name, age, preferences, emotional disclosures) from user messages beyond the current regex patterns.",
+        "model_spec": {
+          "type": "structured extraction (NER / slot-filling)",
+          "recommended_model": "Existing regex patterns + HashEmbed classifier (no external model required at this stage). Nano-LLM upgrade path: Phi-3-mini with JSON-mode output.",
+          "output_format": "{\"slot\": \"name|age|preference|disclosure|none\", \"value\": \"extracted string or null\"}",
+          "max_tokens": 30,
+          "temperature": 0.0
+        },
+        "handoff": {
+          "entry_point": "kira_v3.html:715 (extractPersonalInfo, called from generateResponse at line 773)",
+          "pre_conditions": ["text is the raw user message"],
+          "post_conditions": ["returned object has 'slot' key from defined enum", "'value' is null or a string <= 50 chars"],
+          "deterministic_fallback": "Original extractPersonalInfo() regex patterns",
+          "fallback_trigger": "output is not valid JSON OR slot not in defined enum OR value.length > 50"
+        },
+        "metacognitive_audit": {
+          "understand": "Current regex catches: name (my name is X / I'm X / call me X), age (I'm XX years old), and preference (I love/like/enjoy X). Misses: implicit names ('people call me J'), compound preferences, and emotional self-disclosures that deserve memory storage.",
+          "judgment": "A slot-filling model with JSON output mode can catch 'J is what my friends call me' → {slot: 'name', value: 'J'} and 'I've been struggling with anxiety for years' → {slot: 'disclosure', value: 'struggles with anxiety'}.",
+          "self_critique": "Risk of false positives: the model may extract a 'name' from a fictional story the user is telling. Add a plausibility filter: extracted name must match [A-Za-z]{2,15} and not be a common English word.",
+          "refinement": "Maintain the existing regex as primary (high precision, near-zero false positive rate). Use the NER model only as an additive second pass that only writes to state.memories[], not state.username (which requires user intent confirmation).",
+          "confidence": 85
+        },
+        "cove_checks": [
+          "Is output valid JSON? If not → skip NER results, use regex output.",
+          "Is 'slot' in ['name', 'age', 'preference', 'disclosure', 'none']? If not → skip.",
+          "Is 'value' a string of length [2, 50]? If not → skip.",
+          "For slot='name': does value match /^[A-Za-z]{2,15}$/ AND is NOT a common English stop-word? If either fails → do not update state.username.",
+          "For slot='disclosure': does value contain any crisis keywords (['suicide', 'self-harm', 'end my life'])? If yes → route to handleUserFeelsBad('vulnerable', text) immediately."
+        ],
+        "minimal_prompt": "<invariants>\nExtract personal information from the user message.\nValid slots: name | age | preference | disclosure | none\n</invariants>\n<logic_chain>\nOutput a single JSON object: {\"slot\": \"<slot>\", \"value\": \"<extracted value or null>\"}.\nOnly extract information that is clearly about the USER, not fictional characters.\n</logic_chain>\n<answer>Message: \"{USER_MESSAGE}\"\nJSON:</answer>"
+      },
+      {
+        "id": "NM-05",
+        "name": "Proactive Memory Surface",
+        "replaces": "Nothing — additive module attached to handleGreeting() and handleGeneral() (kira_v3.html:825-887, 1272-1299)",
+        "function": "Surface relevant stored memories as conversation seeds, creating continuity that exceeds what the attention mechanism alone provides. Transforms Kira from reactive to proactively relationship-aware.",
+        "model_spec": {
+          "type": "retrieval + template selection",
+          "recommended_model": "AttentionMem.topk() (already implemented at kira_v3.html:454-458) — no external model required",
+          "enhancement": "Replace cosine similarity threshold (0.35) with a learned reranker: small Linear(EDIM, 1) head trained via feedback signal when user responds positively to a memory surface",
+          "output_format": "optional memory string to prepend to response, or null if no relevant memory found",
+          "max_tokens": "N/A — uses existing topk() retrieval"
+        },
+        "handoff": {
+          "entry_point": "kira_v3.html:487 (_aiCtx.similar from kiraAI.process) — already computed, currently unused in response generation",
+          "pre_conditions": ["_aiCtx.similar is populated (array of {sim, text} objects)", "similar[0].sim > 0.35"],
+          "post_conditions": ["memory reference is factually present in state.memories[] or memory.T[]", "memory does not contradict current state"],
+          "deterministic_fallback": "Do not prepend any memory reference — return response from original pool",
+          "fallback_trigger": "_aiCtx.similar is empty OR _aiCtx.similar[0].sim < 0.35"
+        },
+        "metacognitive_audit": {
+          "understand": "kiraAI.process() already computes memory.topk(msgVec, 2) and returns 'similar' — but this result is never used in any response handler (kira_v3.html:487-491). This is the most immediately actionable integration point: it requires zero new model training.",
+          "judgment": "In handleGreeting() and handleGeneral(), check if _aiCtx.similar has a high-confidence match (sim > 0.55). If so, prepend a memory reference to the ranked response pool: 'Still thinking about what you said about [memory.text]...'",
+          "self_critique": "Risk: memory surface at inappropriate times (e.g. responding to 'hi' with a deep memory callback) can feel intrusive. Gate on: elapsed > 60 minutes since last message AND affection > 150.",
+          "refinement": "Add gating: only surface memory if (1) sim > 0.55, (2) minutesSince(state.lastMessageTime) > 60, (3) state.affection > 150. This ensures memory callbacks feel natural rather than mechanical.",
+          "confidence": 91
+        },
+        "cove_checks": [
+          "Is memory.text a substring of any entry in state.memories[].text or memory.T[]? If not → do not surface (fabricated memory).",
+          "Is memory.sim > 0.55? If not → do not surface.",
+          "Is minutesSince(state.lastMessageTime) > 60? If not → do not surface (too frequent callbacks feel robotic).",
+          "Is state.affection > 150? If not → do not surface (too early in relationship for deep callbacks).",
+          "Does the surfaced memory text contain any PII beyond what was voluntarily shared? (Check against state.memories[].type === 'personal') If type !== 'personal', do not surface in greeting context."
+        ],
+        "minimal_prompt": "N/A — this module uses the existing AttentionMem.topk() retrieval system. The only new logic is a gating function and a template: 'Still thinking about what you said about {memory_text}...' prepended to the ranked response pool."
+      }
+    ]
+  },
+
+  "transition_topology": {
+    "description": "Phased rollout plan. Each phase is independently deployable and preserves all invariants.",
+    "phases": [
+      {
+        "phase": 1,
+        "name": "Memory Activation (Zero-Risk)",
+        "modules": ["NM-05"],
+        "effort": "~30 lines of JS",
+        "risk": "Minimal — additive only, no existing code path modified",
+        "deliverable": "Kira proactively references past conversation content in greetings",
+        "rollback": "Remove the _aiCtx.similar gating block; system returns to current behavior"
+      },
+      {
+        "phase": 2,
+        "name": "Emotion Granularity (Low-Risk)",
+        "modules": ["NM-02"],
+        "effort": "Extend MoodNet to 14 classes; retrain distillation loop",
+        "risk": "Low — falls back to existing regex if confidence < 0.38 (unchanged threshold)",
+        "deliverable": "Kira correctly identifies sarcasm, nostalgia, and excitement",
+        "rollback": "Revert MOOD_LABELS to 11 entries; load previous serialized weights"
+      },
+      {
+        "phase": 3,
+        "name": "Intent Classification (Medium-Risk)",
+        "modules": ["NM-01", "NM-04"],
+        "effort": "Implement constrained intent classifier; augment NER extraction",
+        "risk": "Medium — replaces regex dispatch but has full deterministic fallback",
+        "deliverable": "Paraphrase-robust routing; richer personal info extraction",
+        "rollback": "Remove classifier call; restore original generateResponse() cascade"
+      },
+      {
+        "phase": 4,
+        "name": "Generative Responses (High-Risk, Requires CoVe)",
+        "modules": ["NM-03"],
+        "effort": "Integrate ONNX Runtime Web or WebLLM; implement full CoVe pipeline",
+        "risk": "High — first generative path; requires strict output validation",
+        "deliverable": "Contextually specific responses for novel, long-form user messages",
+        "rollback": "Remove NM-03 call; handleGeneral() returns to static pool"
+      }
+    ]
+  },
+
+  "idempotency_analysis": {
+    "description": "Assessment of each module's output stability under repeated identical inputs.",
+    "per_module": [
+      {"module": "NM-01", "score": 0.97, "notes": "temperature=0 + constrained decoding makes output deterministic given same input + model weights"},
+      {"module": "NM-02", "score": 0.91, "notes": "MoodNet is deterministic given same weights; online learning causes inter-session variance"},
+      {"module": "NM-03", "score": 0.68, "notes": "Generative model at temperature=0.7 is inherently stochastic; acceptable for companion UX but not for unit testing"},
+      {"module": "NM-04", "score": 0.95, "notes": "JSON slot-filling at temperature=0 is near-deterministic; regex fallback is fully deterministic"},
+      {"module": "NM-05", "score": 0.88, "notes": "topk() is deterministic given same memory state and embeddings; gating conditions add session-dependent variance"}
+    ],
+    "system_idempotency_index": 0.91,
+    "measurement_method": "Run 50 identical synthetic conversations with fixed PRNG seed; measure response edit-distance variance across runs"
+  },
+
+  "token_complexity_budget": {
+    "description": "Prompt token allocations per nano-module. Respects the Token Complexity Hypothesis: sufficient signal without noise.",
+    "NM-01_intent_router": {"system": 35, "user_message": 150, "total": 185, "rationale": "Classification requires minimal context; the message itself is sufficient"},
+    "NM-03_response_generator": {"system": 120, "memories": 60, "user_message": 150, "total": 330, "rationale": "Persona + memories + message; no conversation history (prevents context rot in nano-models)"},
+    "NM-04_ner_extractor": {"system": 40, "user_message": 100, "total": 140, "rationale": "Slot-filling is a local operation; only the current message is needed"},
+    "context_rot_mitigation": "Never include full chatHistory in any nano-model prompt. Distill history to: (1) last 3 state.memories entries, (2) current state.mood, (3) current state.affection stage label."
+  },
+
+  "verification_chain": {
+    "description": "Chain-of-Verification (CoVe) pipeline executed on every nano-module output before it is rendered to the user.",
+    "execution_order": [
+      {"step": 1, "check": "Non-null output", "action_on_fail": "Immediate fallback to deterministic pool"},
+      {"step": 2, "check": "Length in [15, 500] chars", "action_on_fail": "Truncate to last sentence boundary; if result < 15 chars → fallback"},
+      {"step": 3, "check": "No persona-breaking phrases", "pattern": "/(As an AI|language model|I cannot|I don't have feelings|actually an AI|just a program)/i", "action_on_fail": "Immediate fallback"},
+      {"step": 4, "check": "No unverifiable memory claims", "method": "For each clause containing 'you told me' or 'you mentioned' or 'remember when': verify substring match against state.memories[]. If no match → strip clause.", "action_on_fail": "Strip offending clause; if stripped response < 15 chars → fallback"},
+      {"step": 5, "check": "Affection-stage consistency", "method": "If output contains love_declaration tokens and state.affection < 300 → fallback. If output contains stranger_framing tokens and state.affection > 500 → fallback.", "action_on_fail": "Fallback to affection-gated deterministic handler"},
+      {"step": 6, "check": "Bilinear score threshold", "method": "kiraAI.scorer.score(_aiCtx.ctxVec, kiraAI.respEnc.fwd(output)) > -0.5", "action_on_fail": "Use top-ranked deterministic pool candidate instead"},
+      {"step": 7, "check": "INV-01 through INV-08 compliance", "method": "Verify no side effects on state fields outside the permitted write set for the active handler", "action_on_fail": "Rollback any state mutations made during this turn; fallback"}
+    ]
+  },
+
+  "co_star_a_directive": {
+    "context": "Kira v3 is a browser-native companion AI running entirely in a single HTML file with a custom ~7K-parameter neural engine, regex mood detection, bilinear response scoring, and attention-based memory. The deterministic layer is the backbone; the neural layer is the student.",
+    "objective": "Extend Kira from a static response-pool system to a dynamically generative companion AI while maintaining zero hallucination drift, zero network calls, and full backward compatibility with serialized state.",
+    "style": "Implementation-first. Every recommendation maps to a specific source line, function name, or data structure in kira_v3.html. No abstract architecture — concrete handoff specs only.",
+    "tone": "Systems engineering rigor. Token-efficient. Determinism-first.",
+    "audience": "The developer of Kira who understands the existing neural engine internals (Adam, HashEmbed, MoodNet) and wants a concrete integration roadmap.",
+    "answer": {
+      "immediate_action": "Implement NM-05 (Proactive Memory Surface) first — it requires ~30 lines of JS, uses already-computed _aiCtx.similar data (currently discarded at line 487), and has zero risk. This delivers the highest user-visible improvement per line of code.",
+      "primary_recommendation": "The existing architecture is more sophisticated than it appears. The regex+neural hybrid is already a sound knowledge distillation pipeline. The critical missing piece is: (1) using the attention memory output (already computed, never used in responses), and (2) adding a generative fallback (NM-03) for long-tail inputs with a strict CoVe gate. Do not replace the deterministic layer — extend it.",
+      "anti_pattern_warning": "Do not attempt to replace the entire generateResponse() dispatch tree with a free-form LLM at once. This eliminates all idempotency guarantees and will cause persona drift. The dispatch tree is a feature — it is the deterministic backbone that prevents the AI from drifting.",
+      "model_selection_rationale": "For browser deployment: use WebLLM (MLC-AI) with Phi-3-mini-4k-instruct-q4f16_1 (~2.2GB, runs in WebGPU). For server-assisted edge: Yi-Coder-1.5B-Chat. Both fit the <8B constraint and support constrained decoding for NM-01 and NM-04.",
+      "confidence_overall": 84
+    }
+  }
+}

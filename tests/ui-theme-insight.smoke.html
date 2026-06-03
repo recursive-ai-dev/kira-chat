@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kira UI Theme/Insight Smoke</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1220;color:#e9edff;padding:24px}
+    .ok{color:#7cf2a1}.fail{color:#ff8d8d}pre{white-space:pre-wrap;background:#11182f;padding:12px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <h1>Kira UI smoke test</h1>
+  <p>Runs a browser-level smoke flow for theme + insight + quick chips.</p>
+  <pre id="out">Running…</pre>
+
+<script>
+(async function(){
+  const out=document.getElementById('out');
+  const logs=[];
+  const keys=['kira_state_v3','kira_ai_v3','kira_images_v3','kira_profilepic_v3','kira_theme_v1'];
+
+  function log(msg,ok=true){logs.push(`${ok?'✅':'❌'} ${msg}`);}
+  function assert(cond,msg){if(!cond)throw new Error(msg);log(msg,true);}
+
+  let frame;
+  try{
+    const html=await fetch('../kira_v3.html').then(r=>{if(!r.ok)throw new Error('failed to fetch kira_v3.html');return r.text();});
+
+    frame=document.createElement('iframe');
+    frame.style.width='1px';frame.style.height='1px';frame.style.border='0';
+    document.body.appendChild(frame);
+
+    const win=frame.contentWindow;
+    keys.forEach(k=>win.localStorage.removeItem(k));
+
+    win.localStorage.setItem('kira_theme_v1','aurora');
+    win.localStorage.setItem('kira_state_v3',JSON.stringify({
+      affection:220,mood:'happy',energy:0.42,currentStreak:3,longestStreak:3,lastVisit:Date.now(),chatHistory:[]
+    }));
+
+    await new Promise((resolve,reject)=>{
+      frame.onload=()=>resolve();
+      frame.onerror=()=>reject(new Error('iframe failed to load'));
+      frame.srcdoc=html;
+    });
+
+    await new Promise(r=>setTimeout(r,50));
+    const doc=win.document;
+
+    const themeBtn=doc.getElementById('theme-btn');
+    assert(doc.body.classList.contains('theme-aurora'),'loadTheme applied aurora class from localStorage');
+    assert(themeBtn.textContent.trim()==='☾','applyTheme updated theme button glyph');
+    assert(themeBtn.title==='Switch to rose mode','applyTheme updated theme button title');
+    assert(themeBtn.getAttribute('aria-pressed')==='true','applyTheme updated aria-pressed=true');
+
+    assert(doc.getElementById('insight-mood').textContent==='happy','updateInsightDock populated insight mood');
+    assert(doc.getElementById('insight-energy').textContent==='42%','updateInsightDock populated insight energy');
+    assert(doc.getElementById('insight-stage').textContent==='Friendly','updateInsightDock populated insight stage');
+    assert(doc.getElementById('insight-streak').textContent==='3 days','updateInsightDock populated insight streak');
+
+    const firstChip=doc.querySelector('.quick-chip');
+    const input=doc.getElementById('msg-input');
+    firstChip.click();
+    assert(input.value===firstChip.getAttribute('data-prompt'),'quick-chip click prefills message input');
+
+    keys.forEach(k=>win.localStorage.removeItem(k));
+    log('teardown cleared all persisted keys, including kira_theme_v1');
+
+    out.className='ok';
+  }catch(err){
+    log(err.message,false);
+    out.className='fail';
+  }finally{
+    if(frame){frame.remove();}
+    out.textContent=logs.join('\n');
+  }
+})();
+</script>
+</body>
+</html>

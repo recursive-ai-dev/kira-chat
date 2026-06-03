@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adaptive Architecture Tests</title>
+<style>
+body{font-family:monospace;padding:20px;background:#0f0e17;color:#e8e0f0}
+.pass{color:#5ae07a}.fail{color:#d46060}.section{margin:20px 0;padding:15px;background:#171526;border-radius:8px}
+h2{color:#e8758a;margin-bottom:10px}
+.test{margin:8px 0;padding:8px;background:#1e1b2e;border-radius:4px}
+button{background:#e8758a;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600}
+button:hover{background:#c06878}
+</style>
+</head>
+<body>
+<h1>🧠 Kira v3 Adaptive Architecture Tests</h1>
+<button onclick="runAllTests()">Run All Tests</button>
+<div id="results"></div>
+
+<script>
+// Mock localStorage
+const _store={};
+const mockLocalStorage={
+  getItem:k=>_store[k]||null,
+  setItem:(k,v)=>{_store[k]=String(v);},
+  removeItem:k=>{delete _store[k];}
+};
+
+// Mock state
+let state={affection:0,personality:'warm',adaptiveEnabled:true,effectivePersonality:'warm',memories:[],userMoods:[],topics:{},askedAbout:{}};
+
+// Mock utilities
+function rng(){return Math.random();}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function chance(p){return rng()<p;}
+
+// Test results
+const results=[];
+
+function test(name,fn){
+  try{
+    fn();
+    results.push({name,pass:true});
+  }catch(e){
+    results.push({name,pass:false,error:e.message});
+  }
+}
+
+function assert(condition,message){
+  if(!condition)throw new Error(message);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Test Suite
+// ─────────────────────────────────────────────────────────────────────
+
+function runAllTests(){
+  results.length=0;
+  _store.length=0;
+
+  // Test 1: DEFAULT_ADAPTIVE_PROFILE exists and has correct structure
+  test('DEFAULT_ADAPTIVE_PROFILE is defined with correct structure',()=>{
+    assert(typeof DEFAULT_ADAPTIVE_PROFILE!=='undefined','DEFAULT_ADAPTIVE_PROFILE not defined');
+    const p=DEFAULT_ADAPTIVE_PROFILE;
+    assert(p.version===1,`Expected version 1, got ${p.version}`);
+    assert(typeof p.engagementEMA==='number','engagementEMA not a number');
+    assert(p.behavior.emojiProbability===0.35,`emojiProbability should be 0.35, got ${p.behavior.emojiProbability}`);
+    assert(p.personality.currentWeights.warm===1.0,'warm weight should start at 1.0');
+    assert(p.memory.memoryRefProbability===0.3,'memoryRefProbability should be 0.3');
+  });
+
+  // Test 2: loadAdaptiveProfile creates default profile on first load
+  test('loadAdaptiveProfile creates default profile on first load',()=>{
+    assert(typeof loadAdaptiveProfile!=='undefined','loadAdaptiveProfile not defined');
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    assert(profile!==null,'Profile should not be null');
+    assert(profile.version===1,'Version should be 1');
+    assert(profile.createdAt!==null,'createdAt should be set');
+    assert(profile.behavior.emojiProbability===0.35,'Default emojiProbability should be 0.35');
+  });
+
+  // Test 3: saveAdaptiveProfile persists to localStorage
+  test('saveAdaptiveProfile persists to localStorage',()=>{
+    assert(typeof saveAdaptiveProfile!=='undefined','saveAdaptiveProfile not defined');
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    _adaptiveTurnsSinceLastSave=10; // Force save
+    const profile=loadAdaptiveProfile();
+    profile.engagementEMA=0.75;
+    saveAdaptiveProfile();
+    const raw=mockLocalStorage.getItem('kira_adaptive_v1');
+    assert(raw!==null,'Profile should be saved to localStorage');
+    const parsed=JSON.parse(raw);
+    assert(parsed.engagementEMA===0.75,`Expected 0.75, got ${parsed.engagementEMA}`);
+  });
+
+  // Test 4: deepMerge merges missing fields
+  test('deepMerge fills in missing fields from defaults',()=>{
+    assert(typeof deepMerge!=='undefined','deepMerge not defined');
+    const partial={version:1,behavior:{emojiProbability:0.5}};
+    const merged=deepMerge(DEFAULT_ADAPTIVE_PROFILE,partial);
+    assert(merged.behavior.emojiProbability===0.5,'Should use partial value');
+    assert(merged.behavior.petNameProbability===0.4,'Should fill in missing field from default');
+    assert(merged.personality.currentWeights.warm===1.0,'Should merge nested objects');
+  });
+
+  // Test 5: loadAdaptiveProfile merges stored data with defaults
+  test('loadAdaptiveProfile merges stored data with defaults',()=>{
+    mockLocalStorage.setItem('kira_adaptive_v1',JSON.stringify({version:1,behavior:{emojiProbability:0.5}}));
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    assert(profile.behavior.emojiProbability===0.5,'Should load stored value');
+    assert(profile.behavior.petNameProbability===0.4,'Should merge missing field');
+    assert(profile.personality.currentWeights.warm===1.0,'Should merge nested defaults');
+  });
+
+  // Test 6: buildAdaptationContext returns correct structure
+  test('buildAdaptationContext returns correct structure',()=>{
+    assert(typeof buildAdaptationContext!=='undefined','buildAdaptationContext not defined');
+    const ctx=buildAdaptationContext('Hello! 😊 How are you?','greeting');
+    assert(ctx.textLength>0,'textLength should be set');
+    assert(ctx.hadEmoji===true,'Should detect emoji');
+    assert(ctx.route==='greeting','Route should be set');
+    assert(Array.isArray(ctx.topics),'topics should be an array');
+    assert(typeof ctx.timeOfDay==='string','timeOfDay should be a string');
+  });
+
+  // Test 7: checkRollbackSafety detects low engagement
+  test('checkRollbackSafety detects low engagement streak',()=>{
+    assert(typeof checkRollbackSafety!=='undefined','checkRollbackSafety not defined');
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    profile.engagementEMA=0.2;
+    profile.previousVersion=JSON.parse(JSON.stringify(DEFAULT_ADAPTIVE_PROFILE));
+    profile._lowEngagementStreak=4;
+    checkRollbackSafety();
+    assert(profile._lowEngagementStreak===5,'Streak should increment');
+  });
+
+  // Test 8: checkRollbackSafety triggers rollback after 5 consecutive low engagement
+  test('checkRollbackSafety triggers rollback after 5 low engagement turns',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    profile.engagementEMA=0.25;
+    profile.behavior.emojiProbability=0.8; // Modified value
+    profile.previousVersion=JSON.parse(JSON.stringify(DEFAULT_ADAPTIVE_PROFILE));
+    profile._lowEngagementStreak=5;
+    checkRollbackSafety();
+    assert(_adaptiveProfile.rollbackCount===1,'Rollback count should increment');
+    assert(_adaptiveProfile.behavior.emojiProbability===0.35,'Should restore default value');
+  });
+
+  // Test 9: saveAdaptiveProfile debounces (doesn't save before 10 turns)
+  test('saveAdaptiveProfile debounces saves',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    _adaptiveTurnsSinceLastSave=0;
+    const profile=loadAdaptiveProfile();
+    profile.engagementEMA=0.99;
+    saveAdaptiveProfile();
+    const raw=mockLocalStorage.getItem('kira_adaptive_v1');
+    assert(raw===null,'Should not save before 10 turns');
+  });
+
+  // Test 10: Corrupt localStorage data falls back to defaults
+  test('loadAdaptiveProfile handles corrupt data gracefully',()=>{
+    mockLocalStorage.setItem('kira_adaptive_v1','{invalid json');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    assert(profile!==null,'Should return a profile');
+    assert(profile.version===1,'Should use default version');
+    assert(profile.behavior.emojiProbability===0.35,'Should use default values');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 2: Behavioral Learning Tests (ADAPT-15)
+  // ─────────────────────────────────────────────────────────────────────
+
+  test('adaptBehavior increases emojiProbability on positive emoji feedback',()=>{
+    assert(typeof adaptBehavior!=='undefined','adaptBehavior not defined');
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    const initial=profile.behavior.emojiProbability;
+    const context={hadEmoji:true,textLength:50,route:'general',topics:[],userMood:'happy',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(1,context);
+    assert(profile.behavior.emojiProbability>initial,'emojiProbability should increase');
+  });
+
+  test('adaptBehavior adjusts preferredResponseLength based on user message length',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    const context={hadEmoji:false,textLength:200,route:'general',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(1,context);
+    assert(profile.behavior.preferredResponseLength>0.5,'Should adapt to longer messages');
+  });
+
+  test('adaptBehavior enforces parameter bounds',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    profile.behavior.emojiProbability=0.9; // Above max
+    const context={hadEmoji:true,textLength:50,route:'general',topics:[],userMood:'happy',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(1,context);
+    assert(profile.behavior.emojiProbability<=0.8,'Should clamp to max 0.8');
+  });
+
+  test('adaptBehavior updates engagementEMA',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    const initial=profile.engagementEMA;
+    const context={hadEmoji:false,textLength:50,route:'general',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(1,context);
+    assert(profile.engagementEMA!==initial,'engagementEMA should update');
+    assert(profile.totalSignals===1,'totalSignals should increment');
+  });
+
+  test('adaptBehavior snapshots previousVersion every 50 turns',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    profile.totalSignals=49;
+    const context={hadEmoji:false,textLength:50,route:'general',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(1,context);
+    assert(profile.previousVersion!==null,'previousVersion should be set at turn 50');
+  });
+
+  test('adaptBehavior does not change parameters on signal=0',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+    const initial=profile.behavior.emojiProbability;
+    const context={hadEmoji:true,textLength:50,route:'general',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptBehavior(0,context);
+    assert(profile.behavior.emojiProbability===initial,'Should not change on neutral signal');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 3: Personality Evolution Tests (ADAPT-23)
+  // ─────────────────────────────────────────────────────────────────────
+
+  test('adaptPersonality boosts associated traits on positive signal',()=>{
+    assert(typeof adaptPersonality!=='undefined','adaptPersonality not defined');
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'happy'};
+    const profile=loadAdaptiveProfile();
+    const initialSpicy=profile.personality.currentWeights.spicy;
+    const context={hadEmoji:false,textLength:50,route:'handleFlirt',topics:[],userMood:'flirty',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleFlirt',1,context);
+    assert(profile.personality.currentWeights.spicy>initialSpicy,'Spicy weight should increase for handleFlirt');
+    assert(profile.personality.currentWeights.playful>0,'Playful weight should increase for handleFlirt');
+  });
+
+  test('adaptPersonality normalizes weights to sum to 1.0',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'happy'};
+    const profile=loadAdaptiveProfile();
+    const context={hadEmoji:false,textLength:50,route:'handleFlirt',topics:[],userMood:'flirty',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleFlirt',1,context);
+    const w=profile.personality.currentWeights;
+    const sum=w.warm+w.playful+w.thoughtful+w.spicy;
+    assert(Math.abs(sum-1.0)<0.001,`Weights should sum to 1.0, got ${sum}`);
+  });
+
+  test('adaptPersonality derives effectivePersonality from dominant weight',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'happy'};
+    const profile=loadAdaptiveProfile();
+    profile.personality.currentWeights={warm:0.1,playful:0.5,thoughtful:0.2,spicy:0.2};
+    const context={hadEmoji:false,textLength:50,route:'handleBored',topics:[],userMood:'bored',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleBored',1,context);
+    assert(state.effectivePersonality==='playful','effectivePersonality should be playful when weight > 0.4');
+  });
+
+  test('adaptPersonality preserves user-selected personality when no dominant weight',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'thoughtful',effectivePersonality:'thoughtful',mood:'neutral'};
+    const profile=loadAdaptiveProfile();
+    profile.personality.currentWeights={warm:0.3,playful:0.3,thoughtful:0.2,spicy:0.2};
+    const context={hadEmoji:false,textLength:50,route:'handleGeneral',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleGeneral',1,context);
+    assert(state.effectivePersonality==='thoughtful','Should preserve user-selected personality when no weight > 0.4');
+  });
+
+  test('adaptPersonality decays weights toward equilibrium',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'happy'};
+    const profile=loadAdaptiveProfile();
+    profile.personality.currentWeights={warm:0.9,playful:0.05,thoughtful:0.03,spicy:0.02};
+    const context={hadEmoji:false,textLength:50,route:'handleGeneral',topics:[],userMood:'neutral',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleGeneral',1,context);
+    assert(profile.personality.currentWeights.warm<0.9,'Warm weight should decay toward equilibrium');
+  });
+
+  test('adaptPersonality learns mood map overrides',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'affectionate'};
+    const profile=loadAdaptiveProfile();
+    const context={hadEmoji:false,textLength:50,route:'handleGreeting',topics:[],userMood:'happy',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleGreeting',1,context);
+    assert(profile.personality.moodMapOverrides.happy!==undefined,'Should create mood map override for happy');
+    assert(profile.personality.moodMapOverrides.happy.affectionate>0,'Should boost affectionate for happy mood');
+  });
+
+  test('adaptPersonality does not change on signal=0',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={personality:'warm',effectivePersonality:'warm',mood:'happy'};
+    const profile=loadAdaptiveProfile();
+    const initialWarm=profile.personality.currentWeights.warm;
+    const context={hadEmoji:false,textLength:50,route:'handleFlirt',topics:[],userMood:'flirty',hadPetName:false,wasQuestion:false,timeOfDay:'day'};
+    adaptPersonality('handleFlirt',0,context);
+    assert(profile.personality.currentWeights.warm===initialWarm,'Should not change on neutral signal');
+  });
+
+  // Render results
+  const container=document.getElementById('results');
+  const passed=results.filter(r=>r.pass).length;
+  const failed=results.filter(r=>!r.pass).length;
+
+  container.innerHTML=`
+    <div class="section">
+      <h2>Summary</h2>
+      <div>Total: ${results.length} | <span class="pass">Passed: ${passed}</span> | <span class="fail">Failed: ${failed}</span></div>
+    </div>
+    <div class="section">
+      <h2>Test Results</h2>
+      ${results.map(r=>`
+        <div class="test ${r.pass?'pass':'fail'}">
+          ${r.pass?'✓':'✗'} ${r.name}
+          ${r.error?`<br><small>Error: ${r.error}</small>`:''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  console.log(`Adaptive Tests: ${passed}/${results.length} passed`);
+}
+
+// Load functions from parent window if available (when opened from kira_v3.html)
+if(window.opener&&window.opener.DEFAULT_ADAPTIVE_PROFILE){
+  window.DEFAULT_ADAPTIVE_PROFILE=window.opener.DEFAULT_ADAPTIVE_PROFILE;
+  window.loadAdaptiveProfile=window.opener.loadAdaptiveProfile;
+  window.saveAdaptiveProfile=window.opener.saveAdaptiveProfile;
+  window.buildAdaptationContext=window.opener.buildAdaptationContext;
+  window.checkRollbackSafety=window.opener.checkRollbackSafety;
+  window.deepMerge=window.opener.deepMerge;
+  window.adaptBehavior=window.opener.adaptBehavior;
+  window.adaptPersonality=window.opener.adaptPersonality;
+  window.adaptMemory=window.opener.adaptMemory;
+  window._adaptiveProfile=null;
+  window._adaptiveTurnsSinceLastSave=0;
+}
+</script>
+</body>
+</html>

@@ -319,6 +319,7 @@ body.theme-aurora{
 //  · All Float32Array typed for performance. Zero network calls.
 // ══════════════════════════════════════════════════════════════════════
 (function(){
+window.onerror=function(msg,url,line){trace("fatal_error",{msg,url,line},"error");try{recoverIncompleteTx();loadState();if(window.addSystemMessage)addSystemMessage("Kira recovered from a minor neural glitch.");}catch(e){}return false;};
 'use strict';
 var rng=Math.random;
 
@@ -641,6 +642,7 @@ class KiraAI{
     let r=rng()*sum,chosen=top[0];
     for(let i=0;i<top.length;i++){r-=w[i];if(r<=0){chosen=top[i];break;}}
     this._lastRVec=chosen.rv;
+    if(!state.recentResponses)state.recentResponses=[];state.recentResponses.push(chosen.text);if(state.recentResponses.length>10)state.recentResponses.shift();
     return chosen.text;
   }
 
@@ -665,6 +667,22 @@ class KiraAI{
 
 const kiraAI=new KiraAI();
 let _aiCtx=null;
+
+// --- PRODUCTION SAFEGUARDS: Neural Health Monitor ---
+function checkNeuralHealth(){
+  const weights = [kiraAI.scorer.W, kiraAI.moodNet.l2.W];
+  for(const W of weights){
+    for(let i=0; i<Math.min(W.length, 100); i++){
+      if(isNaN(W[i]) || !isFinite(W[i])){
+        trace("neural_corruption", "NaN/Inf detected, reverting to canonical weights", "error");
+        const canonical = JSON.parse(atob(CANONICAL_WEIGHTS_B64));
+        kiraAI.load(canonical);
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 // ── Conversation context tracker ──────────────────────────────────────
 // Tracks what Kira is currently focused on so she can follow up naturally
@@ -2465,6 +2483,8 @@ function generateSentenceCandidates(context) {
 
 // CoVe validation for generated sentences
 function validateSentence(sentence, context) {
+  if(!state.recentResponses)state.recentResponses=[];
+  if(state.recentResponses.includes(sentence))return false;
   // 1. Non-null, non-empty
   if (!sentence || !sentence.trim()) return false;
   

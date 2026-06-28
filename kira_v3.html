@@ -332,7 +332,7 @@ window.onerror=function(msg,url,line){trace("fatal_error",{msg,url,line},"error"
     const parsed=Number(raw);
     return Number.isFinite(parsed)?(parsed>>>0):(Date.now()>>>0);
   }
-  const _seed=parseSeed();
+  let _seed=parseSeed();
   var rng=mulberry32(_seed);
 
 
@@ -747,11 +747,12 @@ function logTransition(correlationId,stepName,startedAt,extra={},level='info'){
 function summarizeTrace(){
   if(!DIAG.traces.length)return'none';
   return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
+}
+
 window.onerror=function(msg,url,line,col,error){
   trace("window_error",{msg,url,line,col,error:error?error.stack:null},"error");
   return true;
 };
-}
 
 function setCTX(handler,topic,question){
   CTX.handler=handler;CTX.topic=topic||CTX.topic;

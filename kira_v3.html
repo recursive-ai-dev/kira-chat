@@ -291,6 +291,10 @@ body.theme-aurora{
       <label>Neural Engine</label>
       <div id="ai-stats">Loading...</div>
     </div>
+    <div class="settings-section">
+      <label>Adaptive Architecture</label>
+      <div id="adaptive-stats" style="font-size:12px;color:var(--text-secondary);background:rgba(0,0,0,0.2);padding:10px;border-radius:6px;font-family:monospace;white-space:pre-wrap;">Loading...</div>
+    </div>
     <div class="settings-actions">
       <button class="btn-ghost" id="close-settings">Close</button>
       <button class="btn-primary" id="save-settings">Save</button>
@@ -1316,8 +1320,76 @@ function adaptPersonality(route,signal,context){
   }
 }
 
-function adaptMemory(signal,topics){
-  // Will be implemented in Phase 4
+function adaptMemory(signal, topics, userMood) {
+  const p = loadAdaptiveProfile();
+  if (userMood) {
+    p.memory.moodTrend.push(userMood);
+    if (p.memory.moodTrend.length > 30) {
+      p.memory.moodTrend.shift();
+    }
+  }
+  if (topics && topics.length > 0) {
+    const alpha = 0.1;
+    for (const topic of topics) {
+      if (p.memory.topicEngagement[topic] === undefined) {
+        p.memory.topicEngagement[topic] = 0.5; // default baseline
+      }
+      p.memory.topicEngagement[topic] = alpha * signal + (1 - alpha) * p.memory.topicEngagement[topic];
+    }
+  }
+}
+
+function detectMoodTrend() {
+  const profile = state.adaptiveEnabled ? loadAdaptiveProfile() : null;
+  if (!profile || !profile.memory.moodTrend || profile.memory.moodTrend.length < 10) return null;
+  const trend = profile.memory.moodTrend;
+  // Use last 30 entries (or fewer if trend is shorter)
+  const recent = trend.slice(-30);
+  const counts = {};
+  for (const m of recent) {
+    counts[m] = (counts[m] || 0) + 1;
+  }
+  let maxCount = 0;
+  let dominantMood = null;
+  for (const [m, count] of Object.entries(counts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantMood = m;
+    }
+  }
+  const ratio = maxCount / recent.length;
+  if (ratio > 0.4) {
+    return { mood: dominantMood, strength: ratio };
+  }
+  return null;
+}
+
+function generateMemoryReference(similar, contextType) {
+  if (!similar || similar.length === 0) return null;
+  const elapsed = minutesSince(state.lastMessageTime);
+  const profile = state.adaptiveEnabled ? loadAdaptiveProfile() : null;
+  const prob = profile ? profile.memory.memoryRefProbability : 0.3;
+
+  if (similar[0].sim > 0.55 && state.affection > 150 && elapsed > 60) {
+    if (!chance(prob)) return null;
+
+    const mem = similar[0];
+    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    if (memoryExists && mem.T) {
+      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+      if (contextType === 'greeting') {
+        if (!actualMem || actualMem.type !== 'personal') return null;
+      }
+      const truncated = mem.T.slice(0, 40);
+      const templates = [
+        `Still thinking about what you said — '${truncated}'...`,
+        `You mentioned something similar — '${truncated}' — has that shifted?`,
+        `I keep coming back to what you said: '${truncated}'`
+      ];
+      return pick(templates);
+    }
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1596,6 +1668,23 @@ function generateResponse(userText){
   CTX.mood=userMood;advanceCTX();
   state.conversationDepth++;state.messagesReceived++;
   let affGain=1;
+
+  // ADAPT-28: Apply mood trend
+  const trendData = detectMoodTrend();
+  if (trendData) {
+    if (trendData.mood === 'sad' || trendData.mood === 'vulnerable' || trendData.mood === 'anxious') {
+      if (t.includes('okay') || t.includes('fine') || userMood === 'neutral' || userMood === 'sad') {
+        if (!/(?:what|how|who|where|why)/i.test(t)) {
+          setRoute('user-feels-bad');return handleUserFeelsBad('sad', text);
+        }
+      }
+    } else if (trendData.mood === 'happy' || trendData.mood === 'affectionate') {
+      if (userMood === 'neutral' && text.length > 20 && !/(?:what|how|who|where|why)/i.test(t)) {
+        setRoute('compliment');return handleCompliment(text);
+      }
+    }
+  }
+
   if(text.length>50)affGain++;if(text.length>150)affGain++;
   if(userMood==='flirty')affGain+=3;if(userMood==='grateful')affGain+=2;
   if(userMood==='vulnerable')affGain+=3;
@@ -1699,26 +1788,8 @@ function handleGreeting(tod){
   const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   const elapsed=minutesSince(state.lastMessageTime);
   
-  // NM-05: Proactive Memory Surface
-  let memoryRef=null;
-  if(_aiCtx.similar&&_aiCtx.similar.length>0&&_aiCtx.similar[0].sim>0.55&&state.affection>150&&elapsed>60){
-    const mem=_aiCtx.similar[0];
-    // Find the actual memory in state.memories to verify it exists (CoVe check)
-    const memoryExists=state.memories.some(m=>m.text&&mem.T&&m.text.includes(mem.T.slice(0,30)));
-    if(memoryExists&&mem.T){
-      // Only surface personal memories in greeting context (PII filter)
-      const actualMem=state.memories.find(m=>m.text&&mem.T&&m.text.includes(mem.T.slice(0,30)));
-      if(actualMem&&actualMem.type==='personal'){
-        const truncated=mem.T.slice(0,40);
-        const templates=[
-          `Still thinking about what you said — '${truncated}'...`,
-          `You mentioned something similar — '${truncated}' — has that shifted?`,
-          `I keep coming back to what you said: '${truncated}'`
-        ];
-        memoryRef=pick(templates);
-      }
-    }
-  }
+  // NM-05 / ADAPT-25: Proactive Memory Surface
+  const memoryRef = generateMemoryReference(_aiCtx.similar, 'greeting');
   
   if(elapsed>1440){
     const days=Math.floor(elapsed/1440);
@@ -2132,7 +2203,33 @@ function handleQuestion(text,topics){
 }
 
 function handleTopicResponse(topics,userMood){
-  const n=namePrefix(),topic=topics[0];
+  const n=namePrefix();
+
+  // ADAPT-30 & ADAPT-31: Repetition avoidance and tracking
+  let selectedTopic = topics[0];
+  const profile = state.adaptiveEnabled ? loadAdaptiveProfile() : null;
+  if (profile) {
+    let bestTopic = null;
+    let highestScore = -Infinity;
+    for (const t of topics) {
+      if (profile.memory.askedTopics.includes(t)) continue;
+      const eng = profile.memory.topicEngagement[t] !== undefined ? profile.memory.topicEngagement[t] : 0.5;
+      if (eng < 0.3) continue; // Avoid low engagement topics
+
+      const score = eng + (Math.random() * 0.2); // Add small noise
+      if (score > highestScore) {
+        highestScore = score;
+        bestTopic = t;
+      }
+    }
+    if (bestTopic) selectedTopic = bestTopic;
+
+    // Track asked topics
+    profile.memory.askedTopics.push(selectedTopic);
+    if (profile.memory.askedTopics.length > 20) profile.memory.askedTopics.shift();
+  }
+
+  const topic=selectedTopic;
   const pools={
     work:[
       `Work stuff, huh?${maybeEmoji()} Tell me more. Are you vibing with it or is it draining you?`,
@@ -2893,23 +2990,10 @@ function validateSentence(sentence, context) {
 function handleGeneral(text,userMood,tod){
   const n=namePrefix(),len=text.length;
   
-  // NM-05: Proactive Memory Surface
-  let memoryRef=null;
   const elapsed=minutesSince(state.lastMessageTime);
-  if(_aiCtx.similar&&_aiCtx.similar.length>0&&_aiCtx.similar[0].sim>0.55&&state.affection>150&&elapsed>60){
-    const mem=_aiCtx.similar[0];
-    // Find the actual memory in state.memories to verify it exists (CoVe check)
-    const memoryExists=state.memories.some(m=>m.text&&mem.T&&m.text.includes(mem.T.slice(0,30)));
-    if(memoryExists&&mem.T){
-      const truncated=mem.T.slice(0,40);
-      const templates=[
-        `Still thinking about what you said — '${truncated}'...`,
-        `You mentioned something similar — '${truncated}' — has that shifted?`,
-        `I keep coming back to what you said: '${truncated}'`
-      ];
-      memoryRef=pick(templates);
-    }
-  }
+
+  // NM-05 / ADAPT-26: Proactive Memory Surface
+  const memoryRef = generateMemoryReference(_aiCtx.similar, 'general');
 
   // Build context for sentence engine
   const sentenceContext = {
@@ -2988,8 +3072,8 @@ function handleGeneral(text,userMood,tod){
   ];
 
 
-  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
-  const validCandidatesDeep = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const dynamicCandidatesDeep = generateSentenceCandidates(sentenceContext);
+  const validCandidatesDeep = typeof validateSentence === 'function' ? dynamicCandidatesDeep.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidatesDeep;
   let allCandidates = [...staticPool, ...validCandidatesDeep];
   if(typeof memoryRef !== 'undefined' && memoryRef)allCandidates.unshift(memoryRef);
   return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
@@ -3353,7 +3437,7 @@ function sendMessage(){
     const context=buildAdaptationContext(text,route);
     if(state.adaptiveBehaviorEnabled)adaptBehavior(signal,context);
     if(state.adaptivePersonalityEnabled)adaptPersonality(route,signal,context);
-    if(state.adaptiveMemoryEnabled)adaptMemory(signal,detectTopics(text));
+    if(state.adaptiveMemoryEnabled)adaptMemory(signal,detectTopics(text),context.userMood);
     checkRollbackSafety();
     saveAdaptiveProfile();
   }
@@ -3503,6 +3587,35 @@ function renderAIStats(){
     `<b>Scorer updates</b>: ${kiraAI.scorer.updates}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
     `<b>Trace tail</b>: ${summarizeTrace()}`;
+
+  const adaptiveStats = document.getElementById('adaptive-stats');
+  if (adaptiveStats) {
+    if (!state.adaptiveEnabled) {
+      adaptiveStats.innerHTML = 'Adaptive Architecture is Disabled';
+    } else {
+      const p = loadAdaptiveProfile();
+      let dominantWeight = 'None';
+      let maxW = 0;
+      for (const t in p.personality.currentWeights) {
+        if (p.personality.currentWeights[t] > maxW) {
+          maxW = p.personality.currentWeights[t];
+          dominantWeight = `${t} (${maxW.toFixed(2)})`;
+        }
+      }
+
+      let trendStr = 'None';
+      const trendData = detectMoodTrend();
+      if (trendData) {
+        trendStr = `${trendData.mood} (${Math.round(trendData.strength * 100)}%)`;
+      }
+
+      adaptiveStats.innerHTML =
+        `<b>Engagement EMA</b>: ${p.engagementEMA.toFixed(2)}<br>`+
+        `<b>Dominant Personality</b>: ${dominantWeight}<br>`+
+        `<b>Mood Trend</b>: ${trendStr}<br>`+
+        `<b>Memory Ref Prob</b>: ${p.memory.memoryRefProbability.toFixed(2)}`;
+    }
+  }
 }
 
 function renderPersonalityChips(){

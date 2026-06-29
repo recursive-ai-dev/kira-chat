@@ -326,6 +326,81 @@ function runAllTests(){
     assert(profile.personality.currentWeights.warm===initialWarm,'Should not change on neutral signal');
   });
 
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 4: Memory-Driven Layer Tests (ADAPT-32 & ADAPT-33)
+  // ─────────────────────────────────────────────────────────────────────
+
+  test('adaptMemory records mood trend and tracks topic engagement',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+
+    adaptMemory(1, ['work'], 'happy');
+    assert(profile.memory.moodTrend.length === 1, 'moodTrend should have 1 entry');
+    assert(profile.memory.moodTrend[0] === 'happy', 'moodTrend should record "happy"');
+    assert(profile.memory.topicEngagement['work'] > 0.5, 'topicEngagement for work should increase on positive signal');
+
+    // Simulate capping at 30
+    for(let i=0; i<35; i++){
+      adaptMemory(0, [], 'sad');
+    }
+    assert(profile.memory.moodTrend.length === 30, 'moodTrend should cap at 30 entries');
+  });
+
+  test('detectMoodTrend finds dominant mood > 40%',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    const profile=loadAdaptiveProfile();
+
+    // Require at least 10
+    profile.memory.moodTrend = ['sad', 'sad', 'sad', 'happy', 'sad'];
+    assert(window.detectMoodTrend() === null, 'Should return null if < 10 entries');
+
+    profile.memory.moodTrend = ['sad', 'sad', 'sad', 'sad', 'sad', 'happy', 'sad', 'sad', 'happy', 'sad', 'sad'];
+    const trendData = window.detectMoodTrend();
+    assert(trendData !== null, 'Should return trend data for >= 10 entries');
+    assert(trendData.mood === 'sad', 'Dominant mood should be sad');
+    assert(trendData.strength > 0.4, 'Strength should be > 0.4');
+  });
+
+  test('generateMemoryReference gates logic properly',()=>{
+    mockLocalStorage.removeItem('kira_adaptive_v1');
+    _adaptiveProfile=null;
+    state={
+      adaptiveEnabled: true,
+      lastMessageTime: Date.now() - (120 * 60000), // 120 minutes ago
+      affection: 200,
+      memories: [{ text: 'User loves cats', type: 'personal', ts: Date.now() }]
+    };
+
+    const profile=loadAdaptiveProfile();
+    profile.memory.memoryRefProbability = 1.0; // Force chance()
+
+    const similar = [{ sim: 0.6, T: 'User loves cats' }];
+
+    // Should pass
+    const ref = window.generateMemoryReference(similar, 'greeting');
+    assert(ref !== null && ref.includes('cats'), 'Should generate reference for high sim, high affection, high elapsed time');
+
+    // Should fail gate: affection too low
+    state.affection = 100;
+    assert(window.generateMemoryReference(similar, 'greeting') === null, 'Should fail if affection < 150');
+
+    // Should fail gate: elapsed time too short
+    state.affection = 200;
+    state.lastMessageTime = Date.now() - (30 * 60000);
+    assert(window.generateMemoryReference(similar, 'greeting') === null, 'Should fail if elapsed < 60 min');
+
+    // Should fail PII filter in greeting
+    state.lastMessageTime = Date.now() - (120 * 60000);
+    state.memories[0].type = 'general';
+    assert(window.generateMemoryReference(similar, 'greeting') === null, 'Should fail PII filter if type !== personal in greeting');
+
+    // Should pass if general context
+    const ref2 = window.generateMemoryReference(similar, 'general');
+    assert(ref2 !== null && ref2.includes('cats'), 'Should pass without PII filter for general context');
+  });
+
   // Render results
   const container=document.getElementById('results');
   const passed=results.filter(r=>r.pass).length;

@@ -1568,8 +1568,16 @@ function generateResponse(userText){
   _aiCtx=kiraAI.process(text);
 
   // SE-22: Debug param to preview sentence engine generations directly
-  if (new URLSearchParams(location.search).get("previewSentenceEngine") === "1" && typeof generateSentenceCandidates === 'function') {
-    const ctx = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: true };
+  const previewRequested = new URLSearchParams(location.search).get("previewSentenceEngine") === "1";
+  const previewEnabled = state && state.debug === true;
+  if (previewEnabled && previewRequested && typeof generateSentenceCandidates === 'function') {
+    const ctx = {
+      mood: state.mood,
+      tod: getTimeOfDay(),
+      stage: Math.floor(state.affection / 150),
+      affection: state.affection,
+      allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
+    };
     const candidates = generateSentenceCandidates(ctx); // Force max generation
     const response = "PREVIEW MODE\n\n" + candidates.join('\n');
     logTransition(correlationId,'response_generated',startedAt,{route:'debug_preview',len:response.length});

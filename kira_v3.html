@@ -1979,7 +1979,14 @@ function handleUserFeelsBad(mood,text){
     `I'm really sorry to hear that.${maybeEmoji()}`
   ];
 
-  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, topics: ['empathy'] };
+  const sentenceContext = {
+    mood: mood || 'vulnerable',
+    tod: getTimeOfDay(),
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    topics: ['empathy'],
+    allowNSFW: false,
+  };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
   const combined = [...staticPool, ...validCandidates];

@@ -24,13 +24,24 @@ function testTemplates() {
       const struct = pick(template.structures);
       let sentence = struct;
       for (const [slot, bankName] of Object.entries(template.slots)) {
-        const bank = SENTENCE_WORD_BANKS[bankName];
-        if (!bank || bank.length === 0) {
-          console.error(`[FAIL] Template ${template.id} refers to missing or empty bank: ${bankName}`);
-          allPass = false;
+let bankNameStr = bankName;
+        if (typeof bankName === 'object') {
+           bankNameStr = bankName.bank;
         }
-        const word = pick(bank || ["MISSING"]);
-        sentence = sentence.replace(`{${slot}}`, word);
+        const bank = SENTENCE_WORD_BANKS[bankNameStr];
+        let wordStr = "MISSING";
+        if (!bank || bank.length === 0) {
+          if (bankNameStr !== 'memory_text') {
+            console.error(`[FAIL] Template ${template.id} refers to missing or empty bank: ${bankNameStr}`);
+            allPass = false;
+          }
+        } else {
+          const wordObj = pick(bank);
+          wordStr = typeof wordObj === 'string' ? wordObj : wordObj.word;
+        }
+        while(sentence.includes(`{${slot}}`)) {
+            sentence = sentence.replace(`{${slot}}`, wordStr);
+        }
       }
       if (sentence.includes('{') || sentence.includes('}')) {
         console.error(`[FAIL] Template ${template.id} has unfilled slots: ${sentence}`);

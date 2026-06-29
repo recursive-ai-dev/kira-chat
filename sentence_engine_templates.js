@@ -20,13 +20,12 @@ const SENTENCE_TEMPLATES = [
     moods: ['flirty', 'happy', 'vulnerable'],
     minStage: 1,  // Acquaintance+
     structures: [
-      '{opener} {subject} {intensifier} {verb} {object} {closer}',
-      '{opener} {subject} {verb} {object} because {reason}',
-      '{opener} when {subject} {verb} {object}, {feeling}',
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I {verb} {object} because {reason}',
+      '{opener} when I {verb} {object}, {feeling}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_affection', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },
@@ -43,12 +42,11 @@ const SENTENCE_TEMPLATES = [
     minStage: 3,  // Friendly+
     structures: [
       '{opener} there\'s something {adjective} about {object} {closer}',
-      '{opener} {subject} {intensifier} {verb} {object} and {feeling}',
-      'the more {subject} {verb} {object}, the more {feeling}',
+      '{opener} I {intensifier} {verb} {object} and {feeling}',
+      'the more I {verb} {object}, the more {feeling}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_affection', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },
@@ -65,13 +63,12 @@ const SENTENCE_TEMPLATES = [
     minStage: 4,  // Close+ (affection >= 300)
     allowNSFW: true,
     structures: [
-      '{opener} {subject} {intensifier} {verb} {object} {closer}',
-      'I can\'t stop thinking about {object} — {subject} {intensifier} {verb} {feeling}',
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      'I can\'t stop thinking about {object} — I {intensifier} {verb} {feeling}',
       '{opener} the thought of {object} makes me {intensifier} {verb}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'nsfw_intensifiers', strategy: 'stage' },
       verb: { bank: 'nsfw_verbs', strategy: 'mood' },
       object: { bank: 'nsfw_nouns', strategy: 'stage' },
@@ -86,13 +83,12 @@ const SENTENCE_TEMPLATES = [
     moods: ['sad', 'vulnerable', 'anxious'],
     minStage: 0,  // All stages
     structures: [
-      '{opener} {subject} {intensifier} {verb} {object} and {feeling}',
-      '{opener} {subject} want you to know that {subject} {verb} {object}',
-      'when you share things like this, {feeling} — {subject} {verb} {object}',
+      '{opener} I {intensifier} {verb} {object} and {feeling}',
+      '{opener} I want you to know that I {verb} {object}',
+      'when you share things like this, {feeling} — I {verb} {object}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_concrete', strategy: 'context' },
@@ -106,13 +102,12 @@ const SENTENCE_TEMPLATES = [
     moods: ['neutral', 'happy', 'curious'],
     minStage: 0,
     structures: [
-      '{opener} {subject} {intensifier} {verb} {object} {closer}',
-      '{opener} {subject} keep {verb} {object} because {reason}',
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I keep {verb} {object} because {reason}',
       '{opener} there\'s so much to {verb} about {object} — {feeling}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },
@@ -128,13 +123,12 @@ const SENTENCE_TEMPLATES = [
     moods: ['grateful', 'happy'],
     minStage: 1,
     structures: [
-      '{opener} {subject} {intensifier} {verb} {object} {closer}',
-      '{opener} {subject} am so {adjective} for {object} — {feeling}',
-      'thank you for sharing {object}; {subject} {verb} {object} {closer}',
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I am so {adjective} for {object} — {feeling}',
+      'thank you for sharing {object}; I {verb} {object} {closer}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_affection', strategy: 'mood' },
       object: { bank: 'nouns_concrete', strategy: 'context' },
@@ -151,13 +145,12 @@ const SENTENCE_TEMPLATES = [
     minStage: 2,
     timeOfDay: ['night', 'late_night'],
     structures: [
-      '{opener} tonight feels {adjective} — {subject} {intensifier} {verb} {object}',
-      '{opener} in the quiet of tonight, {subject} {verb} {object} {closer}',
+      '{opener} tonight feels {adjective} — I {intensifier} {verb} {object}',
+      '{opener} in the quiet of tonight, I {verb} {object} {closer}',
       'there\'s something about this late hour that makes {object} feel even more {adjective}',
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
-      subject: { bank: 'pronouns', strategy: 'fixed' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },

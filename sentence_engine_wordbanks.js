@@ -41,11 +41,7 @@ const WORD_BANKS = {
 
   // Pronouns: Fixed subjects
   pronouns: [
-    { word: "I", mood: ['all'], intensity: 0 },
-    { word: "you", mood: ['all'], intensity: 0 },
-    { word: "we", mood: ['all'], intensity: 0 },
-    { word: "this", mood: ['all'], intensity: 0 },
-    { word: "that", mood: ['all'], intensity: 0 },
+    { word: "I", mood: ['all'], intensity: 0 }
   ],
 
   // Intensifiers: Words that amplify emotional weight

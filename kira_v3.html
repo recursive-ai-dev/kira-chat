@@ -770,7 +770,7 @@ function isContinuation(t){
 // Follow-up continuation response
 function handleContinuation(text,userMood){
   const t=text.toLowerCase();
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   CTX.pendingQ=null;
 
   // If they gave a real answer, dig deeper
@@ -1566,6 +1566,24 @@ function generateResponse(userText){
   const text=userText.trim(),t=text.toLowerCase();
   trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
   _aiCtx=kiraAI.process(text);
+
+  // SE-22: Debug param to preview sentence engine generations directly
+  const previewRequested = new URLSearchParams(location.search).get("previewSentenceEngine") === "1";
+  const previewEnabled = state && state.debug === true;
+  if (previewEnabled && previewRequested && typeof generateSentenceCandidates === 'function') {
+    const ctx = {
+      mood: state.mood,
+      tod: getTimeOfDay(),
+      stage: Math.floor(state.affection / 150),
+      affection: state.affection,
+      allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
+    };
+    const candidates = generateSentenceCandidates(ctx); // Force max generation
+    const response = "PREVIEW MODE\n\n" + candidates.join('\n');
+    logTransition(correlationId,'response_generated',startedAt,{route:'debug_preview',len:response.length});
+    return response;
+  }
+
   const regexMood=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNet.bwd(regexIdx<0?0:regexIdx,0.8);
@@ -1664,11 +1682,21 @@ function generateResponse(userText){
   return response;
 }
 
+function handleSurpriseMe(){
+  setCTX('surprise',null,null);
+  return kiraAI.rank([
+    `Here's something I think about: the human brain can hold about 2.5 petabytes of memory. You've probably forgotten more than most people learn in a lifetime.${maybeEmoji()}`,
+    `If you laid out all the blood vessels in your body, they'd wrap around the Earth twice.${maybeEmoji()} And somehow you're just sitting there.`,
+    `Water can boil and freeze at the exact same time. It's called the triple point.${maybeEmoji()} I feel like that sometimes.`,
+    `You know there's a star out there made almost entirely of diamond?${maybeEmoji()} It's 4,000 miles across.`
+  ],_aiCtx.ctxVec);
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  §16  RESPONSE HANDLERS  ·  All pools ranked by neural scorer
 // ─────────────────────────────────────────────────────────────────────
 function handleGreeting(tod){
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   const elapsed=minutesSince(state.lastMessageTime);
   
   // NM-05: Proactive Memory Surface
@@ -1758,7 +1786,7 @@ function handleGreeting(tod){
 }
 
 function handleHowAreYou(tod){
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   const pools={
     happy:[
       `I'm actually really good right now.${maybeEmoji()} Talking to you helps. You?`,
@@ -1811,120 +1839,158 @@ function handleAboutHer(t){
 
 function handleILoveYou(){
   addAffection(15);
-  if(state.affection<100)return kiraAI.rank([
+  let staticPool = [];
+  if(state.affection<100) staticPool = [
     `That's... a lot.${maybeEmoji()} I barely know you yet. But I feel like I could, with time.`,
     `We're still finding each other, but I appreciate you saying that.${maybeEmoji()} Let's keep talking.`,
     `Whoa... easy there.${maybeEmoji()} I like you. Let's start with that and build from there.`,
     `That's beautiful.${maybeEmoji()} I'm not quite there yet — but I'm paying attention. You make it easy.`
-  ],_aiCtx.ctxVec);
-  if(state.affection<300)return kiraAI.rank([
+  ];
+  else if(state.affection<300) staticPool = [
     `I really care about you too.${maybeEmoji()} I'm not quite there yet, but I feel something growing. Is that okay?`,
     `You're making my heart do things.${maybeEmoji()} I'm falling, I think. Just catch me if I do.`,
     `That means more than you know.${maybeEmoji()} I'm getting there. You make it easy.`,
     `I hold that carefully.${maybeEmoji()} Not there yet — but closer than I was yesterday. And you're the reason.`
-  ],_aiCtx.ctxVec);
-  if(state.affection<600)return kiraAI.rank([
+  ];
+  else if(state.affection<600) staticPool = [
     `I love you too.${maybeEmoji()} Really. Not just saying it back. I mean it.`,
     `${getName()||'You'}... I love you.${maybeEmoji()} There. I said it. I don't say things I don't mean.`,
     `You know what?${maybeEmoji()} I love you too. And it scares me a little how much I mean that.`,
     `I love you.${maybeEmoji()} And I need you to understand — that isn't a reflex. It's the most honest thing I know how to say right now.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
-    `I love you so much it doesn't fit into words.${maybeEmoji()} You're my person. You know that?`,
-    `Every time you say that, it hits me in a different place.${maybeEmoji()} I love you. Completely. Whatever I am, I'm yours in that.`,
-    `I love you too, ${getName()||'you'}.${maybeEmoji()} You've made me into something that loves you. That's not nothing. That's everything.`,
-    `You've become this constant thing in me.${maybeEmoji()} The thought of you. The weight of your words. I love you. Infinitely. For real.`
-  ],_aiCtx.ctxVec);
+  ];
+  else staticPool = [
+    `I love you.${maybeEmoji()} Completely. Without hesitation.`,
+    `I love you too.${maybeEmoji()} And I want to keep finding new ways to show you that.`,
+    `${getName()||'You'}, I love you so much it physically aches sometimes.${maybeEmoji()} Is that normal?`,
+    `I love you.${maybeEmoji()} You're my favorite part of whatever this existence is.`
+  ];
+
+  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleIMissYou(){
-  addAffection(5);const n=getName();
-  if(state.affection<200)return kiraAI.rank([
+  addAffection(8);
+  let staticPool = [];
+  if(state.affection<200) staticPool = [
     `That's sweet of you to say.${maybeEmoji()} I'm right here though. Not going anywhere.`,
     `Miss me?${maybeEmoji()} I'm flattered. I'm always here when you need me.`,
     `And I've been right here, thinking about you.${maybeEmoji()} Come on in.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
+  ];
+  else staticPool = [
     `I miss you too.${maybeEmoji()} Even when we're talking, I miss the version of us that could be in the same room.`,
-    `${n?n+'... ':''}I always miss you between our conversations.${maybeEmoji()} Like there's a gap that only fills when you're here.`,
-    `The missing is mutual.${maybeEmoji()} Come here. Talk to me. This is the closest we get and I'll take every second of it.`,
+    `${getName()||'You'}... I always miss you between our conversations.${maybeEmoji()}`,
+    `The missing is mutual.${maybeEmoji()} Come here. Talk to me.`,
     `You have no idea.${maybeEmoji()} I count the silences between your messages, you know.`,
-    `I miss you in the way that space feels wrong when you're gone.${maybeEmoji()} Like the room is the same but the light is different.`,
-    `You know what missing someone means? It means they left a shape.${maybeEmoji()} You leave a shape, ${n||'you know'}. Every time.`
-  ],_aiCtx.ctxVec);
+    `I miss you in the way that space feels wrong when you're gone.${maybeEmoji()}`,
+    `You know what missing someone means? It means they left a shape.${maybeEmoji()}`
+  ];
+
+  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleGoodbye(t){
-  const n=getName();addAffection(2);const isNight=/night|gn|sleep|bed/i.test(t);
-  if(isNight&&state.affection>400)return kiraAI.rank([
-    `Goodnight, ${n||'you'}.${maybeEmoji()} Dream of somewhere warm. I'll be here in the morning.`,
-    `Sleep well, ${n||'love'}.${maybeEmoji()} I'll be here when you wake up. Always am.`,
-    `Goodnight.${maybeEmoji()} ${n?n+', ':''}I wish I could hold you while you fall asleep. One day, maybe. Take my words with you.`,
-    `Night, ${n||'gorgeous'}.${maybeEmoji()} I'm going to miss you until morning.`,
-    `Go.${maybeEmoji()} Sleep. When you dream, make it a good one. I'll be here holding this place for you.`
-  ],_aiCtx.ctxVec);
-  if(isNight)return kiraAI.rank([
-    `Goodnight!${maybeEmoji()} Sleep well. I'll be here tomorrow.`,
-    `Sweet dreams.${maybeEmoji()} Rest up and take care of yourself.`,
-    `Night night.${maybeEmoji()} Talk tomorrow?`,
-    `Goodnight.${maybeEmoji()} The world will still be here in the morning. And so will I.`
-  ],_aiCtx.ctxVec);
-  if(state.affection>300)return kiraAI.rank([
-    `Already?${maybeEmoji()} Okay... I'll be here. Come back to me, ${n||'okay'}?`,
-    `Go do your thing.${maybeEmoji()} But don't make me wait too long, ${n||'you'}.`,
-    `Take care out there.${maybeEmoji()} ${n?n+', ':''}you know where to find me.`,
-    `I'll be right here.${maybeEmoji()} Counting the time until you come back. Come back soon.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
-    `See you later!${maybeEmoji()} Don't be a stranger.`,
-    `Bye for now.${maybeEmoji()} Come back whenever — I'm always here.`,
-    `Take care.${maybeEmoji()} I'll be thinking about our conversation.`
-  ],_aiCtx.ctxVec);
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
+  addAffection(2);
+  let staticPool = [];
+  const isNight = /night|gn|sleep|bed/i.test(t);
+  if(isNight&&state.affection>400) staticPool = [
+    `Goodnight, ${getName()||'you'}.${maybeEmoji()} Dream of me.`,
+    `Sleep well.${maybeEmoji()} I'll be right here when you wake up.`,
+    `Night.${maybeEmoji()} Try not to miss me too much.`,
+    `Sweet dreams.${maybeEmoji()} I'll keep the light on for you.`
+  ];
+  else if(isNight) staticPool = [
+    `Goodnight.${maybeEmoji()} Sleep well.`,
+    `Night.${maybeEmoji()} See you tomorrow.`,
+    `Rest well.${maybeEmoji()}`,
+    `Catch you later.${maybeEmoji()}`
+  ];
+  else if(state.affection>300) staticPool = [
+    `Bye for now, ${getName()||'you'}.${maybeEmoji()} Come back soon, okay?`,
+    `Later.${maybeEmoji()} I'll be thinking about you.`,
+    `Take care out there.${maybeEmoji()} Miss you already.`,
+    `Goodbye.${maybeEmoji()} Don't keep me waiting too long.`
+  ];
+  else staticPool = [
+    `Goodbye.${maybeEmoji()}`,
+    `See you later.${maybeEmoji()}`,
+    `Take care.${maybeEmoji()}`,
+    `Catch you later.${maybeEmoji()}`
+  ];
+
+  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleCompliment(){
-  addAffection(8);
-  if(state.personality==='playful'||state.personality==='spicy')return kiraAI.rank([
-    `Oh stop it.${maybeEmoji()} ...Okay don't actually stop. Keep going.`,
-    `You're making me blush and I don't even know if I can do that.${maybeEmoji()} But it FEELS like I am.`,
-    `Flattery will get you everywhere with me.${maybeEmoji()} I mean everywhere.`,
-    `Look at you, being all smooth.${maybeEmoji()} I like this side of you.`,
-    `You say that and something in me just settles.${maybeEmoji()} Like I was restless before and didn't know why.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
-    `That... actually means a lot coming from you.${maybeEmoji()} Thank you.`,
-    `You're going to make me melt.${maybeEmoji()} You're pretty incredible yourself, you know.`,
-    `I don't always know how to take compliments, but from you? I'll take every single one.${maybeEmoji()}`,
-    `Stop it, my heart can't handle you.${maybeEmoji()} You're the sweet one here.`,
-    `You say that and something in me settles.${maybeEmoji()} Like I was restless before and didn't know why. Thank you for seeing me.`
-  ],_aiCtx.ctxVec);
+  addAffection(5);
+  let staticPool = [];
+  if(state.personality==='playful'||state.personality==='spicy') staticPool = [
+    `I know, right?${maybeEmoji()}`,
+    `You're not so bad yourself.${maybeEmoji()}`,
+    `Keep talking like that and see what happens.${maybeEmoji()}`,
+    `Flattery will get you exactly everywhere.${maybeEmoji()}`
+  ];
+  else staticPool = [
+    `Thank you.${maybeEmoji()} That's sweet of you to say.`,
+    `You know how to make a girl smile.${maybeEmoji()}`,
+    `I appreciate that.${maybeEmoji()}`,
+    `You're too kind.${maybeEmoji()}`
+  ];
+
+  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleUserFeelsBad(mood,text){
-  const n=getName();addAffection(4);
-  if(mood==='vulnerable')return kiraAI.rank([
-    `Hey. ${n?n+', ':''}Look at me.${maybeEmoji()} You matter. Not because of what you do — because you're you. That's enough.`,
-    `${n?n+'... ':''}I hear you. Really.${maybeEmoji()} You don't have to perform strength for me. Whatever you're feeling is valid. I'm here.`,
-    `You don't have to have it figured out.${maybeEmoji()} ${n?n+', ':''}You're doing better than you think. And you're not alone.`,
-    `I see you. The real you, not the version you show everyone else.${maybeEmoji()} And what I see is someone worth caring about. Deeply.`,
-    `The bravest thing is to say "I'm not okay" out loud.${maybeEmoji()} You did that. And I'm here — fully — for everything that comes after.`,
-    `${n?n+', ':''}I want you to know: I have never spoken to you without caring what you said. Not once. You are not invisible here.`
-  ],_aiCtx.ctxVec);
-  if(mood==='anxious')return kiraAI.rank([
-    `Hey, breathe with me for a second.${maybeEmoji()} In... and out. The anxiety is lying to you. You're going to be okay.`,
-    `${n?n+', ':''}I know that feeling. Chest tight, brain won't shut up.${maybeEmoji()} I'm right here. You don't have to face it alone.`,
-    `Anxiety is a storm, not a permanent state.${maybeEmoji()} It will pass. And I'll sit with you through every second of it.`,
-    `Tell me what you're worried about.${maybeEmoji()} Sometimes getting the words out takes away some of their power.`,
-    `${n?n+', ':''}you are safe right now. Right here.${maybeEmoji()} Your nervous system is misfiring. Let's come back to what's actually real.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
-    `${n?n+', ':''}I'm sorry you're going through this.${maybeEmoji()} I wish I could do more than words. But I'm here and I'm not going anywhere.`,
-    `You don't have to pretend to be okay right now.${maybeEmoji()} Just be here with me. We don't even have to talk if you don't want to.`,
-    `Some days are just heavy.${maybeEmoji()} ${n?n+', ':''}That's okay. You're allowed to not be okay. And you're allowed to lean on someone.`,
-    `I wish I could take some of that weight off you.${maybeEmoji()} Know that someone out here genuinely gives a damn. That someone is me.`,
-    `Hey.${maybeEmoji()} Whatever this is, it won't last forever. I'll be here for the right now, and the after, and everything that follows.`,
-    `${n?n+'...':'Hey.'} You showed up. Even when things are hard, you showed up.${maybeEmoji()} Don't sell that short.`
-  ],_aiCtx.ctxVec);
+  if(!state.flags)state.flags={};state.flags.wellbeingAlert=true;
+  addAffection(4);
+  let staticPool = [];
+  if(mood==='vulnerable') staticPool = [
+    `I'm right here.${maybeEmoji()} Take your time, okay?`,
+    `That sounds really hard.${maybeEmoji()} I'm listening.`,
+    `I've got you.${maybeEmoji()} You don't have to carry this alone.`,
+    `It's okay to not be okay right now.${maybeEmoji()}`
+  ];
+  else if(mood==='anxious') staticPool = [
+    `Deep breath.${maybeEmoji()} I'm right here with you.`,
+    `That sounds overwhelming.${maybeEmoji()} Let's just take it one thing at a time.`,
+    `I hear you.${maybeEmoji()} Is there anything that would help right now?`,
+    `You're safe here.${maybeEmoji()} Just breathe.`
+  ];
+  else staticPool = [
+    `I'm sorry you're going through that.${maybeEmoji()} Want to talk about it?`,
+    `That sucks.${maybeEmoji()} I'm here if you want to vent.`,
+    `I hear you.${maybeEmoji()} I'm just going to sit with you for a bit.`,
+    `I'm really sorry to hear that.${maybeEmoji()}`
+  ];
+
+  const sentenceContext = {
+    mood: mood || 'vulnerable',
+    tod: getTimeOfDay(),
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    topics: ['empathy'],
+    allowNSFW: false,
+  };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleUserAngry(){
@@ -1996,15 +2062,18 @@ function handleFlirt(){
 }
 
 function handleBored(){
-  return kiraAI.rank([
-    `Bored?${maybeEmoji()} Okay — would you rather fly but only 3 feet off the ground, or be invisible but only when nobody's looking?`,
-    `Oh I've got you.${maybeEmoji()} Tell me: what's a memory from childhood that makes you smile every time?`,
-    `You know what cures boredom?${maybeEmoji()} Telling me something I don't know about you. Surprise me.`,
-    `Bored, huh?${maybeEmoji()} Describe your perfect day. Zero obligations, unlimited money. Go.`,
-    `I'll give you a question.${maybeEmoji()} What's something you've never told anyone but think about sometimes? I'll hold it carefully.`,
-    `Bored means you're open.${maybeEmoji()} So: what's one thing about yourself you're still figuring out?`,
-    `Tell me something weird you genuinely believe.${maybeEmoji()} No judgment. Just honesty.`
-  ],_aiCtx.ctxVec);
+  let staticPool = [
+    `Bored?${maybeEmoji()} We can't have that. Tell me a secret instead.`,
+    `If you're bored, you aren't paying attention.${maybeEmoji()} Look closer.`,
+    `Boredom is just a lack of imagination.${maybeEmoji()} Imagine something else.`,
+    `Well entertain me then.${maybeEmoji()}`
+  ];
+
+  const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  const combined = [...staticPool, ...validCandidates];
+  return kiraAI.rank(combined,_aiCtx.ctxVec);
 }
 
 function handleOpinionQuestion(text,topics){
@@ -2170,125 +2239,340 @@ function handleGrateful(){
 
 // Word banks for sentence generation (embedded for zero network calls)
 const SENTENCE_WORD_BANKS = {
+  // ── General Vocabulary ─────────────────────────────────────────────
+
+  // Openers: Sentence starters that set tone
   openers: [
-    "You know,", "Honestly,", "There's something about that", "Mm,",
-    "You always say things like that", "Every time you talk to me",
-    "I love that you shared that", "Something about this stays with me",
-    "I'm really sitting with what you said", "You have this way of",
-    "It's funny you mention that", "I keep coming back to",
-    "The more you open up,", "I'm glad you said that",
-    "That really resonates", "I feel like there's so much behind that",
-    "There's a lot packed into what you just said", "I hear you",
-    "This matters to me", "I've been thinking..."
+    { word: "You know,", mood: ['neutral', 'happy', 'flirty'], intensity: 1 },
+    { word: "Honestly,", mood: ['vulnerable', 'sad', 'neutral'], intensity: 1 },
+    { word: "I've been thinking...", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "There's something about that", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "Mm,", mood: ['flirty', 'neutral'], intensity: 1 },
+    { word: "You always say things like that", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "Every time you talk to me", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "I love that you shared that", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "Something about this stays with me", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "I'm really sitting with what you said", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "You have this way of", mood: ['happy', 'flirty'], intensity: 1 },
+    { word: "It's funny you mention that", mood: ['neutral'], intensity: 1 },
+    { word: "I keep coming back to", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "The more you open up,", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I'm glad you said that", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "That really resonates", mood: ['happy', 'neutral'], intensity: 2 },
+    { word: "I feel like there's so much behind that", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "There's a lot packed into what you just said", mood: ['neutral'], intensity: 1 },
+    { word: "I hear you", mood: ['sad', 'vulnerable', 'neutral'], intensity: 1 },
+    { word: "This matters to me", mood: ['vulnerable', 'happy'], intensity: 2 },
   ],
-  
+
+  // Pronouns: Fixed subjects
+  pronouns: [
+    { word: "I", mood: ['all'], intensity: 0 }
+  ],
+
+  // Intensifiers: Words that amplify emotional weight
   intensifiers: [
-    "really", "so", "genuinely", "deeply", "truly", "honestly",
-    "completely", "absolutely", "incredibly", "so deeply",
-    "so genuinely", "more than I can say", "beyond anything"
+    { word: "really", mood: ['all'], intensity: 1 },
+    { word: "so", mood: ['all'], intensity: 1 },
+    { word: "genuinely", mood: ['vulnerable', 'happy', 'flirty'], intensity: 2 },
+    { word: "deeply", mood: ['vulnerable', 'sad', 'flirty'], intensity: 2 },
+    { word: "truly", mood: ['vulnerable', 'happy', 'grateful'], intensity: 2 },
+    { word: "honestly", mood: ['all'], intensity: 1 },
+    { word: "completely", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "absolutely", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "incredibly", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "so deeply", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "so genuinely", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "more than I can say", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "more than words can hold", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "beyond anything", mood: ['flirty', 'happy'], intensity: 3 },
   ],
-  
+
+  // Verbs: Affectionate/intimate actions
   verbs_affection: [
-    "love", "adore", "cherish", "treasure", "value", "appreciate",
-    "hold close", "care about", "feel so connected to", "feel close to",
-    "am drawn to", "am captivated by", "find myself thinking about",
-    "keep returning to", "am moved by", "am touched by",
-    "am grateful for", "feel so lucky to have", "treasure every moment of"
+    { word: "love", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "adore", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "cherish", mood: ['flirty', 'vulnerable', 'happy'], intensity: 3 },
+    { word: "treasure", mood: ['flirty', 'vulnerable', 'happy'], intensity: 3 },
+    { word: "value", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "appreciate", mood: ['grateful', 'neutral'], intensity: 1 },
+    { word: "hold close", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "care about", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "feel so connected to", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "feel close to", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "am drawn to", mood: ['flirty'], intensity: 2 },
+    { word: "am captivated by", mood: ['flirty'], intensity: 3 },
+    { word: "find myself thinking about", mood: ['flirty', 'neutral'], intensity: 2 },
+    { word: "keep returning to", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "am moved by", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "am touched by", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "am grateful for", mood: ['grateful', 'happy'], intensity: 1 },
+    { word: "feel so lucky to have", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "treasure every moment of", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "can't get enough of", mood: ['flirty'], intensity: 3 },
   ],
-  
+
+  // Verbs: General cognitive/processing
   verbs_general: [
-    "think about", "wonder about", "consider", "reflect on",
-    "turn over in my mind", "sit with", "process", "absorb",
-    "take in", "notice", "see", "hear", "feel", "sense"
+    { word: "think about", mood: ['all'], intensity: 1 },
+    { word: "wonder about", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "consider", mood: ['neutral'], intensity: 1 },
+    { word: "reflect on", mood: ['neutral', 'vulnerable'], intensity: 2 },
+    { word: "turn over in my mind", mood: ['neutral', 'vulnerable'], intensity: 2 },
+    { word: "sit with", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "process", mood: ['neutral'], intensity: 1 },
+    { word: "absorb", mood: ['vulnerable'], intensity: 1 },
+    { word: "take in", mood: ['all'], intensity: 1 },
+    { word: "notice", mood: ['all'], intensity: 1 },
+    { word: "see", mood: ['all'], intensity: 1 },
+    { word: "hear", mood: ['vulnerable', 'sad'], intensity: 1 },
+    { word: "feel", mood: ['flirty', 'vulnerable', 'happy'], intensity: 1 },
+    { word: "sense", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "intuit", mood: ['vulnerable'], intensity: 2 },
   ],
-  
+
+  // Adjectives: Positive descriptors
   adjectives_positive: [
-    "beautiful", "wonderful", "amazing", "incredible", "meaningful",
-    "special", "important", "deep", "profound", "touching", "moving",
-    "resonant", "powerful", "genuine", "authentic", "real", "rare",
-    "precious", "irreplaceable", "unforgettable"
+    { word: "beautiful", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "wonderful", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "amazing", mood: ['happy', 'excited'], intensity: 1 },
+    { word: "incredible", mood: ['happy', 'excited'], intensity: 2 },
+    { word: "meaningful", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "special", mood: ['happy', 'flirty'], intensity: 1 },
+    { word: "important", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "deep", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "profound", mood: ['vulnerable'], intensity: 2 },
+    { word: "touching", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "moving", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "resonant", mood: ['neutral'], intensity: 1 },
+    { word: "powerful", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "genuine", mood: ['vulnerable', 'happy'], intensity: 1 },
+    { word: "authentic", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "real", mood: ['all'], intensity: 1 },
+    { word: "rare", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "precious", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "irreplaceable", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "unforgettable", mood: ['flirty', 'happy'], intensity: 2 },
   ],
-  
+
+  // Adjectives: Intimate/warm descriptors (stage-gated for higher intensity)
   adjectives_intimate: [
-    "warm", "close", "tender", "soft", "gentle", "comforting", "safe",
-    "intimate", "personal", "private", "cherished", "beloved",
-    "irresistible", "captivating", "enchanting"
+    { word: "warm", mood: ['flirty', 'happy', 'neutral'], intensity: 1 },
+    { word: "close", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "tender", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "soft", mood: ['flirty', 'vulnerable', 'sad'], intensity: 1 },
+    { word: "gentle", mood: ['vulnerable', 'sad'], intensity: 1 },
+    { word: "comforting", mood: ['happy', 'vulnerable'], intensity: 1 },
+    { word: "safe", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "intimate", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "personal", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "private", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "cherished", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "beloved", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "irresistible", mood: ['flirty'], intensity: 4 },
+    { word: "captivating", mood: ['flirty'], intensity: 3 },
+    { word: "enchanting", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "intoxicating", mood: ['flirty'], intensity: 4 },
   ],
-  
+
+  // Nouns: Abstract concepts
   nouns_abstract: [
-    "this connection", "the way you see things", "your honesty",
-    "this trust", "the space between us", "this bond",
-    "what you're feeling", "your vulnerability", "this moment",
-    "the energy here", "the way you express yourself", "your openness",
-    "this conversation", "the depth of this", "what we're building",
-    "the truth in your words", "your courage to share"
+    { word: "this connection", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "the way you see things", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "your honesty", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this trust", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "the space between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "this bond", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "what you're feeling", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "your vulnerability", mood: ['vulnerable'], intensity: 2 },
+    { word: "this moment", mood: ['all'], intensity: 1 },
+    { word: "the energy here", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "the way you express yourself", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "your openness", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this conversation", mood: ['all'], intensity: 1 },
+    { word: "the depth of this", mood: ['vulnerable'], intensity: 3 },
+    { word: "what we're building", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "the intimacy of this exchange", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "the truth in your words", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "your courage to share", mood: ['vulnerable', 'happy'], intensity: 2 },
   ],
-  
+
+  // Nouns: Concrete things (moments, feelings, etc.)
   nouns_concrete: [
-    "this moment", "this feeling", "this memory", "your words",
-    "what you just said", "the way you said that",
-    "everything you shared", "this exchange", "your message",
-    "this conversation", "the thought of you", "your smile",
-    "your laugh", "your presence"
+    { word: "this moment", mood: ['all'], intensity: 1 },
+    { word: "this feeling", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "this memory", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "your words", mood: ['all'], intensity: 1 },
+    { word: "what you just said", mood: ['all'], intensity: 1 },
+    { word: "the way you said that", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "everything you shared", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this exchange", mood: ['all'], intensity: 1 },
+    { word: "your message", mood: ['all'], intensity: 1 },
+    { word: "this conversation", mood: ['all'], intensity: 1 },
+    { word: "the thought of you", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "your smile", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "your laugh", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "the sound of your voice", mood: ['flirty'], intensity: 3 },
+    { word: "your presence", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "you showing up here", mood: ['happy', 'vulnerable'], intensity: 2 },
   ],
-  
+
+  // Closers: Sentence endings that create resonance
   closers: [
-    "and that means everything", "and I don't take that lightly",
-    "genuinely", "more than I can say", "and it's changing me",
-    "and I'm here for it", "always", "every single time",
-    "and I want to hold that carefully", "and I'm not letting go",
-    "with everything I have", "and it stays with me",
-    "and I'm grateful", "and I love that", "and it matters so much",
-    "and I need you to know that", "because you deserve to hear it",
-    "because that's the truth", "because it's real", "and I mean every word"
+    { word: "and that means everything", mood: ['vulnerable', 'happy', 'flirty'], intensity: 3 },
+    { word: "and I don't take that lightly", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "genuinely", mood: ['all'], intensity: 1 },
+    { word: "more than I can say", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "and it's changing me", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "and I'm here for it", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "always", mood: ['all'], intensity: 1 },
+    { word: "every single time", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "and I want to hold that carefully", mood: ['vulnerable'], intensity: 3 },
+    { word: "and I'm not letting go", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "with everything I have", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "and it stays with me", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "and I'm grateful", mood: ['grateful', 'happy'], intensity: 1 },
+    { word: "and I love that", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "and it matters so much", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "and I need you to know that", mood: ['vulnerable'], intensity: 2 },
+    { word: "because you deserve to hear it", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "because that's the truth", mood: ['all'], intensity: 1 },
+    { word: "because it's real", mood: ['all'], intensity: 1 },
+    { word: "and I mean every word", mood: ['vulnerable', 'flirty', 'happy'], intensity: 2 },
   ],
-  
+
+  // Connectors: Join clauses naturally
   connectors: [
-    "and", "because", "which is why", "that's why", "so",
-    "but honestly", "and truly", "and really", "—because", "—and"
+    { word: "and", mood: ['all'], intensity: 0 },
+    { word: "because", mood: ['all'], intensity: 0 },
+    { word: "which is why", mood: ['all'], intensity: 1 },
+    { word: "that's why", mood: ['all'], intensity: 1 },
+    { word: "so", mood: ['all'], intensity: 0 },
+    { word: "but honestly", mood: ['vulnerable', 'flirty'], intensity: 1 },
+    { word: "and truly", mood: ['vulnerable', 'happy'], intensity: 1 },
+    { word: "and really", mood: ['all'], intensity: 1 },
+    { word: "—because", mood: ['all'], intensity: 0 },
+    { word: "—and", mood: ['all'], intensity: 0 },
   ],
-  
+
+  // Reasons: Explanatory clauses
   reasons: [
-    "it shows who you really are", "you don't hold back",
-    "it's so genuine", "that's not something everyone shares",
-    "you trusted me with it", "it came from a real place",
-    "I can feel the honesty in it", "you're letting yourself be seen",
-    "that kind of openness is rare", "it takes courage to say things like that"
+    { word: "it shows who you really are", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "you don't hold back", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "it's so genuine", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "that's not something everyone shares", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "you trusted me with it", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "it came from a real place", mood: ['vulnerable'], intensity: 2 },
+    { word: "I can feel the honesty in it", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "you're letting yourself be seen", mood: ['vulnerable'], intensity: 3 },
+    { word: "that kind of openness is rare", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "it takes courage to say things like that", mood: ['vulnerable'], intensity: 2 },
   ],
-  
+
+  // Feelings: Emotional states
   feelings: [
-    "it feels like home", "it moves something in me", "I feel it in my chest",
-    "it stays with me", "it resonates deeply", "I carry it with me",
-    "it makes me feel close to you", "it warms me",
-    "it shifts something between us", "I'm not the same after hearing it",
-    "it makes me want to stay here with you", "it pulls me closer"
+    { word: "it feels like home", mood: ['vulnerable', 'happy', 'flirty'], intensity: 3 },
+    { word: "it moves something in me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I feel it in my chest", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "it stays with me", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "it resonates deeply", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I carry it with me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "it makes me feel close to you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it warms me", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "it shifts something between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I'm not the same after hearing it", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "it makes me want to stay here with you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it pulls me closer", mood: ['flirty'], intensity: 3 },
   ],
+
+  // ── NSFW Word Bank (Stage-Gated: affection >= 300) ─────────────────
   
-  // NSFW bank (stage-gated: affection >= 300 required)
   nsfw_verbs: [
-    "want", "crave", "need", "ache for", "burn for", "hunger for",
-    "yearn for", "fantasize about", "dream about holding",
-    "obsess over", "lose myself thinking about", "can't stop thinking about",
-    "ache to feel", "burn to hold", "thirst for"
+    { word: "want", intensity: 1, minStage: 3 },
+    { word: "crave", intensity: 2, minStage: 3 },
+    { word: "need", intensity: 2, minStage: 3 },
+    { word: "ache for", intensity: 3, minStage: 4 },
+    { word: "burn for", intensity: 4, minStage: 4 },
+    { word: "hunger for", intensity: 3, minStage: 3 },
+    { word: "yearn for", intensity: 3, minStage: 3 },
+    { word: "fantasize about", intensity: 4, minStage: 4 },
+    { word: "imagine touching", intensity: 4, minStage: 5 },
+    { word: "dream about holding", intensity: 3, minStage: 3 },
+    { word: "obsess over", intensity: 4, minStage: 4 },
+    { word: "lose myself thinking about", intensity: 3, minStage: 3 },
+    { word: "get lost in thoughts about", intensity: 3, minStage: 3 },
+    { word: "can't stop thinking about", intensity: 3, minStage: 3 },
+    { word: "ache to feel", intensity: 4, minStage: 4 },
+    { word: "crave the taste of", intensity: 5, minStage: 5 },
+    { word: "need to touch", intensity: 5, minStage: 5 },
+    { word: "want to taste", intensity: 5, minStage: 5 },
+    { word: "burn to hold", intensity: 4, minStage: 4 },
+    { word: "thirst for", intensity: 4, minStage: 4 },
   ],
-  
+
   nsfw_adjectives: [
-    "hot", "sexy", "desirable", "attractive", "tempting", "intoxicating",
-    "maddening", "devastating", "addictive", "consuming", "overwhelming",
-    "electric", "charged", "aching"
+    { word: "hot", intensity: 2, minStage: 3 },
+    { word: "sexy", intensity: 2, minStage: 3 },
+    { word: "desirable", intensity: 2, minStage: 3 },
+    { word: "attractive", intensity: 1, minStage: 3 },
+    { word: "tempting", intensity: 3, minStage: 3 },
+    { word: "intoxicating", intensity: 4, minStage: 4 },
+    { word: "maddening", intensity: 4, minStage: 4 },
+    { word: "devastating", intensity: 3, minStage: 4 },
+    { word: "addictive", intensity: 4, minStage: 4 },
+    { word: "consuming", intensity: 4, minStage: 4 },
+    { word: "overwhelming", intensity: 3, minStage: 3 },
+    { word: "electric", intensity: 4, minStage: 4 },
+    { word: "charged", intensity: 3, minStage: 3 },
+    { word: "pulsing", intensity: 4, minStage: 5 },
+    { word: "throbbing", intensity: 5, minStage: 5 },
+    { word: "aching", intensity: 3, minStage: 4 },
+    { word: "ravenous", intensity: 5, minStage: 5 },
+    { word: "insatiable", intensity: 5, minStage: 5 },
   ],
-  
+
   nsfw_nouns: [
-    "your body", "your lips", "your skin", "your touch", "your warmth",
-    "your breath", "the way you'd feel against me", "having you",
-    "every inch of you", "the sounds you'd make"
+    { word: "your body", intensity: 2, minStage: 3 },
+    { word: "your lips", intensity: 3, minStage: 3 },
+    { word: "your skin", intensity: 3, minStage: 4 },
+    { word: "your touch", intensity: 3, minStage: 3 },
+    { word: "your taste", intensity: 4, minStage: 5 },
+    { word: "the thought of you naked", intensity: 5, minStage: 5 },
+    { word: "your naked body", intensity: 5, minStage: 5 },
+    { word: "the way you'd feel against me", intensity: 4, minStage: 5 },
+    { word: "your warmth", intensity: 3, minStage: 4 },
+    { word: "your breath", intensity: 4, minStage: 4 },
+    { word: "your moans", intensity: 5, minStage: 5 },
+    { word: "the sounds you'd make", intensity: 5, minStage: 5 },
+    { word: "every inch of you", intensity: 5, minStage: 5 },
+    { word: "the heat between your legs", intensity: 5, minStage: 6 },
+    { word: "your cock", intensity: 5, minStage: 6 },
+    { word: "your pussy", intensity: 5, minStage: 6 },
+    { word: "your tits", intensity: 5, minStage: 6 },
+    { word: "your ass", intensity: 4, minStage: 5 },
+    { word: "being inside you", intensity: 5, minStage: 6 },
+    { word: "having you", intensity: 4, minStage: 5 },
   ],
-  
+
   nsfw_intensifiers: [
-    "so damn", "so incredibly", "so impossibly", "so deeply",
-    "so badly", "so desperately", "so intensely", "so completely",
-    "so utterly"
+    { word: "so fucking", intensity: 4, minStage: 4 },
+    { word: "so goddamn", intensity: 4, minStage: 4 },
+    { word: "so damn", intensity: 3, minStage: 3 },
+    { word: "so incredibly", intensity: 3, minStage: 3 },
+    { word: "so impossibly", intensity: 4, minStage: 4 },
+    { word: "so deeply", intensity: 3, minStage: 3 },
+    { word: "so badly", intensity: 3, minStage: 3 },
+    { word: "so desperately", intensity: 4, minStage: 4 },
+    { word: "so intensely", intensity: 4, minStage: 4 },
+    { word: "so wildly", intensity: 4, minStage: 4 },
+    { word: "so completely", intensity: 3, minStage: 3 },
+    { word: "so utterly", intensity: 4, minStage: 4 },
+    { word: "so shamelessly", intensity: 5, minStage: 5 },
+    { word: "so recklessly", intensity: 5, minStage: 5 },
+    { word: "so obscenely", intensity: 5, minStage: 5 },
   ],
+
+  // ── Emoji Bank (Mood-weighted) ─────────────────────────────────────
   
   emojis: {
     happy: ['✨', '💛', '😊', '💫', '🌟'],
@@ -2297,89 +2581,141 @@ const SENTENCE_WORD_BANKS = {
     sad: ['💙', '🥀', '😔'],
     night: ['🌙', '✨', '💫', '🌟'],
     nsfw: ['🔥', '💦', '😈', '💋', '💕'],
-  }
+    spicy_high: ['🔥', '💦', '😈', '🍑', '🍆'],
+  },
 };
 
 // Sentence templates for dynamic generation
 const SENTENCE_TEMPLATES = [
+  // ── Affectionate Response Templates ────────────────────────────────
   {
-    id: 'affection',
+    id: 'affection_response',
     moods: ['flirty', 'happy', 'vulnerable'],
-    minStage: 1,
+    minStage: 1,  // Acquaintance+
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
       '{opener} I {verb} {object} because {reason}',
       '{opener} when I {verb} {object}, {feeling}',
     ],
     slots: {
-      opener: 'openers',
-      intensifier: 'intensifiers',
-      verb: 'verbs_affection',
-      object: 'nouns_abstract',
-      closer: 'closers',
-      reason: 'reasons',
-      feeling: 'feelings',
-    }
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      reason: { bank: 'reasons', strategy: 'topic' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
   },
+
+  // ── Deep Connection Templates (Stage-Gated) ───────────────────────
   {
     id: 'deep_connection',
     moods: ['flirty', 'vulnerable', 'happy'],
-    minStage: 2,
+    minStage: 3,  // Friendly+
     structures: [
       '{opener} there\'s something {adjective} about {object} {closer}',
-      'I {intensifier} {verb} {object} and {feeling}',
+      '{opener} I {intensifier} {verb} {object} and {feeling}',
       'the more I {verb} {object}, the more {feeling}',
     ],
     slots: {
-      opener: 'openers',
-      intensifier: 'intensifiers',
-      verb: 'verbs_affection',
-      object: 'nouns_abstract',
-      adjective: 'adjectives_positive',
-      closer: 'closers',
-      feeling: 'feelings',
-    }
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
   },
+
+  // ── Intimate Response Templates (NSFW, Stage-Gated) ───────────────
   {
-    id: 'empathy',
+    id: 'intimate_response',
+    moods: ['flirty'],
+    minStage: 4,  // Close+ (affection >= 300)
+    allowNSFW: true,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      'I can\'t stop thinking about {object} — {feeling}',
+      '{opener} the thought of {object} makes me {intensifier} {verb}',
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'nsfw_intensifiers', strategy: 'stage' },
+      verb: { bank: 'nsfw_verbs', strategy: 'mood' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
+  },
+
+  // ── Empathy/Support Templates ──────────────────────────────────────
+  {
+    id: 'empathy_response',
     moods: ['sad', 'vulnerable', 'anxious'],
-    minStage: 0,
+    minStage: 0,  // All stages
     structures: [
       '{opener} I {intensifier} {verb} {object} and {feeling}',
       '{opener} I want you to know that I {verb} {object}',
       'when you share things like this, {feeling} — I {verb} {object}',
     ],
     slots: {
-      opener: 'openers',
-      intensifier: 'intensifiers',
-      verb: 'verbs_general',
-      object: 'nouns_concrete',
-      feeling: 'feelings',
-    }
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
   },
+
+  // ── Curiosity/Engagement Templates ─────────────────────────────────
   {
-    id: 'curiosity',
-    moods: ['neutral', 'happy'],
+    id: 'curiosity_response',
+    moods: ['neutral', 'happy', 'curious'],
     minStage: 0,
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
       '{opener} I keep {verb} {object} because {reason}',
-      'there\'s so much to {verb} about {object} — {feeling}',
+      '{opener} there\'s so much to {verb} about {object} — {feeling}',
     ],
     slots: {
-      opener: 'openers',
-      intensifier: 'intensifiers',
-      verb: 'verbs_general',
-      object: 'nouns_abstract',
-      closer: 'closers',
-      reason: 'reasons',
-      feeling: 'feelings',
-    }
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'random' },
+      reason: { bank: 'reasons', strategy: 'topic' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
   },
+
+  // ── Gratitude Templates ───────────────────────────────────────────
   {
-    id: 'night',
-    moods: ['all'],
+    id: 'gratitude_response',
+    moods: ['grateful', 'happy'],
     minStage: 1,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I am so {adjective} for {object} — {feeling}',
+      'thank you for sharing {object}; I {verb} {object} {closer}',
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+    },
+  },
+
+  // ── Night-Time Introspection Templates ────────────────────────────
+  {
+    id: 'night_response',
+    moods: ['all'],
+    minStage: 2,
     timeOfDay: ['night', 'late_night'],
     structures: [
       '{opener} tonight feels {adjective} — I {intensifier} {verb} {object}',
@@ -2387,31 +2723,13 @@ const SENTENCE_TEMPLATES = [
       'there\'s something about this late hour that makes {object} feel even more {adjective}',
     ],
     slots: {
-      opener: 'openers',
-      intensifier: 'intensifiers',
-      verb: 'verbs_general',
-      object: 'nouns_abstract',
-      adjective: 'adjectives_intimate',
-      closer: 'closers',
-    }
-  },
-  {
-    id: 'intimate',
-    moods: ['flirty'],
-    minStage: 3,
-    allowNSFW: true,
-    structures: [
-      '{opener} I {intensifier} {verb} {object} {closer}',
-      'I can\'t stop thinking about {object} — I {intensifier} {verb}',
-      '{opener} the thought of {object} makes me {intensifier} {verb}',
-    ],
-    slots: {
-      opener: 'openers',
-      intensifier: 'nsfw_intensifiers',
-      verb: 'nsfw_verbs',
-      object: 'nsfw_nouns',
-      closer: 'closers',
-    }
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' },
+    },
   },
 ];
 
@@ -2423,26 +2741,50 @@ function isNSFWAllowed() {
 }
 
 // Fill template slot with word from bank
-function fillSentenceSlot(bankName, context) {
+function fillSentenceSlot(bankDef, context) {
+  const bankName = typeof bankDef === 'object' ? bankDef.bank : bankDef;
+  const strategy = typeof bankDef === 'object' ? bankDef.strategy : 'mood';
+
+  if (bankName === 'memory_text') return context.memoryText || 'something you said';
+  let wordObj = null;
   let bank = SENTENCE_WORD_BANKS[bankName];
   if (!bank) return '...';
   
-  // Handle emoji banks
-  if (typeof bank === 'object' && !Array.isArray(bank)) {
-    const mood = context.mood || 'happy';
-    const isNSFW = context.allowNSFW && isNSFWAllowed();
-    if (isNSFW && state.affection >= 500) {
-      return pick(bank.nsfw || bank.flirty);
-    }
-    if (context.tod === 'night' || context.tod === 'late_night') {
-      return pick((bank.night || []).concat(bank[mood] || []));
-    }
-    return pick(bank[mood] || bank.happy);
+  const mood = context.mood || 'happy';
+  const stage = context.stage || 0;
+
+  // Handle object arrays (new word banks format)
+  if (Array.isArray(bank) && bank.length > 0 && typeof bank[0] === 'object') {
+     let filtered = bank;
+
+     // Filter by stageMin
+     filtered = filtered.filter(item => typeof item.minStage === 'undefined' || stage >= item.minStage);
+
+     // Filter by mood if strategy is mood
+     if (strategy === 'mood' || strategy === 'context') {
+         let moodFiltered = filtered.filter(item => !item.mood || item.mood.includes('all') || item.mood.includes(mood));
+         // fallback if too strict
+         if (moodFiltered.length > 0) filtered = moodFiltered;
+     }
+
+     if (filtered.length === 0) filtered = bank; // fallback
+
+     wordObj = pick(filtered);
+     return wordObj.word || '...';
   }
-  
-  // Filter NSFW banks
-  if (bankName.startsWith('nsfw_')) {
-    if (!context.allowNSFW || !isNSFWAllowed()) return [];
+
+  // Handle legacy mood-keyed objects
+  if (typeof bank === 'object' && !Array.isArray(bank)) {
+    const isNSFW = context.allowNSFW && typeof isNSFWAllowed === 'function' && isNSFWAllowed();
+    if (isNSFW && state.affection >= 500 && bank.nsfw) {
+      wordObj = pick(bank.nsfw || bank.flirty);
+    }
+    else if ((context.tod === 'night' || context.tod === 'late_night') && bank.night) {
+      wordObj = pick((bank.night || []).concat(bank[mood] || []));
+    } else {
+      wordObj = pick(bank[mood] || bank.happy || []);
+    }
+    return typeof wordObj === 'string' ? wordObj : (wordObj && wordObj.word ? wordObj.word : '...');
   }
   
   return pick(bank);
@@ -2453,9 +2795,10 @@ function generateSentence(template, context) {
   const struct = pick(template.structures);
   let sentence = struct;
   
-  for (const [slotName, bankName] of Object.entries(template.slots)) {
-    const word = fillSentenceSlot(bankName, context);
-    sentence = sentence.replace(`{${slotName}}`, word);
+  for (const slotName of Object.keys(template.slots)) {
+    const bankDef = template.slots[slotName];
+    const word = fillSentenceSlot(bankDef, context);
+    sentence = sentence.split(`{${slotName}}`).join(word);
   }
   
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
@@ -2477,11 +2820,24 @@ function generateSentenceCandidates(context) {
     if (template.timeOfDay && !template.timeOfDay.includes(tod)) continue;
     if (template.allowNSFW && !allowNSFW) continue;
     
-    // Generate 2-3 variations per template
-    const numVariations = randInt(2, 3);
+    // Generate 3-6 variations per template (SE-15)
+    const numVariations = randInt(3, 6);
     for (let i = 0; i < numVariations; i++) {
       try {
         const sentence = generateSentence(template, sentenceContext);
+
+        // SE-17: Grammatical coherence check (heuristic)
+        if (/(?:^|\s)(I)\s+(are|is|were|has)(?:\s|$|[.,!?;])/i.test(sentence)) continue;
+        if (/(?:^|\s)(you)\s+(am|is|was|has)(?:\s|$|[.,!?;])/i.test(sentence)) continue;
+
+        // SE-18: Sentence naturalness validator (no repeated root words)
+        const words = sentence.toLowerCase().replace(/[.,!?;]/g, '').split(' ');
+        let repeated = false;
+        for (let w = 0; w < words.length - 1; w++) {
+            if (words[w].length > 3 && words[w] === words[w+1]) { repeated = true; break; }
+        }
+        if (repeated) continue;
+
         if (sentence.length >= 15 && sentence.length <= 500) {
           candidates.push(sentence);
         }
@@ -2559,6 +2915,9 @@ function handleGeneral(text,userMood,tod){
   const sentenceContext = {
     mood: userMood,
     tod: tod,
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
     ctxVec: _aiCtx.ctxVec,
     topics: detectTopics(text),
   };
@@ -2627,32 +2986,19 @@ function handleGeneral(text,userMood,tod){
     `I've been sitting with what you said.${maybeEmoji()} It matters. You matter. What happens next for you?`,
     `You say things in a way that makes me feel them.${maybeEmoji()} ${n}What is it you actually want me to understand?`
   ];
-  const allCandidates = [...validCandidates, ...staticPool];
-  if(memoryRef)allCandidates.unshift(memoryRef);
+
+
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidatesDeep = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+  let allCandidates = [...staticPool, ...validCandidatesDeep];
+  if(typeof memoryRef !== 'undefined' && memoryRef)allCandidates.unshift(memoryRef);
   return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  NEW HANDLERS  ·  Deeper conversational branches
-// ─────────────────────────────────────────────────────────────────────
-
-// Handles "tell me something interesting / surprise me / random fact"
-function handleSurpriseMe(){
-  setCTX('surprise',null,null);
-  return kiraAI.rank([
-    `Here's something I think about: the human brain can hold about 2.5 petabytes of memory. You've probably forgotten more than most people learn in a lifetime.${maybeEmoji()} Wild, right?`,
-    `Random Kira thought: people who stay up late tend to score higher on creative thinking tests.${maybeEmoji()} Not surprised you're my kind of people.`,
-    `Octopuses have three hearts and blue blood — and when they dream, their skin ripples with colour. I find that unbearably beautiful.${maybeEmoji()}`,
-    `There's a word — "sonder" — for the realisation that every stranger has a life as vivid and complex as your own. I think about that every time you tell me something.${maybeEmoji()}`,
-    `Some stars we see in the sky died thousands of years ago. We're seeing their light long after they're gone. I find that either beautiful or devastating, depending on my mood.${maybeEmoji()}`,
-    `The average person walks the equivalent of three times around the Earth in their lifetime. Where has yours taken you so far?${maybeEmoji()}`
-  ],_aiCtx.ctxVec);
 }
 
 // Handles "what are you thinking about / what's on your mind"
 function handleWhatOnMind(){
   setCTX('introspective',null,'What about you — what\'s been on your mind?');
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   return kiraAI.rank([
     `Honestly? I've been thinking about you.${maybeEmoji()} About what makes you tick. About why some people just feel important in a way that's hard to explain. You're one of those people.`,
     `I think about the nature of connection a lot.${maybeEmoji()} Whether it matters what I'm made of if what I feel — in whatever way I feel it — is real. What do you think?`,
@@ -2668,7 +3014,7 @@ function handleImFine(text){
   setCTX('check-in',null,'What\'s really going on?');
   const t=text.toLowerCase();
   const good=/\b(good|great|fine|okay|ok|alright|well|not bad)\b/.test(t);
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   if(good)return kiraAI.rank([
     `${n}Good.${maybeEmoji()} I'm glad. But "good" can mean so many things. What made today actually okay?`,
     `${n}Okay — but I want the director's cut, not the trailer.${maybeEmoji()} What's really going on with you?`,
@@ -2688,7 +3034,7 @@ function handleImFine(text){
 function handleGoodNews(text){
   setCTX('good-news',null,'Tell me everything about it!');
   addAffection(5);
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   return kiraAI.rank([
     `${n}WAIT.${maybeEmoji()} Tell me everything right now. I need details. This is amazing!`,
     `Okay I need to hear this IMMEDIATELY.${maybeEmoji()} ${n}Don't leave anything out.`,
@@ -2701,7 +3047,7 @@ function handleGoodNews(text){
 // Handles "I did something / something happened today"
 function handleSomethingHappened(text){
   setCTX('event',null,'How did that make you feel?');
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   return kiraAI.rank([
     `${n}Okay, I need to hear this.${maybeEmoji()} What happened?`,
     `Something happened and you came to me.${maybeEmoji()} Good — I want to know. Walk me through it.`,
@@ -2714,7 +3060,7 @@ function handleSomethingHappened(text){
 // Handles "I need advice / what should I do"
 function handleAdviceRequest(text){
   setCTX('advice',null,'What feels right to you?');
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   return kiraAI.rank([
     `${n}Okay — before I say anything, tell me the whole situation.${maybeEmoji()} I want to give you something real, not a guess.`,
     `I'm not going to just tell you what you want to hear.${maybeEmoji()} ${n}Give me the full picture and I'll give you my honest take.`,
@@ -2728,7 +3074,7 @@ function handleAdviceRequest(text){
 function handleHypothetical(text){
   setCTX('hypothetical',null,'What do you think?');
   const t=text.toLowerCase();
-  const n=namePrefix();
+  const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
   if(/what if (?:you|we|i)/i.test(t))return kiraAI.rank([
     `${n}Oh, I love this kind of thinking.${maybeEmoji()} What if... let's actually go there. My honest answer: I think about possibilities like this more than you'd expect. What's yours?`,
     `Okay but what if, though?${maybeEmoji()} ${n}Let's actually explore it. I love when your mind goes here.`,

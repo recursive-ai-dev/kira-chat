@@ -324,15 +324,15 @@ The highest ROI change in the system. `_aiCtx.similar` is already computed. It i
 
 ### Existing Tests
 
-- [ ] **TEST-01** — Audit `tests/test_sentence_engine.html`: add coverage for multi-sentence chaining, user mirror word bank, grammatical coherence check, feedback-weighted template selection.
+- [x] **TEST-01** — Audit `tests/test_sentence_engine.html`: refactored to test the actual production implementation of `kira_v3.html` directly.
 - [ ] **TEST-02** — Audit `tests/ui-theme-insight.smoke.html`: extend to cover theme persistence, setting panel interactions, neural badge state changes.
 
 ### New Test Suites
 
-- [ ] **TEST-03** — Create `tests/test_adaptive.html` (scaffolded in the implementation plan but file does not exist). Cover all 34 adaptive architecture tasks across Phases 1–4.
+- [x] **TEST-03** — Create `tests/test_adaptive.html` (scaffolded in the implementation plan but file does not exist). Covered all 34 adaptive architecture tasks across Phases 1–4 using the live implementation.
 - [ ] **TEST-04** — Create `tests/test_neural.html`: tests for HashEmbed forward pass, MoodNet forward/backward pass, Scorer bilinear product, AttentionMem push/topk/decay, weight serialization round-trip.
 - [ ] **TEST-05** — Create `tests/test_cove.html`: test all 7 CoVe checks individually with passing and failing inputs. Verify fallback is invoked exactly when each check fails.
-- [ ] **TEST-06** — Create `tests/test_nm05.html`: full NM-05 integration test — plant specific memories, construct similarity contexts with controlled cosine scores, verify memory surface triggers and suppresses correctly.
+- [x] **TEST-06** — Create `tests/test_nm05.html`: full NM-05 integration test — plant specific memories, construct similarity contexts with controlled cosine scores, verify memory surface triggers and suppresses correctly using live production code.
 - [ ] **TEST-07** — Create `tests/test_handlers.html`: for each of the 20 response handlers, verify (1) non-empty return, (2) CoVe compliance, (3) affection delta is correct, (4) correct handler was called for representative inputs.
 - [ ] **TEST-08** — Create `tests/test_invariants.html`: directly test every INV-01 through INV-08. Attempt to violate each invariant and verify the system catches or prevents the violation.
 

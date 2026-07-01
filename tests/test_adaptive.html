@@ -19,45 +19,122 @@ button:hover{background:#c06878}
 <div id="results"></div>
 
 <script>
-// Mock localStorage
-const _store={};
-const mockLocalStorage={
-  getItem:k=>_store[k]||null,
-  setItem:(k,v)=>{_store[k]=String(v);},
-  removeItem:k=>{delete _store[k];}
+// Mock localStorage using real localStorage for sharing with iframe
+const mockLocalStorage = {
+  getItem: k => localStorage.getItem(k),
+  setItem: (k, v) => localStorage.setItem(k, v),
+  removeItem: k => localStorage.removeItem(k)
 };
 
-// Mock state
-let state={affection:0,personality:'warm',adaptiveEnabled:true,effectivePersonality:'warm',memories:[],userMoods:[],topics:{},askedAbout:{}};
+// Test runner state
+let win = window;
+let initialized = false;
 
-// Mock utilities
-function rng(){return Math.random();}
-function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
-function chance(p){return rng()<p;}
+function rng() {
+  return Math.random();
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function chance(p) {
+  return rng() < p;
+}
 
 // Test results
-const results=[];
+const results = [];
 
-function test(name,fn){
-  try{
+function test(name, fn) {
+  try {
     fn();
-    results.push({name,pass:true});
-  }catch(e){
-    results.push({name,pass:false,error:e.message});
+    results.push({ name, pass: true });
+  } catch (e) {
+    results.push({ name, pass: false, error: e.message });
   }
 }
 
-function assert(condition,message){
-  if(!condition)throw new Error(message);
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Test Suite
-// ─────────────────────────────────────────────────────────────────────
+async function ensureInitialized() {
+  if (initialized) return;
+  
+  if (window.opener && window.opener.DEFAULT_ADAPTIVE_PROFILE) {
+    win = window.opener;
+    initialized = true;
+  } else {
+    try {
+      const html = await fetch('../kira_v3.html').then(r => {
+        if (!r.ok) throw new Error('Failed to fetch kira_v3.html');
+        return r.text();
+      });
+      const frame = document.createElement('iframe');
+      frame.id = 'prod-frame';
+      frame.style.width = '1px';
+      frame.style.height = '1px';
+      frame.style.border = '0';
+      document.body.appendChild(frame);
+      win = frame.contentWindow;
+      
+      await new Promise((resolve, reject) => {
+        frame.onload = resolve;
+        frame.onerror = () => reject(new Error('Failed to load iframe'));
+        frame.srcdoc = html;
+      });
+      
+      // Wait slightly for initialization
+      await new Promise(r => setTimeout(r, 100));
+      initialized = true;
+    } catch (e) {
+      document.getElementById('results').innerHTML = `<div class="test fail">Error initializing production code: ${e.message}</div>`;
+      throw e;
+    }
+  }
+  
+  // Wire properties once initialized
+  Object.defineProperty(window, 'state', {
+    get: () => win.state,
+    set: (v) => {
+      if (win.state) {
+        for (const k in win.state) delete win.state[k];
+        Object.assign(win.state, v);
+      }
+    }
+  });
+  
+  Object.defineProperty(window, '_adaptiveProfile', {
+    get: () => win._adaptiveProfile,
+    set: (v) => { win._adaptiveProfile = v; }
+  });
+  
+  Object.defineProperty(window, '_adaptiveTurnsSinceLastSave', {
+    get: () => win._adaptiveTurnsSinceLastSave,
+    set: (v) => { win._adaptiveTurnsSinceLastSave = v; }
+  });
+  
+  // Wire functions
+  window.DEFAULT_ADAPTIVE_PROFILE = win.DEFAULT_ADAPTIVE_PROFILE;
+  window.loadAdaptiveProfile = () => win.loadAdaptiveProfile();
+  window.saveAdaptiveProfile = () => win.saveAdaptiveProfile();
+  window.buildAdaptationContext = (text, route) => win.buildAdaptationContext(text, route);
+  window.checkRollbackSafety = () => win.checkRollbackSafety();
+  window.deepMerge = (target, source) => win.deepMerge(target, source);
+  window.adaptBehavior = (signal, context) => win.adaptBehavior(signal, context);
+  window.adaptPersonality = (route, signal, context) => win.adaptPersonality(route, signal, context);
+  window.adaptMemory = (signal, topics, userMood) => win.adaptMemory(signal, topics, userMood);
+  window.detectMoodTrend = () => win.detectMoodTrend();
+  window.generateMemoryReference = (similar, contextType) => win.generateMemoryReference(similar, contextType);
+}
 
-function runAllTests(){
-  results.length=0;
-  _store.length=0;
+// Test Suite
+
+async function runAllTests() {
+  await ensureInitialized();
+  results.length = 0;
+  mockLocalStorage.removeItem('kira_adaptive_v1');
+
 
   // Test 1: DEFAULT_ADAPTIVE_PROFILE exists and has correct structure
   test('DEFAULT_ADAPTIVE_PROFILE is defined with correct structure',()=>{
@@ -376,7 +453,11 @@ function runAllTests(){
     const profile=loadAdaptiveProfile();
     profile.memory.memoryRefProbability = 1.0; // Force chance()
 
-    const similar = [{ sim: 0.6, T: 'User loves cats' }];
+    const similar = [{ sim: 0.6, text: 'User loves cats' }];
+
+    // Stub chance to be safe
+    const origChance = win.chance;
+    win.chance = () => true;
 
     // Should pass
     const ref = window.generateMemoryReference(similar, 'greeting');
@@ -399,6 +480,9 @@ function runAllTests(){
     // Should pass if general context
     const ref2 = window.generateMemoryReference(similar, 'general');
     assert(ref2 !== null && ref2.includes('cats'), 'Should pass without PII filter for general context');
+
+    // Restore chance
+    win.chance = origChance;
   });
 
   // Render results

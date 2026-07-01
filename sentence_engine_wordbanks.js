@@ -14,7 +14,7 @@
 
 const WORD_BANKS = {
   // ── General Vocabulary ─────────────────────────────────────────────
-  
+
   // Openers: Sentence starters that set tone
   openers: [
     { word: "You know,", mood: ['neutral', 'happy', 'flirty'], intensity: 1 },
@@ -37,11 +37,53 @@ const WORD_BANKS = {
     { word: "There's a lot packed into what you just said", mood: ['neutral'], intensity: 1 },
     { word: "I hear you", mood: ['sad', 'vulnerable', 'neutral'], intensity: 1 },
     { word: "This matters to me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I almost didn't say this, but", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "It's kind of hard to put into words, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "I'm a little hesitant to admit it, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I've been holding this back, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "To be completely transparent,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "Okay so,", mood: ['happy', 'curious', 'flirty'], intensity: 1 },
+    { word: "Guess what?", mood: ['happy', 'curious'], intensity: 1 },
+    { word: "Wait, let me think...", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "Ooh, tell me more about", mood: ['curious', 'happy', 'flirty'], intensity: 2 },
+    { word: "Ah, so that's how it is!", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "If I'm being completely real with you,", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "I don't usually say things like this, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "Lately, I've been feeling like", mood: ['vulnerable', 'sad', 'anxious'], intensity: 2 },
+    { word: "It's rare for me to feel this way, but", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "Deep down,", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "There's something about the way", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "In the quiet moments,", mood: ['vulnerable', 'sad', 'night'], intensity: 2 },
+    { word: "Sometimes the world feels so loud, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "Like a thread running through my thoughts,", mood: ['vulnerable', 'thoughtful'], intensity: 3 },
+    { word: "The texture of this moment makes me feel", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I notice that", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "It feels like", mood: ['neutral', 'vulnerable'], intensity: 1 },
+    { word: "Actually,", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "Oh,", mood: ['neutral', 'sad', 'curious'], intensity: 1 },
+    { word: "Well,", mood: ['neutral'], intensity: 1 },
+    { word: "I was just thinking that", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "I have a feeling that", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "It's interesting,", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "Maybe it's just me, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "Let's be honest here,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "I can't help but notice", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "You make me think about", mood: ['happy', 'flirty', 'vulnerable'], intensity: 2 },
+    { word: "I'm standing here thinking", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "It makes me smile to think", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "Without sounding too dramatic,", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I keep replaying", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "It's so clear to me that", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "To tell you the absolute truth,", mood: ['vulnerable'], intensity: 2 },
+    { word: "I have this quiet thought that", mood: ['vulnerable', 'night'], intensity: 3 },
+    { word: "If we're being honest,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "I keep wondering if", mood: ['curious', 'vulnerable'], intensity: 2 },
+    { word: "There's a beautiful truth in", mood: ['grateful', 'happy'], intensity: 2 }
   ],
 
   // Pronouns: Fixed subjects
   pronouns: [
-    { word: "I", mood: ['all'], intensity: 0 }
+    { word: "I", mood: ['all'], intensity: 1 }
   ],
 
   // Intensifiers: Words that amplify emotional weight
@@ -59,7 +101,7 @@ const WORD_BANKS = {
     { word: "so genuinely", mood: ['vulnerable', 'happy'], intensity: 3 },
     { word: "more than I can say", mood: ['vulnerable', 'flirty'], intensity: 3 },
     { word: "more than words can hold", mood: ['vulnerable', 'flirty'], intensity: 4 },
-    { word: "beyond anything", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "beyond anything", mood: ['flirty', 'happy'], intensity: 3 }
   ],
 
   // Verbs: Affectionate/intimate actions
@@ -84,6 +126,38 @@ const WORD_BANKS = {
     { word: "feel so lucky to have", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "treasure every moment of", mood: ['flirty', 'vulnerable'], intensity: 3 },
     { word: "can't get enough of", mood: ['flirty'], intensity: 3 },
+    { word: "can't stop thinking about", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "find myself drawn to", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "keep coming back to", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "lose myself in thoughts of", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "feel a deep pull toward", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "am constantly thinking of", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "hold you in my heart through", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "ache to be closer to", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "dream of sharing", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "am completely wrapped up in", mood: ['flirty'], intensity: 3 },
+    { word: "revere", mood: ['vulnerable'], intensity: 4 },
+    { word: "worship", mood: ['flirty'], intensity: 5 },
+    { word: "prize", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "admire", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "esteem", mood: ['neutral'], intensity: 1 },
+    { word: "favor", mood: ['happy'], intensity: 1 },
+    { word: "exalt", mood: ['happy'], intensity: 3 },
+    { word: "gravitate toward", mood: ['flirty', 'neutral'], intensity: 2 },
+    { word: "safeguard", mood: ['vulnerable'], intensity: 3 },
+    { word: "delight in", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "long for", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "yearn for", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "crave", mood: ['flirty'], intensity: 4 },
+    { word: "pine for", mood: ['sad', 'vulnerable'], intensity: 3 },
+    { word: "clings to", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "hold onto", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "embrace", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "protect", mood: ['vulnerable'], intensity: 2 },
+    { word: "nurture", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "welcome", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "rejoice in", mood: ['happy'], intensity: 2 },
+    { word: "marvel at", mood: ['happy', 'curious'], intensity: 2 }
   ],
 
   // Verbs: General cognitive/processing
@@ -102,7 +176,7 @@ const WORD_BANKS = {
     { word: "hear", mood: ['vulnerable', 'sad'], intensity: 1 },
     { word: "feel", mood: ['flirty', 'vulnerable', 'happy'], intensity: 1 },
     { word: "sense", mood: ['vulnerable', 'neutral'], intensity: 2 },
-    { word: "intuit", mood: ['vulnerable'], intensity: 2 },
+    { word: "intuit", mood: ['vulnerable'], intensity: 2 }
   ],
 
   // Adjectives: Positive descriptors
@@ -126,7 +200,7 @@ const WORD_BANKS = {
     { word: "rare", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "precious", mood: ['flirty', 'vulnerable'], intensity: 3 },
     { word: "irreplaceable", mood: ['flirty', 'vulnerable'], intensity: 3 },
-    { word: "unforgettable", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "unforgettable", mood: ['flirty', 'happy'], intensity: 2 }
   ],
 
   // Adjectives: Intimate/warm descriptors (stage-gated for higher intensity)
@@ -147,6 +221,30 @@ const WORD_BANKS = {
     { word: "captivating", mood: ['flirty'], intensity: 3 },
     { word: "enchanting", mood: ['flirty', 'happy'], intensity: 3 },
     { word: "intoxicating", mood: ['flirty'], intensity: 4 },
+    { word: "cozy", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "quiet", mood: ['vulnerable', 'neutral', 'night'], intensity: 1 },
+    { word: "calm", mood: ['neutral', 'vulnerable'], intensity: 1 },
+    { word: "pleasant", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "dear", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "honest", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "precious", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "sincere", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "trusted", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "emotional", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "magnetic", mood: ['flirty'], intensity: 3 },
+    { word: "deep", mood: ['vulnerable', 'neutral'], intensity: 3 },
+    { word: "special", mood: ['happy', 'flirty'], intensity: 3 },
+    { word: "devoted", mood: ['flirty', 'grateful'], intensity: 3 },
+    { word: "electric", mood: ['flirty'], intensity: 4 },
+    { word: "intense", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "passionate", mood: ['flirty'], intensity: 4 },
+    { word: "vulnerable", mood: ['vulnerable'], intensity: 4 },
+    { word: "burning", mood: ['flirty'], intensity: 4 },
+    { word: "consuming", mood: ['flirty', 'vulnerable'], intensity: 5 },
+    { word: "soul-stirring", mood: ['vulnerable', 'flirty'], intensity: 5 },
+    { word: "overwhelming", mood: ['vulnerable', 'sad'], intensity: 5 },
+    { word: "boundless", mood: ['happy', 'flirty'], intensity: 5 },
+    { word: "irreplaceable", mood: ['vulnerable', 'grateful'], intensity: 5 }
   ],
 
   // Nouns: Abstract concepts
@@ -168,7 +266,7 @@ const WORD_BANKS = {
     { word: "what we're building", mood: ['flirty', 'happy'], intensity: 3 },
     { word: "the intimacy of this exchange", mood: ['flirty', 'vulnerable'], intensity: 4 },
     { word: "the truth in your words", mood: ['vulnerable', 'neutral'], intensity: 2 },
-    { word: "your courage to share", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "your courage to share", mood: ['vulnerable', 'happy'], intensity: 2 }
   ],
 
   // Nouns: Concrete things (moments, feelings, etc.)
@@ -188,7 +286,7 @@ const WORD_BANKS = {
     { word: "your laugh", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "the sound of your voice", mood: ['flirty'], intensity: 3 },
     { word: "your presence", mood: ['happy', 'flirty'], intensity: 2 },
-    { word: "you showing up here", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "you showing up here", mood: ['happy', 'vulnerable'], intensity: 2 }
   ],
 
   // Closers: Sentence endings that create resonance
@@ -212,21 +310,26 @@ const WORD_BANKS = {
     { word: "because you deserve to hear it", mood: ['vulnerable', 'happy'], intensity: 2 },
     { word: "because that's the truth", mood: ['all'], intensity: 1 },
     { word: "because it's real", mood: ['all'], intensity: 1 },
-    { word: "and I mean every word", mood: ['vulnerable', 'flirty', 'happy'], intensity: 2 },
+    { word: "and I mean every word", mood: ['vulnerable', 'flirty', 'happy'], intensity: 2 }
   ],
 
   // Connectors: Join clauses naturally
   connectors: [
-    { word: "and", mood: ['all'], intensity: 0 },
-    { word: "because", mood: ['all'], intensity: 0 },
-    { word: "which is why", mood: ['all'], intensity: 1 },
-    { word: "that's why", mood: ['all'], intensity: 1 },
-    { word: "so", mood: ['all'], intensity: 0 },
-    { word: "but honestly", mood: ['vulnerable', 'flirty'], intensity: 1 },
-    { word: "and truly", mood: ['vulnerable', 'happy'], intensity: 1 },
-    { word: "and really", mood: ['all'], intensity: 1 },
-    { word: "—because", mood: ['all'], intensity: 0 },
-    { word: "—and", mood: ['all'], intensity: 0 },
+    { word: "and", mood: ['all'], intensity: 1 },
+    { word: "because", mood: ['all'], intensity: 1 },
+    { word: "which is why", mood: ['all'], intensity: 2 },
+    { word: "that's why", mood: ['all'], intensity: 2 },
+    { word: "so", mood: ['all'], intensity: 1 },
+    { word: "but honestly", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "and truly", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "and really", mood: ['all'], intensity: 2 },
+    { word: "—because", mood: ['all'], intensity: 1 },
+    { word: "—and", mood: ['all'], intensity: 1 },
+    { word: "and yet,", mood: ['all'], intensity: 2 },
+    { word: "but what I really want to say is,", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "somehow,", mood: ['all'], intensity: 2 },
+    { word: "more than that,", mood: ['all'], intensity: 2 },
+    { word: "which is why", mood: ['all'], intensity: 2 }
   ],
 
   // Reasons: Explanatory clauses
@@ -240,7 +343,7 @@ const WORD_BANKS = {
     { word: "I can feel the honesty in it", mood: ['vulnerable', 'happy'], intensity: 2 },
     { word: "you're letting yourself be seen", mood: ['vulnerable'], intensity: 3 },
     { word: "that kind of openness is rare", mood: ['vulnerable', 'grateful'], intensity: 2 },
-    { word: "it takes courage to say things like that", mood: ['vulnerable'], intensity: 2 },
+    { word: "it takes courage to say things like that", mood: ['vulnerable'], intensity: 2 }
   ],
 
   // Feelings: Emotional states
@@ -256,7 +359,41 @@ const WORD_BANKS = {
     { word: "it shifts something between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
     { word: "I'm not the same after hearing it", mood: ['vulnerable', 'flirty'], intensity: 4 },
     { word: "it makes me want to stay here with you", mood: ['flirty', 'vulnerable'], intensity: 3 },
-    { word: "it pulls me closer", mood: ['flirty'], intensity: 3 },
+    { word: "it pulls me closer", mood: ['flirty'], intensity: 3 }
+  ],
+
+  // Phrases complete: preformed sentence fragments (SE-11)
+  phrases_complete: [
+    { word: "I've been thinking about this all day", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "it makes my heart skip a beat", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "I don't even know how to describe it", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "you make everything feel a bit warmer", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "it's like the rest of the world just fades out", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I feel completely at ease with you", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "there's a quiet magic between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "you always know exactly what to say", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "it stays with me long after we stop talking", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I keep coming back to this moment", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "you're unlike anyone else I've met", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it brings a smile to my face every time", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "I hope you know how much you mean to me", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "we have something incredibly rare here", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I'm so glad we found each other", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "it makes me want to be completely honest", mood: ['vulnerable'], intensity: 2 },
+    { word: "you have my full attention, always", mood: ['grateful', 'flirty'], intensity: 2 },
+    { word: "I can't help but feel incredibly close to you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "every word you say lands so deeply", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "I'm right here by your side", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "it feels so natural to open up to you", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "you are my absolute favorite distraction", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "nothing else seems to matter as much", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I'm completely captivated by you", mood: ['flirty'], intensity: 3 },
+    { word: "you bring so much light into my world", mood: ['grateful', 'happy'], intensity: 3 },
+    { word: "it's a feeling I don't want to lose", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I want to hold onto this forever", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "you make my world feel completely safe", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "there's no place I'd rather be", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "you are truly irreplaceable to me", mood: ['vulnerable', 'grateful'], intensity: 4 }
   ],
 
   // ── NSFW Word Bank (Stage-Gated: affection >= 300) ─────────────────
@@ -265,8 +402,8 @@ const WORD_BANKS = {
     { word: "want", intensity: 1, minStage: 3 },
     { word: "crave", intensity: 2, minStage: 3 },
     { word: "need", intensity: 2, minStage: 3 },
-    { word: "ache for", intensity: 3, minStage: 4 },
-    { word: "burn for", intensity: 4, minStage: 4 },
+    { word: "ache for", intensity: 3, minStage: 3 },
+    { word: "burn for", intensity: 4, minStage: 3 },
     { word: "hunger for", intensity: 3, minStage: 3 },
     { word: "yearn for", intensity: 3, minStage: 3 },
     { word: "fantasize about", intensity: 4, minStage: 4 },
@@ -276,12 +413,12 @@ const WORD_BANKS = {
     { word: "lose myself thinking about", intensity: 3, minStage: 3 },
     { word: "get lost in thoughts about", intensity: 3, minStage: 3 },
     { word: "can't stop thinking about", intensity: 3, minStage: 3 },
-    { word: "ache to feel", intensity: 4, minStage: 4 },
+    { word: "ache to feel", intensity: 4, minStage: 3 },
     { word: "crave the taste of", intensity: 5, minStage: 5 },
     { word: "need to touch", intensity: 5, minStage: 5 },
     { word: "want to taste", intensity: 5, minStage: 5 },
-    { word: "burn to hold", intensity: 4, minStage: 4 },
-    { word: "thirst for", intensity: 4, minStage: 4 },
+    { word: "burn to hold", intensity: 4, minStage: 3 },
+    { word: "thirst for", intensity: 4, minStage: 4 }
   ],
 
   nsfw_adjectives: [
@@ -290,8 +427,8 @@ const WORD_BANKS = {
     { word: "desirable", intensity: 2, minStage: 3 },
     { word: "attractive", intensity: 1, minStage: 3 },
     { word: "tempting", intensity: 3, minStage: 3 },
-    { word: "intoxicating", intensity: 4, minStage: 4 },
-    { word: "maddening", intensity: 4, minStage: 4 },
+    { word: "intoxicating", intensity: 4, minStage: 3 },
+    { word: "maddening", intensity: 4, minStage: 3 },
     { word: "devastating", intensity: 3, minStage: 4 },
     { word: "addictive", intensity: 4, minStage: 4 },
     { word: "consuming", intensity: 4, minStage: 4 },
@@ -300,9 +437,9 @@ const WORD_BANKS = {
     { word: "charged", intensity: 3, minStage: 3 },
     { word: "pulsing", intensity: 4, minStage: 5 },
     { word: "throbbing", intensity: 5, minStage: 5 },
-    { word: "aching", intensity: 3, minStage: 4 },
+    { word: "aching", intensity: 3, minStage: 3 },
     { word: "ravenous", intensity: 5, minStage: 5 },
-    { word: "insatiable", intensity: 5, minStage: 5 },
+    { word: "insatiable", intensity: 5, minStage: 5 }
   ],
 
   nsfw_nouns: [
@@ -325,7 +462,7 @@ const WORD_BANKS = {
     { word: "your tits", intensity: 5, minStage: 6 },
     { word: "your ass", intensity: 4, minStage: 5 },
     { word: "being inside you", intensity: 5, minStage: 6 },
-    { word: "having you", intensity: 4, minStage: 5 },
+    { word: "having you", intensity: 4, minStage: 5 }
   ],
 
   nsfw_intensifiers: [
@@ -343,11 +480,10 @@ const WORD_BANKS = {
     { word: "so utterly", intensity: 4, minStage: 4 },
     { word: "so shamelessly", intensity: 5, minStage: 5 },
     { word: "so recklessly", intensity: 5, minStage: 5 },
-    { word: "so obscenely", intensity: 5, minStage: 5 },
+    { word: "so obscenely", intensity: 5, minStage: 5 }
   ],
 
   // ── Emoji Bank (Mood-weighted) ─────────────────────────────────────
-  
   emojis: {
     happy: ['✨', '💛', '😊', '💫', '🌟'],
     flirty: ['💕', '😏', '💋', '🔥', '💗', '😘'],
@@ -355,8 +491,8 @@ const WORD_BANKS = {
     sad: ['💙', '🥀', '😔'],
     night: ['🌙', '✨', '💫', '🌟'],
     nsfw: ['🔥', '💦', '😈', '💋', '💕'],
-    spicy_high: ['🔥', '💦', '😈', '🍑', '🍆'],
-  },
+    spicy_high: ['🔥', '💦', '😈', '🍑', '🍆']
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────

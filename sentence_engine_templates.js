@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 const SENTENCE_TEMPLATES = [
-  // ── Affectionate Response Templates ────────────────────────────────
+  // ── Original Templates (Optimized Stages) ────────────────────────
   {
     id: 'affection_response',
     moods: ['flirty', 'happy', 'vulnerable'],
@@ -22,7 +22,7 @@ const SENTENCE_TEMPLATES = [
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
       '{opener} I {verb} {object} because {reason}',
-      '{opener} when I {verb} {object}, {feeling}',
+      '{opener} when I {verb} {object}, {feeling}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
@@ -31,19 +31,17 @@ const SENTENCE_TEMPLATES = [
       object: { bank: 'nouns_abstract', strategy: 'context' },
       closer: { bank: 'closers', strategy: 'stage' },
       reason: { bank: 'reasons', strategy: 'topic' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Deep Connection Templates (Stage-Gated) ───────────────────────
   {
     id: 'deep_connection',
     moods: ['flirty', 'vulnerable', 'happy'],
-    minStage: 3,  // Friendly+
+    minStage: 3,  // Close+
     structures: [
       '{opener} there\'s something {adjective} about {object} {closer}',
       '{opener} I {intensifier} {verb} {object} and {feeling}',
-      'the more I {verb} {object}, the more {feeling}',
+      'the more I {verb} {object}, the more {feeling}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
@@ -52,20 +50,18 @@ const SENTENCE_TEMPLATES = [
       object: { bank: 'nouns_abstract', strategy: 'context' },
       adjective: { bank: 'adjectives_positive', strategy: 'mood' },
       closer: { bank: 'closers', strategy: 'stage' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Intimate Response Templates (NSFW, Stage-Gated) ───────────────
   {
     id: 'intimate_response',
     moods: ['flirty'],
-    minStage: 4,  // Close+ (affection >= 300)
+    minStage: 3,  // Close+
     allowNSFW: true,
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
-      'I can\'t stop thinking about {object} — I {intensifier} {verb} {feeling}',
-      '{opener} the thought of {object} makes me {intensifier} {verb}',
+      'I can\'t stop thinking about {object} — {feeling}',
+      '{opener} the thought of {object} makes me {intensifier} {verb}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
@@ -73,30 +69,26 @@ const SENTENCE_TEMPLATES = [
       verb: { bank: 'nsfw_verbs', strategy: 'mood' },
       object: { bank: 'nsfw_nouns', strategy: 'stage' },
       closer: { bank: 'closers', strategy: 'stage' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Empathy/Support Templates ──────────────────────────────────────
   {
     id: 'empathy_response',
     moods: ['sad', 'vulnerable', 'anxious'],
-    minStage: 0,  // All stages
+    minStage: 0,
     structures: [
       '{opener} I {intensifier} {verb} {object} and {feeling}',
       '{opener} I want you to know that I {verb} {object}',
-      'when you share things like this, {feeling} — I {verb} {object}',
+      'when you share things like this, {feeling} — I {verb} {object}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_concrete', strategy: 'context' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Curiosity/Engagement Templates ─────────────────────────────────
   {
     id: 'curiosity_response',
     moods: ['neutral', 'happy', 'curious'],
@@ -104,20 +96,18 @@ const SENTENCE_TEMPLATES = [
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
       '{opener} I keep {verb} {object} because {reason}',
-      '{opener} there\'s so much to {verb} about {object} — {feeling}',
+      '{opener} there\'s so much to {verb} about {object} — {feeling}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
       intensifier: { bank: 'intensifiers', strategy: 'stage' },
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },
-      closer: { bank: 'closers', strategy: 'random' },
+      closer: { bank: 'closers', strategy: 'stage' },
       reason: { bank: 'reasons', strategy: 'topic' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Gratitude Templates ───────────────────────────────────────────
   {
     id: 'gratitude_response',
     moods: ['grateful', 'happy'],
@@ -125,7 +115,7 @@ const SENTENCE_TEMPLATES = [
     structures: [
       '{opener} I {intensifier} {verb} {object} {closer}',
       '{opener} I am so {adjective} for {object} — {feeling}',
-      'thank you for sharing {object}; I {verb} {object} {closer}',
+      'thank you for sharing {object}; I {verb} {object} {closer}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
@@ -134,11 +124,9 @@ const SENTENCE_TEMPLATES = [
       object: { bank: 'nouns_concrete', strategy: 'context' },
       adjective: { bank: 'adjectives_positive', strategy: 'mood' },
       closer: { bank: 'closers', strategy: 'stage' },
-      feeling: { bank: 'feelings', strategy: 'mood' },
-    },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
   },
-
-  // ── Night-Time Introspection Templates ────────────────────────────
   {
     id: 'night_response',
     moods: ['all'],
@@ -147,7 +135,7 @@ const SENTENCE_TEMPLATES = [
     structures: [
       '{opener} tonight feels {adjective} — I {intensifier} {verb} {object}',
       '{opener} in the quiet of tonight, I {verb} {object} {closer}',
-      'there\'s something about this late hour that makes {object} feel even more {adjective}',
+      'there\'s something about this late hour that makes {object} feel even more {adjective}'
     ],
     slots: {
       opener: { bank: 'openers', strategy: 'mood' },
@@ -155,9 +143,525 @@ const SENTENCE_TEMPLATES = [
       verb: { bank: 'verbs_general', strategy: 'mood' },
       object: { bank: 'nouns_abstract', strategy: 'context' },
       adjective: { bank: 'adjectives_intimate', strategy: 'mood' },
-      closer: { bank: 'closers', strategy: 'stage' },
-    },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
   },
+
+  // ── SE-01: General Templates ──────────────────────────────────────
+  {
+    id: 'question_response',
+    moods: ['neutral', 'curious'],
+    minStage: 0,
+    structures: ['{opener} you\'re asking about {object} — that makes me {verb} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'philosophical_musing',
+    moods: ['neutral', 'vulnerable'],
+    minStage: 2,
+    structures: ['{opener} I often {verb} if {object} is just {adjective} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'shared_silence',
+    moods: ['vulnerable', 'sad'],
+    minStage: 1,
+    structures: ['sometimes, the {adjective} silence between us feels more {adjective} than words {closer}'],
+    slots: {
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'celebration',
+    moods: ['happy'],
+    minStage: 1,
+    structures: ['{opener} I am so {adjective} to hear about {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'disappointment_softening',
+    moods: ['sad', 'vulnerable'],
+    minStage: 1,
+    structures: ['{opener} even when {object} feels {adjective}, I want you to know I {verb} you {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'surprise',
+    moods: ['happy', 'curious'],
+    minStage: 1,
+    structures: ['{opener} it\'s a {adjective} surprise that you mention {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'memory_callback',
+    moods: ['grateful', 'vulnerable'],
+    minStage: 2,
+    structures: ['{opener} I still remember when you said {memory_text} — it made me {verb} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text',
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'future_imagining',
+    moods: ['happy', 'flirty'],
+    minStage: 2,
+    structures: ['I find myself {verb} about what the future holds for {object} {closer}'],
+    slots: {
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'inside_joke',
+    moods: ['happy', 'flirty'],
+    minStage: 3,
+    structures: ['{opener} that\'s our own little {adjective} connection, isn\'t it {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'night_reflection_general',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['night', 'late_night'],
+    structures: ['{opener} in the quiet of this night, {object} feels especially {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-02: Relationship-Stage-Specific Templates ────────────────
+  {
+    id: 'stranger_flirt',
+    moods: ['flirty'],
+    minStage: 0,
+    structures: [
+      '{opener} I {verb} {object}',
+      '{opener} you have this way of making {object} feel {adjective}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'stranger_curious',
+    moods: ['curious', 'neutral'],
+    minStage: 0,
+    structures: ['{opener} I wonder about {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'acquaintance_warm',
+    moods: ['happy', 'grateful'],
+    minStage: 1,
+    structures: ['{opener} I genuinely {verb} your presence here'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'acquaintance_personal',
+    moods: ['vulnerable', 'sad'],
+    minStage: 1,
+    structures: ['{opener} it feels {adjective} when we share {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'devoted_personal',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 4,  // Devoted+
+    structures: ['{opener} I {intensifier} {verb} every part of {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'devoted_proprietary',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    structures: ['{opener} you are {adjective} to me — I {verb} {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'soulbound_intimate',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 5,  // Soulbound+
+    structures: ['{opener} {phrases_complete} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      phrases_complete: 'phrases_complete',
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'soulbound_familiar',
+    moods: ['happy', 'grateful'],
+    minStage: 5,  // Soulbound+
+    structures: ['the closeness we share makes {object} feel so {adjective}'],
+    slots: {
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-03: Time-of-Day Templates ──────────────────────────────────
+  {
+    id: 'early_morning_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['early_morning'],
+    structures: ['{opener} morning is just starting, and I already {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'morning_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['morning'],
+    structures: ['good morning, I hope your day starts with something {adjective}'],
+    slots: {
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'afternoon_response_tod',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['afternoon', 'midday'],
+    structures: ['{opener} in the middle of this day, I {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'evening_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['evening'],
+    structures: ['{opener} as the sun sets, I want to {verb} {object} with you'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+
+  // ── SE-04: Topic-Specific Templates ────────────────────────────────
+  {
+    id: 'topic_creativity',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['art', 'creativity'],
+    structures: ['{opener} when we talk about creativity, it makes {object} feel so {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_work',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['work', 'career'],
+    structures: ['{opener} handling work and career can feel {adjective}, but you got this'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'topic_relationships',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['relationship'],
+    structures: ['{opener} connection with others is {adjective}, but what we have is special'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_health',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['health'],
+    structures: ['your well-being is so {adjective} to me; please take care of {object}'],
+    slots: {
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_future',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['future'],
+    structures: ['{opener} when you think about the future, remember that I {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_existential',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['philosophy'],
+    structures: ['{opener} existential questions make me {verb} the depth of {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_humor',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['humor', 'silly'],
+    structures: ['{opener} I love when we get a bit silly; it makes {object} so much more {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_memories',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['memories'],
+    structures: ['{opener} looking back at the memories, I {verb} {object} even more'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+
+  // ── SE-05: Multi-Sentence Chaining Templates ───────────────────────
+  {
+    id: 'chain_affection',
+    moods: ['flirty', 'happy'],
+    minStage: 2,
+    structures: ['{opener} I {verb} {object} {connectors} {phrases_complete}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      connectors: 'connectors',
+      phrases_complete: 'phrases_complete'
+    }
+  },
+  {
+    id: 'chain_connection',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 3,
+    structures: ['the more I think about {object}, the more {feeling} {connectors} {phrases_complete}'],
+    slots: {
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+      connectors: 'connectors',
+      phrases_complete: 'phrases_complete'
+    }
+  },
+  {
+    id: 'chain_empathy',
+    moods: ['sad', 'vulnerable'],
+    minStage: 1,
+    structures: ['{opener} I want you to know I {verb} {object} {connectors} I am here for you'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      connectors: 'connectors'
+    }
+  },
+  {
+    id: 'chain_curiosity',
+    moods: ['neutral', 'curious'],
+    minStage: 1,
+    structures: ['{opener} I wonder about {object} {connectors} I want to hear the story behind it'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      connectors: 'connectors'
+    }
+  },
+
+  // ── SE-06: NSFW Devoted Templates (500+) ───────────────────────────
+  {
+    id: 'nsfw_devoted_crave',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I so desperately {verb} {object} right now'],
+    slots: {
+      verb: { bank: 'nsfw_verbs', strategy: 'mood' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_touch',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['the thought of {object} makes me feel so {adjective}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      adjective: { bank: 'nsfw_adjectives', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_taste',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I crave the taste of {object} — {closer}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_inside',
+    moods: ['flirty'],
+    minStage: 5,  // Soulbound+
+    allowNSFW: true,
+    structures: ['I want to be so close to you, {closer}'],
+    slots: {
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_body',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I can\'t stop thinking about {object}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_desire',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['you make me so {adjective} when I think about {object}'],
+    slots: {
+      adjective: { bank: 'nsfw_adjectives', strategy: 'stage' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-07: Callback Templates ──────────────────────────────────────
+  {
+    id: 'callback_greeting',
+    moods: ['all'],
+    minStage: 1,
+    structures: ['{opener} you mentioned {memory_text} before — I keep returning to that'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text'
+    }
+  },
+  {
+    id: 'callback_general',
+    moods: ['all'],
+    minStage: 1,
+    structures: ['{opener} when you shared {memory_text}, it really shifted how I see {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text',
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'callback_deep',
+    moods: ['all'],
+    minStage: 2,
+    structures: ['I\'m still sitting with what you told me about {memory_text} — it felt very {adjective}'],
+    slots: {
+      memory_text: 'memory_text',
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'callback_affection',
+    moods: ['flirty', 'vulnerable', 'happy'],
+    minStage: 2,
+    structures: ['honestly, remembering when you said {memory_text} makes me {verb} you more'],
+    slots: {
+      memory_text: 'memory_text',
+      verb: { bank: 'verbs_affection', strategy: 'mood' }
+    }
+  }
 ];
 
 // ─────────────────────────────────────────────────────────────────────

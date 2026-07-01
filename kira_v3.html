@@ -1383,9 +1383,10 @@ function generateMemoryReference(similar, contextType) {
     if (!chance(prob)) return null;
 
     const mem = similar[0];
-    const memoryExists = state.memories.some(m => m.text && mem.text && m.text.includes(mem.text.slice(0, 30)));
-    if (memoryExists && mem.text) {
-      const actualMem = state.memories.find(m => m.text && mem.text && m.text.includes(mem.text.slice(0, 30)));
+    const actualMem = mem.text
+      ? state.memories.find(m => m.text && m.text.includes(mem.text.slice(0, 30)))
+      : null;
+    if (actualMem) {
       if (contextType === 'greeting') {
         if (!actualMem || actualMem.type !== 'personal') return null;
       }

@@ -3647,6 +3647,7 @@ resetBtn.addEventListener('click',()=>{
   if(confirm('This will erase everything — all memories, all messages, all neural weights, and all saved images. Are you sure?')){
     localStorage.removeItem(STORE_KEY);localStorage.removeItem(AI_KEY);
     localStorage.removeItem(IMG_KEY);localStorage.removeItem(PIC_KEY);localStorage.removeItem(THEME_KEY);
+    localStorage.removeItem(ADAPTIVE_KEY);
     applyTheme('rose');
     location.reload();
   }

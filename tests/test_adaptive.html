@@ -19,6 +19,23 @@ button:hover{background:#c06878}
 <div id="results"></div>
 
 <script>
+window.onerror = function(message, source, lineno, colno, error) {
+  const resultsDiv = document.getElementById('results');
+  if (resultsDiv) {
+    resultsDiv.innerHTML += `
+      <div class="test fail" style="background:#3a1a1a; padding:15px; border-radius:8px; margin:10px 0;">
+        <h3>Global Error Captured:</h3>
+        <p><strong>Message:</strong> ${message}</p>
+        <p><strong>Source:</strong> ${source}:${lineno}:${colno}</p>
+        <pre style="white-space:pre-wrap; color:#ff9999;">${error ? (error.stack || error) : ''}</pre>
+      </div>
+    `;
+  }
+  return false;
+};
+</script>
+<script>
+
 // Mock localStorage using real localStorage for sharing with iframe
 const mockLocalStorage = {
   getItem: k => localStorage.getItem(k),
@@ -427,6 +444,7 @@ async function runAllTests() {
   test('detectMoodTrend finds dominant mood > 40%',()=>{
     mockLocalStorage.removeItem('kira_adaptive_v1');
     _adaptiveProfile=null;
+    state.adaptiveEnabled = true;
     const profile=loadAdaptiveProfile();
 
     // Require at least 10
@@ -523,6 +541,10 @@ if(window.opener&&window.opener.DEFAULT_ADAPTIVE_PROFILE){
   window._adaptiveProfile=null;
   window._adaptiveTurnsSinceLastSave=0;
 }
+runAllTests().catch(err => {
+  document.getElementById('results').innerHTML = `<div class="test fail">Error running tests: ${err.stack || err.message || err}</div>`;
+});
 </script>
+<script src="/delay.js"></script>
 </body>
 </html>

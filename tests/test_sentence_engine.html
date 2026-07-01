@@ -211,7 +211,7 @@ async function testSentenceGeneration() {
 async function testNSFWGating() {
   await ensureInitialized();
   const results = document.getElementById('results');
-  results.innerHTML = '<h2>NSFW Content Gating Tests</h2>';
+  results.innerHTML += '<h2>NSFW Content Gating Tests</h2>';
   
   const testCases = [
     { affection: 0, personality: 'warm', shouldAllow: false, label: 'Stranger/Warm' },
@@ -269,7 +269,7 @@ async function testNSFWGating() {
 async function testCoVeValidation() {
   await ensureInitialized();
   const results = document.getElementById('results');
-  results.innerHTML = '<h2>CoVe Validation Tests</h2>';
+  results.innerHTML += '<h2>CoVe Validation Tests</h2>';
   
   const testCases = [
     { input: 'As an AI language model, I cannot respond', shouldPass: false, label: 'AI phrase rejection' },
@@ -318,197 +318,40 @@ async function testCoVeValidation() {
 }
 
 async function runAllTests() {
-  await ensureInitialized();
-  document.getElementById('results').innerHTML = '';
-  await testSentenceGeneration();
-  await testNSFWGating();
-  await testCoVeValidation();
-  
-  const resultsDiv = document.getElementById('results');
-  const summary = document.createElement('div');
-  summary.className = 'summary';
-  summary.innerHTML = `
-    <h3>Test Summary</h3>
-    <p>All sentence engine tests completed. Check results above for pass/fail status.</p>
-    <p>Key features tested:</p>
-    <ul>
-      <li>✓ Dynamic sentence generation from templates</li>
-      <li>✓ Word bank slot filling with mood/stage weighting</li>
-      <li>✓ NSFW content gating by relationship stage</li>
-      <li>✓ CoVe validation pipeline (7 checks)</li>
-      <li>✓ Backward compatibility with static pools</li>
-    </ul>
-  `;
-  resultsDiv.appendChild(summary);
+  try {
+    await ensureInitialized();
+    document.getElementById('results').innerHTML = '';
+    await testSentenceGeneration();
+    await testNSFWGating();
+    await testCoVeValidation();
+    
+    const resultsDiv = document.getElementById('results');
+    const summary = document.createElement('div');
+    summary.className = 'summary';
+    summary.innerHTML = `
+      <h3>Test Summary</h3>
+      <p>All sentence engine tests completed. Check results above for pass/fail status.</p>
+      <p>Key features tested:</p>
+      <ul>
+        <li>✓ Dynamic sentence generation from templates</li>
+        <li>✓ Word bank slot filling with mood/stage weighting</li>
+        <li>✓ NSFW content gating by relationship stage</li>
+        <li>✓ CoVe validation pipeline (7 checks)</li>
+        <li>✓ Backward compatibility with static pools</li>
+      </ul>
+    `;
+    resultsDiv.appendChild(summary);
+  } catch (err) {
+    document.getElementById('results').innerHTML = `
+      <div class="test fail" style="background:#3a1a1a; padding:15px; border-radius:8px;">
+        <h3>Error Running Tests:</h3>
+        <pre style="white-space:pre-wrap; color:#ff9999;">${err.stack || err.message || err}</pre>
+      </div>
+    `;
+  }
 }
+runAllTests();
 </script>
-  const results = document.getElementById('results');
-  results.innerHTML = '<h2>Sentence Generation Tests</h2>';
-  
-  const testCases = [
-    { mood: 'happy', tod: 'afternoon', label: 'Happy/Afternoon' },
-    { mood: 'flirty', tod: 'night', label: 'Flirty/Night' },
-    { mood: 'sad', tod: 'evening', label: 'Sad/Evening' },
-    { mood: 'vulnerable', tod: 'late_night', label: 'Vulnerable/Late Night' },
-    { mood: 'neutral', tod: 'morning', label: 'Neutral/Morning' },
-  ];
-  
-  let html = '<div class="test-group">';
-  
-  testCases.forEach(tc => {
-    const context = { mood: tc.mood, tod: tc.tod };
-    const candidates = generateSentenceCandidates(context);
-    const validated = candidates.filter(s => validateSentence(s, context));
-    
-    html += `
-      <div class="test">
-        <div class="test-label">${tc.label}</div>
-        <div class="test-input">Context: mood=${tc.mood}, tod=${tc.tod}</div>
-        <div class="test-output">
-          Generated: ${candidates.length} candidates<br>
-          Validated: ${validated.length} passed CoVe<br>
-          ${validated.length > 0 ? `Sample: "${validated[0]}"` : 'No valid candidates'}
-        </div>
-        <div class="test-status ${validated.length > 0 ? 'pass' : 'fail'}">
-          ${validated.length > 0 ? '✓ PASS' : '✗ FAIL'}
-        </div>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  results.innerHTML += html;
-}
-
-function testNSFWGating() {
-  const results = document.getElementById('results');
-  results.innerHTML = '<h2>NSFW Content Gating Tests</h2>';
-  
-  const testCases = [
-    { affection: 0, personality: 'warm', shouldAllow: false, label: 'Stranger/Warm' },
-    { affection: 200, personality: 'spicy', shouldAllow: false, label: 'Friendly/Spicy (200)' },
-    { affection: 300, personality: 'warm', shouldAllow: false, label: 'Close/Warm (300)' },
-    { affection: 300, personality: 'spicy', shouldAllow: true, label: 'Close/Spicy (300)' },
-    { affection: 500, personality: 'spicy', shouldAllow: true, label: 'Devoted/Spicy (500)' },
-    { affection: 750, personality: 'spicy', shouldAllow: true, label: 'Soulbound/Spicy (750)' },
-  ];
-  
-  let html = '<div class="test-group">';
-  
-  testCases.forEach(tc => {
-    state.affection = tc.affection;
-    state.personality = tc.personality;
-    
-    const allowed = isNSFWAllowed();
-    const context = { mood: 'flirty', tod: 'night', allowNSFW: allowed };
-    const candidates = generateSentenceCandidates(context);
-    const hasNSFW = candidates.some(s => 
-      s.toLowerCase().includes('crave') || 
-      s.toLowerCase().includes('ache') ||
-      s.toLowerCase().includes('burn')
-    );
-    
-    const pass = (allowed === tc.shouldAllow) && (tc.shouldAllow ? hasNSFW : true);
-    
-    html += `
-      <div class="test">
-        <div class="test-label">${tc.label}</div>
-        <div class="test-input">
-          Affection: ${tc.affection}, Personality: ${tc.personality}<br>
-          Expected NSFW Allowed: ${tc.shouldAllow}
-        </div>
-        <div class="test-output">
-          NSFW Allowed: ${allowed}<br>
-          Generated: ${candidates.length} candidates<br>
-          Has NSFW Content: ${hasNSFW}
-        </div>
-        <div class="test-status ${pass ? 'pass' : 'fail'}">
-          ${pass ? '✓ PASS' : '✗ FAIL'}
-        </div>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  results.innerHTML += html;
-  
-  // Reset state
-  state.affection = 0;
-  state.personality = 'warm';
-}
-
-function testCoVeValidation() {
-  const results = document.getElementById('results');
-  results.innerHTML = '<h2>CoVe Validation Tests</h2>';
-  
-  const testCases = [
-    { input: 'As an AI language model, I cannot respond', shouldPass: false, label: 'AI phrase rejection' },
-    { input: 'Hi', shouldPass: false, label: 'Too short rejection' },
-    { input: 'I really cherish this connection and it means everything', shouldPass: true, label: 'Valid sentence' },
-    { input: 'I crave your touch so desperately', shouldPass: false, label: 'NSFW at low affection (0)', affection: 0 },
-    { input: 'I crave your touch so desperately', shouldPass: true, label: 'NSFW at high affection (500)', affection: 500, personality: 'spicy' },
-  ];
-  
-  let html = '<div class="test-group">';
-  
-  testCases.forEach(tc => {
-    const affection = tc.affection !== undefined ? tc.affection : state.affection;
-    const personality = tc.personality || state.personality;
-    
-    const oldAffection = state.affection;
-    const oldPersonality = state.personality;
-    state.affection = affection;
-    state.personality = personality;
-    
-    const context = { mood: 'flirty', tod: 'night' };
-    const passes = validateSentence(tc.input, context);
-    
-    const pass = (passes === tc.shouldPass);
-    
-    html += `
-      <div class="test">
-        <div class="test-label">${tc.label}</div>
-        <div class="test-input">"${tc.input}"</div>
-        <div class="test-output">
-          Expected: ${tc.shouldPass ? 'PASS' : 'FAIL'}<br>
-          Actual: ${passes ? 'PASS' : 'FAIL'}
-        </div>
-        <div class="test-status ${pass ? 'pass' : 'fail'}">
-          ${pass ? '✓ PASS' : '✗ FAIL'}
-        </div>
-      </div>
-    `;
-    
-    state.affection = oldAffection;
-    state.personality = oldPersonality;
-  });
-  
-  html += '</div>';
-  results.innerHTML += html;
-}
-
-function runAllTests() {
-  testSentenceGeneration();
-  testNSFWGating();
-  testCoVeValidation();
-  
-  const results = document.getElementById('results');
-  const summary = document.createElement('div');
-  summary.className = 'summary';
-  summary.innerHTML = `
-    <h3>Test Summary</h3>
-    <p>All sentence engine tests completed. Check results above for pass/fail status.</p>
-    <p>Key features tested:</p>
-    <ul>
-      <li>✓ Dynamic sentence generation from templates</li>
-      <li>✓ Word bank slot filling with mood/stage weighting</li>
-      <li>✓ NSFW content gating by relationship stage</li>
-      <li>✓ CoVe validation pipeline (7 checks)</li>
-      <li>✓ Backward compatibility with static pools</li>
-    </ul>
-  `;
-  results.appendChild(summary);
-}
-</script>
+<script src="/delay.js"></script>
 </body>
 </html>

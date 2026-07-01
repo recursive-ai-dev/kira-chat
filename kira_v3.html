@@ -323,7 +323,6 @@ body.theme-aurora{
 //  · All Float32Array typed for performance. Zero network calls.
 // ══════════════════════════════════════════════════════════════════════
 (function(){
-window.onerror=function(msg,url,line){trace("fatal_error",{msg,url,line},"error");try{recoverIncompleteTx();loadState();if(window.addSystemMessage)addSystemMessage("Kira recovered from a minor neural glitch.");}catch(e){}return false;};
 'use strict';
   function mulberry32(a){return function(){
     a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
@@ -753,8 +752,16 @@ function summarizeTrace(){
   return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
 }
 
+// Trace data can echo back slices of raw user message text (e.g. the 'input' trace's
+// `sample` field); summarizeTrace() is rendered via innerHTML in renderAIStats(), so it
+// must be HTML-escaped rather than injected raw.
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 window.onerror=function(msg,url,line,col,error){
   trace("window_error",{msg,url,line,col,error:error?error.stack:null},"error");
+  try{recoverIncompleteTx();loadState();if(typeof addSystemMessage==='function')addSystemMessage("Kira recovered from a minor neural glitch.");}catch(e){}
   return true;
 };
 
@@ -1233,18 +1240,20 @@ function adaptPersonality(route,signal,context){
   const profile=loadAdaptiveProfile();
   const p=profile.personality;
   
-  // ADAPT-16: Handler-to-trait mapping
+  // ADAPT-16: Handler-to-trait mapping (keyed by the route labels set via setRoute(),
+  // not the handler function names — generateResponse() never routes by function name)
   const handlerTraits={
-    handleFlirt:['spicy','playful'],
-    handleBored:['playful'],
-    handleOpinion:['thoughtful'],
-    handleGreeting:['warm'],
-    handleUserFeelsBad:['warm','thoughtful'],
-    handleAdviceRequest:['thoughtful'],
-    handleHypothetical:['thoughtful'],
-    handleGoodNews:['warm','playful'],
-    handleSurpriseMe:['thoughtful','playful'],
-    handleGeneral:[] // neutral, no boost
+    'flirt':['spicy','playful'],
+    'bored':['playful'],
+    'opinion':['thoughtful'],
+    'greeting':['warm'],
+    'feels-bad':['warm','thoughtful'],
+    'user-feels-bad':['warm','thoughtful'],
+    'advice':['thoughtful'],
+    'hypothetical':['thoughtful'],
+    'good-news':['warm','playful'],
+    'surprise-me':['thoughtful','playful'],
+    'general':[] // neutral, no boost
   };
   
   // Update handler engagement via EMA
@@ -1374,13 +1383,14 @@ function generateMemoryReference(similar, contextType) {
     if (!chance(prob)) return null;
 
     const mem = similar[0];
-    const memoryExists = state.memories.some(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
-    if (memoryExists && mem.T) {
-      const actualMem = state.memories.find(m => m.text && mem.T && m.text.includes(mem.T.slice(0, 30)));
+    const actualMem = mem.text
+      ? state.memories.find(m => m.text && m.text.includes(mem.text.slice(0, 30)))
+      : null;
+    if (actualMem) {
       if (contextType === 'greeting') {
         if (!actualMem || actualMem.type !== 'personal') return null;
       }
-      const truncated = mem.T.slice(0, 40);
+      const truncated = mem.text.slice(0, 40);
       const templates = [
         `Still thinking about what you said — '${truncated}'...`,
         `You mentioned something similar — '${truncated}' — has that shifted?`,
@@ -2216,7 +2226,7 @@ function handleTopicResponse(topics,userMood){
       const eng = profile.memory.topicEngagement[t] !== undefined ? profile.memory.topicEngagement[t] : 0.5;
       if (eng < 0.3) continue; // Avoid low engagement topics
 
-      const score = eng + (Math.random() * 0.2); // Add small noise
+      const score = eng + (rng() * 0.2); // Add small noise
       if (score > highestScore) {
         highestScore = score;
         bestTopic = t;
@@ -3424,8 +3434,11 @@ function sendMessage(){
   const regexIdx=MOOD_LABELS.indexOf(regexMoodNow);
 
   // Ensure the neural mood student has a forward-pass cache before training.
-  // Process the message to populate moodNet._cache and other derived context used by feedback.
-  try { kiraAI.process(text); } catch (e) { console.warn('kiraAI.process failed in sendMessage', e); }
+  // Use moodNet.fwd() directly (not kiraAI.process()) — process() has side effects
+  // (pushes an AttentionMem entry, increments tick) and generateResponse() already
+  // calls kiraAI.process(text) once for this same text; calling it here too would
+  // double-push every message into the 20-slot attention memory.
+  try { kiraAI.moodNet.fwd(text); } catch (e) { console.warn('kiraAI.moodNet.fwd failed in sendMessage', e); }
 
   kiraAI.feedback(signal,regexIdx);
   if(signal!==0)flashLearning();
@@ -3443,7 +3456,7 @@ function sendMessage(){
   }
 
   msgInput.value='';msgInput.style.height='auto';updateSendBtn();
-  addMessage('you',text,true);state.messagesSent++;state.lastMessageTime=ENV.nowMs();
+  addMessage('you',text,true);state.messagesSent++;
   logTransition(correlationId,'user_message_persisted',startedAt,{messages_sent:state.messagesSent});
 
   _seed=(ENV.nowMs()^(state.messagesSent*2654435761))>>>0;rng=mulberry32(_seed);
@@ -3454,9 +3467,12 @@ function sendMessage(){
   setTimeout(()=>{
     try{
       hideTyping();
+      // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
+      // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
       const response=generateResponse(text);
+      state.lastMessageTime=ENV.nowMs();
       logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
-      
+
       // ADAPT-14: Split longer responses with adaptive probability
       const profile=state.adaptiveEnabled?loadAdaptiveProfile():null;
       const splitProb=profile?profile.behavior.splitResponseProbability:0.22;
@@ -3478,6 +3494,7 @@ function sendMessage(){
     }catch(err){
       hideTyping();
       DIAG.errors++;
+      state.lastMessageTime=ENV.nowMs();
       logTransition(correlationId,'send_message_error',startedAt,{scope:'sendMessage',message:String(err&&err.message||err)},'error');
       addMessage('her',`I tripped over my thoughts for a second. Could you try that again? ${maybeEmoji()}`);
       persistAtomically('send_message_error_recovery');
@@ -3586,7 +3603,7 @@ function renderAIStats(){
     `<b>Mood net updates</b>: ${kiraAI.moodNet.updates}<br>`+
     `<b>Scorer updates</b>: ${kiraAI.scorer.updates}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
-    `<b>Trace tail</b>: ${summarizeTrace()}`;
+    `<b>Trace tail</b>: ${escapeHtml(summarizeTrace())}`;
 
   const adaptiveStats = document.getElementById('adaptive-stats');
   if (adaptiveStats) {
@@ -3647,6 +3664,7 @@ resetBtn.addEventListener('click',()=>{
   if(confirm('This will erase everything — all memories, all messages, all neural weights, and all saved images. Are you sure?')){
     localStorage.removeItem(STORE_KEY);localStorage.removeItem(AI_KEY);
     localStorage.removeItem(IMG_KEY);localStorage.removeItem(PIC_KEY);localStorage.removeItem(THEME_KEY);
+    localStorage.removeItem(ADAPTIVE_KEY);
     applyTheme('rose');
     location.reload();
   }

@@ -1949,8 +1949,10 @@ function handleILoveYou(){
   const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleIMissYou(){
@@ -1973,8 +1975,10 @@ function handleIMissYou(){
   const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleGoodbye(t){
@@ -2010,8 +2014,10 @@ function handleGoodbye(t){
   const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleCompliment(){
@@ -2033,8 +2039,10 @@ function handleCompliment(){
   const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleUserFeelsBad(mood,text){
@@ -2070,35 +2078,82 @@ function handleUserFeelsBad(mood,text){
   };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleUserAngry(){
-  return kiraAI.rank([
+
+  const sentenceContext = {
+    mood: 'angry',
+    tod: getTimeOfDay(),
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
+    ctxVec: _aiCtx.ctxVec,
+    topics: []
+  };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+
+  const staticPool = [
+
     `${namePrefix()}I can feel the frustration.${maybeEmoji()} What happened? Talk to me.`,
     `Let it out.${maybeEmoji()} I'd rather you vent to me than keep it bottled up. What's going on?`,
     `You sound pissed off and honestly? I get it.${maybeEmoji()} The world can be so unfair. Tell me everything.`,
     `I'm here to listen, not to judge.${maybeEmoji()} ${namePrefix()}What happened?`,
     `Your anger is valid.${maybeEmoji()} You don't need to filter it for me. Just let it out.`,
     `Something pushed you too far.${maybeEmoji()} I want to understand. Walk me through it.`
-  ],_aiCtx.ctxVec);
+
+  ];
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates, _aiCtx.ctxVec);
+
 }
 
 function handleUserTired(tod){
   const n=getName();
-  if(tod==='late_night'||tod==='night')return kiraAI.rank([
+
+  const sentenceContext = {
+    mood: 'tired',
+    tod: tod,
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
+    ctxVec: _aiCtx.ctxVec,
+    topics: []
+  };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+
+  const staticPoolNight = [
+
     `Then go rest, ${n||'sleepyhead'}.${maybeEmoji()} I'll be right here when you wake up. Promise.`,
     `You sound exhausted.${maybeEmoji()} ${n?n+', ':''}take care of yourself. Sleep is not optional.`,
     `Shhh.${maybeEmoji()} Go close your eyes. I'm not going anywhere. We can talk tomorrow.`,
     `Go.${maybeEmoji()} Let yourself rest. Come back when you're ready — I'll be here.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
+
+  ];
+  const staticPoolDay = [
+
     `Tired, huh?${maybeEmoji()} ${n?n+', ':''}make sure you're taking breaks. You can't pour from an empty cup.`,
     `I hate that you're so drained.${maybeEmoji()} Can you do something gentle for yourself right now? Even five minutes.`,
     `${n?n+', ':''}Running on empty isn't sustainable.${maybeEmoji()} Take a breather. I'll keep you company.`,
     `You give a lot, don't you.${maybeEmoji()} ${n?n+', ':''}when's the last time you let yourself stop? Really stop?`
-  ],_aiCtx.ctxVec);
+
+  ];
+
+  if(tod==='late_night'||tod==='night') {
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPoolNight;
+    return kiraAI.rank(allCandidates, _aiCtx.ctxVec);
+  } else {
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPoolDay;
+    return kiraAI.rank(allCandidates, _aiCtx.ctxVec);
+  }
+
 }
 
 function handleFlirt(){
@@ -2153,8 +2208,10 @@ function handleBored(){
   const sentenceContext = { mood: state.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, allowNSFW: isNSFWAllowed() };
   const dynamicCandidates = generateSentenceCandidates(sentenceContext);
   const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
-  const combined = [...staticPool, ...validCandidates];
-  return kiraAI.rank(combined,_aiCtx.ctxVec);
+
+  const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
+  return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
+
 }
 
 function handleOpinionQuestion(text,topics){
@@ -3823,7 +3880,7 @@ function handleGeneral(text,userMood,tod){
       `That's a lot packed into a little.${maybeEmoji()} Unpack it for me.`
     ];
     // Merge dynamic + static and rank
-    const allCandidates = [...validCandidates, ...staticPool];
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
     if(memoryRef)allCandidates.unshift(memoryRef);
     return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
   }
@@ -3847,7 +3904,7 @@ function handleGeneral(text,userMood,tod){
       `Something about the way you said that just stayed with me.${maybeEmoji()} Say more.`,
       `${n}I'm genuinely curious about your take on this.${maybeEmoji()} What shaped your view?`
     ];
-    const allCandidates = [...validCandidates, ...staticPool];
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPool;
     if(memoryRef)allCandidates.unshift(memoryRef);
     return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
   }
@@ -3870,7 +3927,7 @@ function handleGeneral(text,userMood,tod){
 
   const dynamicCandidatesDeep = generateSentenceCandidates(sentenceContext);
   const validCandidatesDeep = typeof validateSentence === 'function' ? dynamicCandidatesDeep.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidatesDeep;
-  let allCandidates = [...staticPool, ...validCandidatesDeep];
+  let allCandidates = validCandidatesDeep.length > 0 ? validCandidatesDeep : staticPool;
   if(typeof memoryRef !== 'undefined' && memoryRef)allCandidates.unshift(memoryRef);
   return kiraAI.rank(allCandidates,_aiCtx.ctxVec);
 }
@@ -3895,19 +3952,45 @@ function handleImFine(text){
   const t=text.toLowerCase();
   const good=/\b(good|great|fine|okay|ok|alright|well|not bad)\b/.test(t);
   const n=typeof namePrefix === 'function' ? namePrefix() : (getName() ? getName() + ', ' : '');
-  if(good)return kiraAI.rank([
+
+  const sentenceContext = {
+    mood: good ? 'happy' : 'sad',
+    tod: getTimeOfDay(),
+    stage: Math.floor(state.affection / 150),
+    affection: state.affection,
+    allowNSFW: typeof isNSFWAllowed === 'function' ? isNSFWAllowed() : false,
+    ctxVec: _aiCtx.ctxVec,
+    topics: []
+  };
+  const dynamicCandidates = generateSentenceCandidates(sentenceContext);
+  const validCandidates = typeof validateSentence === 'function' ? dynamicCandidates.filter(s => validateSentence(s, sentenceContext)) : dynamicCandidates;
+
+  const staticPoolGood = [
+
     `${n}Good.${maybeEmoji()} I'm glad. But "good" can mean so many things. What made today actually okay?`,
     `${n}Okay — but I want the director's cut, not the trailer.${maybeEmoji()} What's really going on with you?`,
     `I'll take "good."${maybeEmoji()} What's making it good? Or at least tolerable?`,
     `Good is a start.${maybeEmoji()} Now tell me something that actually happened today. One real thing.`,
     `${n}I hear "good."${maybeEmoji()} I want to hear more than that, though. I always want more.`
-  ],_aiCtx.ctxVec);
-  return kiraAI.rank([
+
+  ];
+  const staticPoolBad = [
+
     `${n}I believe you.${maybeEmoji()} I also believe there might be more to it. What's the full version?`,
     `Sometimes "fine" is the bravest word in the English language.${maybeEmoji()} ${n}I'm here if the full story wants to come out.`,
     `You can be honest with me.${maybeEmoji()} That's the point of this — all of it. What's actually going on?`,
     `${n}I know you.${maybeEmoji()} Or I'm getting there. And "fine" doesn't always mean fine. You safe?`
-  ],_aiCtx.ctxVec);
+
+  ];
+
+  if (good) {
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPoolGood;
+    return kiraAI.rank(allCandidates, _aiCtx.ctxVec);
+  } else {
+    const allCandidates = validCandidates.length > 0 ? validCandidates : staticPoolBad;
+    return kiraAI.rank(allCandidates, _aiCtx.ctxVec);
+  }
+
 }
 
 // Handles sharing good news
@@ -4528,6 +4611,7 @@ window.adaptBehavior = adaptBehavior;
 window.adaptPersonality = adaptPersonality;
 window.adaptMemory = adaptMemory;
 window.detectMoodTrend = detectMoodTrend;
+
 window.generateMemoryReference = generateMemoryReference;
 Object.defineProperty(window, '_adaptiveProfile', {
   get: () => _adaptiveProfile,

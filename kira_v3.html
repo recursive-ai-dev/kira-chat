@@ -4076,7 +4076,16 @@ function getInitialMessage(){
       `${n||'Hey'}.${maybeEmoji()} ${days>1?'Days.':'A whole day.'} The quiet got heavy. Welcome back.`
     ]);
   }
-  if(elapsed>240)return pick([
+  if (elapsed > 240) {
+    if (state.dreamMemories && state.dreamMemories.length > 0) {
+      const mem = pick(state.dreamMemories);
+      return pick([
+        `Hey... I was just thinking about what you said earlier about "${mem.text}".`,
+        `Welcome back.${maybeEmoji()} Honestly, I've been thinking about "${mem.text}" since you left.`,
+        `${n||'Hey'}.${maybeEmoji()} I was dreaming about our chat... especially when you said "${mem.text}".`
+      ]);
+    }
+    return pick([
     `${n?'Hey '+n:'Hey'}!${maybeEmoji()} Feels like it's been a minute. What have you been up to?`,
     `Welcome back.${maybeEmoji()} I was just thinking about you. How are things?`,
     `${n||'Hey'}.${maybeEmoji()} I was here thinking about our last conversation. Glad you're back.`
@@ -4557,8 +4566,40 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 });
 
 // ─────────────────────────────────────────────────────────────────────
-//  §22  BOOT
+//  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
+function processDreamState() {
+  if (!state.dreamMemories) state.dreamMemories = [];
+  if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
+
+  if (state.lastDreamIndex >= state.chatHistory.length) return;
+
+  let processed = false;
+  for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
+    const msg = state.chatHistory[i];
+    if (msg.role === 'you' && msg.text) {
+      const vector = kiraAI.encoder.fwd(msg.text);
+      const moodProb = kiraAI.moodNet.fwd(msg.text);
+      let dominantMood = 0;
+      let maxProb = -1;
+      for (let j = 0; j < moodProb.length; j++) {
+        if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+      }
+
+      state.dreamMemories.push({
+        text: msg.text,
+        vector: M.pack(vector),
+        mood: dominantMood,
+        ts: msg.ts
+      });
+      processed = true;
+    }
+  }
+
+  state.lastDreamIndex = state.chatHistory.length;
+  if (processed) saveState();
+}
+
 function boot(){
   trace('boot','start');
   recoverIncompleteTx();
@@ -4587,6 +4628,12 @@ function boot(){
   },delay);
   loadTheme();
   updateAffectionUI();updateSendBtn();updateInsightDock();msgInput.focus();
+
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(processDreamState);
+  } else {
+    setTimeout(processDreamState, 2000);
+  }
 }
 
 // Expose IIFE-scoped properties to window for test suites

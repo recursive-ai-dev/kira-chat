@@ -3737,7 +3737,7 @@ function generateSentence(template, context) {
     }
   }
   
-  for (const slotName of Object.keys(slotCache)) {
+  for (const slotName in slotCache) {
     sentence = sentence.split(`{${slotName}}`).join(slotCache[slotName]);
   }
   

@@ -1438,20 +1438,20 @@ function updateAffectionUI(){
 function detectUserMoodRegex(text){
   const t=text.toLowerCase();
   const signals={
-    happy:/\b(haha|lol|lmao|happy|great|awesome|amazing|wonderful|yay|hell yeah|love it|😂|😊|🥰)\b/,
-    sad:/\b(sad|depressed|lonely|alone|miss|crying|cry|hurts|pain|sucks|awful|terrible|empty|numb|💔|😢)\b/,
-    angry:/\b(angry|mad|pissed|furious|hate|annoying|frustrated|goddamn|pisses me off)\b/,
-    anxious:/\b(anxious|worried|scared|nervous|stress|overwhelm|panic|freaking out|terrified)\b/,
-    flirty:/\b(cute|beautiful|gorgeous|babe|baby|sexy|hot|kiss|hug|cuddle|miss you|love you|want you|❤|💕|😘|😏)\b/,
-    bored:/\b(bored|boring|nothing to do|meh|whatever|blah|so bored)\b/,
-    tired:/\b(tired|exhausted|sleepy|drained|worn out|need sleep|passing out)\b/,
-    curious:/\b(what if|wonder|curious|tell me|how does|why do|what do you think|opinion|thoughts on)\b/,
-    grateful:/\b(thank|thanks|appreciate|grateful|means a lot|so kind|sweet of you|you're the best)\b/,
-    vulnerable:/\b(i feel like|no one|nobody|don.t matter|worth|am i|do you even|be honest|tell me the truth)\b/
+    happy:/\b(haha|lol|lmao|happy|great|awesome|amazing|wonderful|yay|hell yeah|love it|😂|😊|🥰)\b/gi,
+    sad:/\b(sad|depressed|lonely|alone|miss|crying|cry|hurts|pain|sucks|awful|terrible|empty|numb|💔|😢)\b/gi,
+    angry:/\b(angry|mad|pissed|furious|hate|annoying|frustrated|goddamn|pisses me off)\b/gi,
+    anxious:/\b(anxious|worried|scared|nervous|stress|overwhelm|panic|freaking out|terrified)\b/gi,
+    flirty:/\b(cute|beautiful|gorgeous|babe|baby|sexy|hot|kiss|hug|cuddle|miss you|love you|want you|❤|💕|😘|😏)\b/gi,
+    bored:/\b(bored|boring|nothing to do|meh|whatever|blah|so bored)\b/gi,
+    tired:/\b(tired|exhausted|sleepy|drained|worn out|need sleep|passing out)\b/gi,
+    curious:/\b(what if|wonder|curious|tell me|how does|why do|what do you think|opinion|thoughts on)\b/gi,
+    grateful:/\b(thank|thanks|appreciate|grateful|means a lot|so kind|sweet of you|you're the best)\b/gi,
+    vulnerable:/\b(i feel like|no one|nobody|don.t matter|worth|am i|do you even|be honest|tell me the truth)\b/gi
   };
   let best='neutral',maxM=0;
   for(const[mood,rx]of Object.entries(signals)){
-    const m=t.match(new RegExp(rx.source,'gi'));
+    const m=t.match(rx);
     if(m&&m.length>maxM){maxM=m.length;best=mood;}
   }
   state.userMoods.push(best);

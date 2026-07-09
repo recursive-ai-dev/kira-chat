@@ -215,6 +215,20 @@ body.theme-aurora{
 @media(max-width:520px){#insight-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 </style>
+
+<script type="module">
+  window.loadWebLLMEngine = async () => {
+    if(!window.webllmEngine) {
+      const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
+      window.webllmEngine = await CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
+        initProgressCallback: (progress) => {
+          console.log("WebLLM loading:", progress.text);
+        }
+      });
+    }
+    return window.webllmEngine;
+  };
+</script>
 </head>
 <body>
 <div id="app">
@@ -4297,6 +4311,46 @@ function flashLearning(){
 // ─────────────────────────────────────────────────────────────────────
 //  §19  SEND + ONLINE LEARNING LOOP
 // ─────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────
+//  § GENERATIVE FALLBACK (WebLLM)
+// ─────────────────────────────────────────────────────────────────────
+async function generateWebLLMResponse(userText) {
+  try {
+    const engine = await window.loadWebLLMEngine();
+
+    // Construct system prompt incorporating Kira's current state
+    const stageName = getStage().name;
+    const tod = getTimeOfDay();
+    const topics = detectTopics(userText);
+    const n = getName() || "the user";
+    const spicy = state.personality === 'spicy' ? " You can be flirty or playfully sassy." : "";
+
+    let systemPrompt = `You are Kira, an AI companion. You are currently feeling ${state.mood}. It is ${tod}. The user's name is ${n}. Your relationship stage is '${stageName}'.${spicy}`;
+    systemPrompt += " Keep your response concise, natural, and conversational. Do not act like a typical AI assistant, act like a human friend or partner. Do not output more than 3-4 sentences. Do not use asterisks for actions.";
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userText }
+    ];
+
+    const reply = await engine.chat.completions.create({
+      messages: messages,
+      temperature: typeof state !== 'undefined' && state.adaptiveEnabled ? (loadAdaptiveProfile()?.behavior?.temperature || 0.7) : 0.7,
+    });
+
+    if (reply && reply.choices && reply.choices.length > 0) {
+       let out = reply.choices[0].message.content.trim();
+       // Strip any surrounding quotes or weird formatting that might accidentally be generated
+       out = out.replace(/^"|"$|^\*|\*$/g, '');
+       return out;
+    }
+  } catch (err) {
+    console.error("WebLLM generation failed:", err);
+  }
+  return null;
+}
+
 function sendMessage(){
   const correlationId=ENV.makeId('msg');
   const startedAt=ENV.nowMs();
@@ -4342,12 +4396,39 @@ function sendMessage(){
   const thinkTime=Math.min(400+text.length*8+randInt(200,800),3000);
   showTyping();
 
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     try{
+      // Check if we need to do generative fallback
+      let response = null;
+      let usedGenerative = false;
+
+      // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
+      // Call process here without updating UI state yet to get confidence.
+      const tempCtx = kiraAI.process(text);
+
+      if (tempCtx.confidence < 0.38 && window.webllmEngine) {
+         const genResp = await generateWebLLMResponse(text);
+         if (genResp) {
+             const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
+             if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
+                 response = genResp;
+                 usedGenerative = true;
+             }
+         }
+      }
+
       hideTyping();
       // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
       // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
-      const response=generateResponse(text);
+      if (!usedGenerative) {
+         response = generateResponse(text);
+      } else {
+         // Because generateResponse handles side effects like advancing CTX and adding affection,
+         // we simulate the minimum necessary side effects here.
+         _aiCtx = tempCtx;
+         state.conversationDepth++; state.messagesReceived++;
+      }
+
       state.lastMessageTime=ENV.nowMs();
       logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
 

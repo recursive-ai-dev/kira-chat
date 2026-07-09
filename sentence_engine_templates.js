@@ -675,7 +675,19 @@ const _compiledCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 // Reference-safe RNG: some consumers (CommonJS tests) don't provide a global
 // `rng`. Fall back to Math.random to avoid ReferenceError while preserving
 // seeded RNGs when the host provides one.
-const _rand = (typeof rng === 'function') ? rng : Math.random;
+const _fallbackRand = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] / (0xffffffff + 1);
+  } else if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0] / (0xffffffff + 1);
+  }
+  return Math.random();
+};
+const _rand = (typeof rng === 'function') ? rng : _fallbackRand;
 
 function _compileStructure(str) {
   const parts = [];

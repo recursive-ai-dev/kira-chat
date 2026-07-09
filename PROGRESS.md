@@ -101,7 +101,7 @@ Kira adapts her behavior, personality, and memories over time using gradual **Ex
 * [ ] **NM-01: Intent Router** — Constrain intent mapping with a `Linear(EDIM*2, 17)` head applied to FNV-1a HashEmbed, replacing the 20-handler regex cascade.
 * [ ] **NM-02: Emotion Granularity** — Train parallel MLP head (`Linear(EDIM, 3)`) for `sarcastic`, `nostalgic`, and `excited` mood detection.
 * [ ] **NM-04: Semantic NER** — Implement a token-level slots classifier (`Linear(EDIM*2, 5)`) for name, age, preference, and vulnerability disclosures.
-* [ ] **NM-03: Generative Fallback** — Integrate quantized WebLLM/ONNX runtime to generate open-ended long-tail responses when confidence is low.
+* [x] **NM-03: Generative Fallback** — Integrate quantized WebLLM/ONNX runtime to generate open-ended long-tail responses when confidence is low.
 
 ### Phase 2 — Testing & Tooling
 * [ ] **DEV-12: Build & Minify Script** — Create a build tool to compile/inline the standalone JS files into [kira_v3.html](file:///home/lubuntu/Pictures/kira-chat/kira_v3.html) and produce a minified version.

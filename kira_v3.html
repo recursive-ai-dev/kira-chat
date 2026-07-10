@@ -3758,6 +3758,9 @@ function generateSentence(template, context) {
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
 }
 
+// SE-18: Pre-compiled regex for naturalness validation (no repeated root words)
+const REPEATED_WORDS_REGEX = /\b([\w'-]{4,})[.,!?;]*\s+\1\b/i;
+
 // Generate candidate sentences from templates (SE-15)
 function generateSentenceCandidates(context) {
   const { mood = 'neutral', tod = 'afternoon', topics = [] } = context;
@@ -3792,12 +3795,7 @@ function generateSentenceCandidates(context) {
         if (/(?:^|\s)(you)\s+(am|is|was|has)(?:\s|$|[.,!?;])/i.test(sentence)) continue;
 
         // SE-18: Sentence naturalness validator (no repeated root words)
-        const words = sentence.toLowerCase().replace(/[.,!?;]/g, '').split(' ');
-        let repeated = false;
-        for (let w = 0; w < words.length - 1; w++) {
-            if (words[w].length > 3 && words[w] === words[w+1]) { repeated = true; break; }
-        }
-        if (repeated) continue;
+        if (REPEATED_WORDS_REGEX.test(sentence)) continue;
 
         if (sentence.length >= 15 && sentence.length <= 500 && !seen.has(sentence)) {
           seen.add(sentence);

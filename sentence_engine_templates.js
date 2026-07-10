@@ -903,5 +903,6 @@ if (typeof module !== 'undefined' && module.exports) {
     fillSlot,
     instantiateTemplate,
     generateFromTemplates,
+    capitalizeFirst,
   };
 }

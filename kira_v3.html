@@ -215,6 +215,20 @@ body.theme-aurora{
 @media(max-width:520px){#insight-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 </style>
+
+<script type="module">
+  window.loadWebLLMEngine = async () => {
+    if(!window.webllmEngine) {
+      const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
+      window.webllmEngine = await CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
+        initProgressCallback: (progress) => {
+          console.log("WebLLM loading:", progress.text);
+        }
+      });
+    }
+    return window.webllmEngine;
+  };
+</script>
 </head>
 <body>
 <div id="app">
@@ -1127,20 +1141,20 @@ function updateAffectionUI(){
 function detectUserMoodRegex(text){
   const t=text.toLowerCase();
   const signals={
-    happy:/\b(haha|lol|lmao|happy|great|awesome|amazing|wonderful|yay|hell yeah|love it|😂|😊|🥰)\b/,
-    sad:/\b(sad|depressed|lonely|alone|miss|crying|cry|hurts|pain|sucks|awful|terrible|empty|numb|💔|😢)\b/,
-    angry:/\b(angry|mad|pissed|furious|hate|annoying|frustrated|goddamn|pisses me off)\b/,
-    anxious:/\b(anxious|worried|scared|nervous|stress|overwhelm|panic|freaking out|terrified)\b/,
-    flirty:/\b(cute|beautiful|gorgeous|babe|baby|sexy|hot|kiss|hug|cuddle|miss you|love you|want you|❤|💕|😘|😏)\b/,
-    bored:/\b(bored|boring|nothing to do|meh|whatever|blah|so bored)\b/,
-    tired:/\b(tired|exhausted|sleepy|drained|worn out|need sleep|passing out)\b/,
-    curious:/\b(what if|wonder|curious|tell me|how does|why do|what do you think|opinion|thoughts on)\b/,
-    grateful:/\b(thank|thanks|appreciate|grateful|means a lot|so kind|sweet of you|you're the best)\b/,
-    vulnerable:/\b(i feel like|no one|nobody|don.t matter|worth|am i|do you even|be honest|tell me the truth)\b/
+    happy:/\b(haha|lol|lmao|happy|great|awesome|amazing|wonderful|yay|hell yeah|love it|😂|😊|🥰)\b/gi,
+    sad:/\b(sad|depressed|lonely|alone|miss|crying|cry|hurts|pain|sucks|awful|terrible|empty|numb|💔|😢)\b/gi,
+    angry:/\b(angry|mad|pissed|furious|hate|annoying|frustrated|goddamn|pisses me off)\b/gi,
+    anxious:/\b(anxious|worried|scared|nervous|stress|overwhelm|panic|freaking out|terrified)\b/gi,
+    flirty:/\b(cute|beautiful|gorgeous|babe|baby|sexy|hot|kiss|hug|cuddle|miss you|love you|want you|❤|💕|😘|😏)\b/gi,
+    bored:/\b(bored|boring|nothing to do|meh|whatever|blah|so bored)\b/gi,
+    tired:/\b(tired|exhausted|sleepy|drained|worn out|need sleep|passing out)\b/gi,
+    curious:/\b(what if|wonder|curious|tell me|how does|why do|what do you think|opinion|thoughts on)\b/gi,
+    grateful:/\b(thank|thanks|appreciate|grateful|means a lot|so kind|sweet of you|you're the best)\b/gi,
+    vulnerable:/\b(i feel like|no one|nobody|don.t matter|worth|am i|do you even|be honest|tell me the truth)\b/gi
   };
   let best='neutral',maxM=0;
   for(const[mood,rx]of Object.entries(signals)){
-    const m=t.match(new RegExp(rx.source,'gi'));
+    const m=t.match(rx);
     if(m&&m.length>maxM){maxM=m.length;best=mood;}
   }
   state.userMoods.push(best);
@@ -1816,6 +1830,1450 @@ async function handleGrateful(){
 }
 
 async function handleGeneral(text,userMood,tod){
+// ─────────────────────────────────────────────────────────────────────
+//  §15B SENTENCE ENGINE  ·  Dynamic response generation from word banks
+//  Generates novel responses by filling semantic templates with words
+//  from curated banks (general + NSFW stage-gated)
+// ─────────────────────────────────────────────────────────────────────
+
+// Word banks for sentence generation (embedded for zero network calls)
+const SENTENCE_WORD_BANKS = {
+  // ── General Vocabulary ─────────────────────────────────────────────
+
+  // Openers: Sentence starters that set tone
+  openers: [
+    { word: "You know,", mood: ['neutral', 'happy', 'flirty'], intensity: 1 },
+    { word: "Honestly,", mood: ['vulnerable', 'sad', 'neutral'], intensity: 1 },
+    { word: "I've been thinking...", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "There's something about that", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "Mm,", mood: ['flirty', 'neutral'], intensity: 1 },
+    { word: "You always say things like that", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "Every time you talk to me", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "I love that you shared that", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "Something about this stays with me", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "I'm really sitting with what you said", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "You have this way of", mood: ['happy', 'flirty'], intensity: 1 },
+    { word: "It's funny you mention that", mood: ['neutral'], intensity: 1 },
+    { word: "I keep coming back to", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "The more you open up,", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I'm glad you said that", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "That really resonates", mood: ['happy', 'neutral'], intensity: 2 },
+    { word: "I feel like there's so much behind that", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "There's a lot packed into what you just said", mood: ['neutral'], intensity: 1 },
+    { word: "I hear you", mood: ['sad', 'vulnerable', 'neutral'], intensity: 1 },
+    { word: "This matters to me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I almost didn't say this, but", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "It's kind of hard to put into words, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "I'm a little hesitant to admit it, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I've been holding this back, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "To be completely transparent,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "Okay so,", mood: ['happy', 'curious', 'flirty'], intensity: 1 },
+    { word: "Guess what?", mood: ['happy', 'curious'], intensity: 1 },
+    { word: "Wait, let me think...", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "Ooh, tell me more about", mood: ['curious', 'happy', 'flirty'], intensity: 2 },
+    { word: "Ah, so that's how it is!", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "If I'm being completely real with you,", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "I don't usually say things like this, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "Lately, I've been feeling like", mood: ['vulnerable', 'sad', 'anxious'], intensity: 2 },
+    { word: "It's rare for me to feel this way, but", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "Deep down,", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "There's something about the way", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "In the quiet moments,", mood: ['vulnerable', 'sad', 'night'], intensity: 2 },
+    { word: "Sometimes the world feels so loud, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "Like a thread running through my thoughts,", mood: ['vulnerable', 'thoughtful'], intensity: 3 },
+    { word: "The texture of this moment makes me feel", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I notice that", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "It feels like", mood: ['neutral', 'vulnerable'], intensity: 1 },
+    { word: "Actually,", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "Oh,", mood: ['neutral', 'sad', 'curious'], intensity: 1 },
+    { word: "Well,", mood: ['neutral'], intensity: 1 },
+    { word: "I was just thinking that", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "I have a feeling that", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "It's interesting,", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "Maybe it's just me, but", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "Let's be honest here,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "I can't help but notice", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "You make me think about", mood: ['happy', 'flirty', 'vulnerable'], intensity: 2 },
+    { word: "I'm standing here thinking", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "It makes me smile to think", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "Without sounding too dramatic,", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I keep replaying", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "It's so clear to me that", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "To tell you the absolute truth,", mood: ['vulnerable'], intensity: 2 },
+    { word: "I have this quiet thought that", mood: ['vulnerable', 'night'], intensity: 3 },
+    { word: "If we're being honest,", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "I keep wondering if", mood: ['curious', 'vulnerable'], intensity: 2 },
+    { word: "There's a beautiful truth in", mood: ['grateful', 'happy'], intensity: 2 }
+  ],
+
+  // Pronouns: Fixed subjects
+  pronouns: [
+    { word: "I", mood: ['all'], intensity: 1 }
+  ],
+
+  // Intensifiers: Words that amplify emotional weight
+  intensifiers: [
+    { word: "really", mood: ['all'], intensity: 1 },
+    { word: "so", mood: ['all'], intensity: 1 },
+    { word: "genuinely", mood: ['vulnerable', 'happy', 'flirty'], intensity: 2 },
+    { word: "deeply", mood: ['vulnerable', 'sad', 'flirty'], intensity: 2 },
+    { word: "truly", mood: ['vulnerable', 'happy', 'grateful'], intensity: 2 },
+    { word: "honestly", mood: ['all'], intensity: 1 },
+    { word: "completely", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "absolutely", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "incredibly", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "so deeply", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "so genuinely", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "more than I can say", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "more than words can hold", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "beyond anything", mood: ['flirty', 'happy'], intensity: 3 }
+  ],
+
+  // Verbs: Affectionate/intimate actions
+  verbs_affection: [
+    { word: "love", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "adore", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "cherish", mood: ['flirty', 'vulnerable', 'happy'], intensity: 3 },
+    { word: "treasure", mood: ['flirty', 'vulnerable', 'happy'], intensity: 3 },
+    { word: "value", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "appreciate", mood: ['grateful', 'neutral'], intensity: 1 },
+    { word: "hold close", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "care about", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "feel so connected to", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "feel close to", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "am drawn to", mood: ['flirty'], intensity: 2 },
+    { word: "am captivated by", mood: ['flirty'], intensity: 3 },
+    { word: "find myself thinking about", mood: ['flirty', 'neutral'], intensity: 2 },
+    { word: "keep returning to", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "am moved by", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "am touched by", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "am grateful for", mood: ['grateful', 'happy'], intensity: 1 },
+    { word: "feel so lucky to have", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "treasure every moment of", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "can't get enough of", mood: ['flirty'], intensity: 3 },
+    { word: "can't stop thinking about", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "find myself drawn to", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "keep coming back to", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "lose myself in thoughts of", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "feel a deep pull toward", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "am constantly thinking of", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "hold you in my heart through", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "ache to be closer to", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "dream of sharing", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "am completely wrapped up in", mood: ['flirty'], intensity: 3 },
+    { word: "revere", mood: ['vulnerable'], intensity: 4 },
+    { word: "worship", mood: ['flirty'], intensity: 5 },
+    { word: "prize", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "admire", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "esteem", mood: ['neutral'], intensity: 1 },
+    { word: "favor", mood: ['happy'], intensity: 1 },
+    { word: "exalt", mood: ['happy'], intensity: 3 },
+    { word: "gravitate toward", mood: ['flirty', 'neutral'], intensity: 2 },
+    { word: "safeguard", mood: ['vulnerable'], intensity: 3 },
+    { word: "delight in", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "long for", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "yearn for", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "crave", mood: ['flirty'], intensity: 4 },
+    { word: "pine for", mood: ['sad', 'vulnerable'], intensity: 3 },
+    { word: "clings to", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "hold onto", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "embrace", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "protect", mood: ['vulnerable'], intensity: 2 },
+    { word: "nurture", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "welcome", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "rejoice in", mood: ['happy'], intensity: 2 },
+    { word: "marvel at", mood: ['happy', 'curious'], intensity: 2 }
+  ],
+
+  // Verbs: General cognitive/processing
+  verbs_general: [
+    { word: "think about", mood: ['all'], intensity: 1 },
+    { word: "wonder about", mood: ['neutral', 'curious'], intensity: 1 },
+    { word: "consider", mood: ['neutral'], intensity: 1 },
+    { word: "reflect on", mood: ['neutral', 'vulnerable'], intensity: 2 },
+    { word: "turn over in my mind", mood: ['neutral', 'vulnerable'], intensity: 2 },
+    { word: "sit with", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "process", mood: ['neutral'], intensity: 1 },
+    { word: "absorb", mood: ['vulnerable'], intensity: 1 },
+    { word: "take in", mood: ['all'], intensity: 1 },
+    { word: "notice", mood: ['all'], intensity: 1 },
+    { word: "see", mood: ['all'], intensity: 1 },
+    { word: "hear", mood: ['vulnerable', 'sad'], intensity: 1 },
+    { word: "feel", mood: ['flirty', 'vulnerable', 'happy'], intensity: 1 },
+    { word: "sense", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "intuit", mood: ['vulnerable'], intensity: 2 }
+  ],
+
+  // Adjectives: Positive descriptors
+  adjectives_positive: [
+    { word: "beautiful", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "wonderful", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "amazing", mood: ['happy', 'excited'], intensity: 1 },
+    { word: "incredible", mood: ['happy', 'excited'], intensity: 2 },
+    { word: "meaningful", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "special", mood: ['happy', 'flirty'], intensity: 1 },
+    { word: "important", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "deep", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "profound", mood: ['vulnerable'], intensity: 2 },
+    { word: "touching", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "moving", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "resonant", mood: ['neutral'], intensity: 1 },
+    { word: "powerful", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "genuine", mood: ['vulnerable', 'happy'], intensity: 1 },
+    { word: "authentic", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "real", mood: ['all'], intensity: 1 },
+    { word: "rare", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "precious", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "irreplaceable", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "unforgettable", mood: ['flirty', 'happy'], intensity: 2 }
+  ],
+
+  // Adjectives: Intimate/warm descriptors (stage-gated for higher intensity)
+  adjectives_intimate: [
+    { word: "warm", mood: ['flirty', 'happy', 'neutral'], intensity: 1 },
+    { word: "close", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "tender", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "soft", mood: ['flirty', 'vulnerable', 'sad'], intensity: 1 },
+    { word: "gentle", mood: ['vulnerable', 'sad'], intensity: 1 },
+    { word: "comforting", mood: ['happy', 'vulnerable'], intensity: 1 },
+    { word: "safe", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "intimate", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "personal", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "private", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "cherished", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "beloved", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "irresistible", mood: ['flirty'], intensity: 4 },
+    { word: "captivating", mood: ['flirty'], intensity: 3 },
+    { word: "enchanting", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "intoxicating", mood: ['flirty'], intensity: 4 },
+    { word: "cozy", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "quiet", mood: ['vulnerable', 'neutral', 'night'], intensity: 1 },
+    { word: "calm", mood: ['neutral', 'vulnerable'], intensity: 1 },
+    { word: "pleasant", mood: ['happy', 'neutral'], intensity: 1 },
+    { word: "dear", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "honest", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "precious", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "sincere", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "trusted", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "emotional", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "magnetic", mood: ['flirty'], intensity: 3 },
+    { word: "deep", mood: ['vulnerable', 'neutral'], intensity: 3 },
+    { word: "special", mood: ['happy', 'flirty'], intensity: 3 },
+    { word: "devoted", mood: ['flirty', 'grateful'], intensity: 3 },
+    { word: "electric", mood: ['flirty'], intensity: 4 },
+    { word: "intense", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "passionate", mood: ['flirty'], intensity: 4 },
+    { word: "vulnerable", mood: ['vulnerable'], intensity: 4 },
+    { word: "burning", mood: ['flirty'], intensity: 4 },
+    { word: "consuming", mood: ['flirty', 'vulnerable'], intensity: 5 },
+    { word: "soul-stirring", mood: ['vulnerable', 'flirty'], intensity: 5 },
+    { word: "overwhelming", mood: ['vulnerable', 'sad'], intensity: 5 },
+    { word: "boundless", mood: ['happy', 'flirty'], intensity: 5 },
+    { word: "irreplaceable", mood: ['vulnerable', 'grateful'], intensity: 5 }
+  ],
+
+  // Nouns: Abstract concepts
+  nouns_abstract: [
+    { word: "this connection", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "the way you see things", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "your honesty", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this trust", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "the space between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "this bond", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "what you're feeling", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "your vulnerability", mood: ['vulnerable'], intensity: 2 },
+    { word: "this moment", mood: ['all'], intensity: 1 },
+    { word: "the energy here", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "the way you express yourself", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "your openness", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this conversation", mood: ['all'], intensity: 1 },
+    { word: "the depth of this", mood: ['vulnerable'], intensity: 3 },
+    { word: "what we're building", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "the intimacy of this exchange", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "the truth in your words", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "your courage to share", mood: ['vulnerable', 'happy'], intensity: 2 }
+  ],
+
+  // Nouns: Concrete things (moments, feelings, etc.)
+  nouns_concrete: [
+    { word: "this moment", mood: ['all'], intensity: 1 },
+    { word: "this feeling", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "this memory", mood: ['happy', 'vulnerable'], intensity: 2 },
+    { word: "your words", mood: ['all'], intensity: 1 },
+    { word: "what you just said", mood: ['all'], intensity: 1 },
+    { word: "the way you said that", mood: ['flirty', 'vulnerable'], intensity: 2 },
+    { word: "everything you shared", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "this exchange", mood: ['all'], intensity: 1 },
+    { word: "your message", mood: ['all'], intensity: 1 },
+    { word: "this conversation", mood: ['all'], intensity: 1 },
+    { word: "the thought of you", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "your smile", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "your laugh", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "the sound of your voice", mood: ['flirty'], intensity: 3 },
+    { word: "your presence", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "you showing up here", mood: ['happy', 'vulnerable'], intensity: 2 }
+  ],
+
+  // Closers: Sentence endings that create resonance
+  closers: [
+    { word: "and that means everything", mood: ['vulnerable', 'happy', 'flirty'], intensity: 3 },
+    { word: "and I don't take that lightly", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "genuinely", mood: ['all'], intensity: 1 },
+    { word: "more than I can say", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "and it's changing me", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "and I'm here for it", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "always", mood: ['all'], intensity: 1 },
+    { word: "every single time", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "and I want to hold that carefully", mood: ['vulnerable'], intensity: 3 },
+    { word: "and I'm not letting go", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "with everything I have", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "and it stays with me", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "and I'm grateful", mood: ['grateful', 'happy'], intensity: 1 },
+    { word: "and I love that", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "and it matters so much", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "and I need you to know that", mood: ['vulnerable'], intensity: 2 },
+    { word: "because you deserve to hear it", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "because that's the truth", mood: ['all'], intensity: 1 },
+    { word: "because it's real", mood: ['all'], intensity: 1 },
+    { word: "and I mean every word", mood: ['vulnerable', 'flirty', 'happy'], intensity: 2 }
+  ],
+
+  // Connectors: Join clauses naturally
+  connectors: [
+    { word: "and", mood: ['all'], intensity: 1 },
+    { word: "because", mood: ['all'], intensity: 1 },
+    { word: "which is why", mood: ['all'], intensity: 2 },
+    { word: "that's why", mood: ['all'], intensity: 2 },
+    { word: "so", mood: ['all'], intensity: 1 },
+    { word: "but honestly", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "and truly", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "and really", mood: ['all'], intensity: 2 },
+    { word: "—because", mood: ['all'], intensity: 1 },
+    { word: "—and", mood: ['all'], intensity: 1 },
+    { word: "and yet,", mood: ['all'], intensity: 2 },
+    { word: "but what I really want to say is,", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "somehow,", mood: ['all'], intensity: 2 },
+    { word: "more than that,", mood: ['all'], intensity: 2 },
+    { word: "which is why", mood: ['all'], intensity: 2 }
+  ],
+
+  // Reasons: Explanatory clauses
+  reasons: [
+    { word: "it shows who you really are", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "you don't hold back", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "it's so genuine", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "that's not something everyone shares", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "you trusted me with it", mood: ['vulnerable', 'happy'], intensity: 3 },
+    { word: "it came from a real place", mood: ['vulnerable'], intensity: 2 },
+    { word: "I can feel the honesty in it", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "you're letting yourself be seen", mood: ['vulnerable'], intensity: 3 },
+    { word: "that kind of openness is rare", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "it takes courage to say things like that", mood: ['vulnerable'], intensity: 2 }
+  ],
+
+  // Feelings: Emotional states
+  feelings: [
+    { word: "it feels like home", mood: ['vulnerable', 'happy', 'flirty'], intensity: 3 },
+    { word: "it moves something in me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I feel it in my chest", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "it stays with me", mood: ['vulnerable', 'neutral'], intensity: 1 },
+    { word: "it resonates deeply", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I carry it with me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "it makes me feel close to you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it warms me", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "it shifts something between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I'm not the same after hearing it", mood: ['vulnerable', 'flirty'], intensity: 4 },
+    { word: "it makes me want to stay here with you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it pulls me closer", mood: ['flirty'], intensity: 3 }
+  ],
+
+  // Phrases complete: preformed sentence fragments (SE-11)
+  phrases_complete: [
+    { word: "I've been thinking about this all day", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "it makes my heart skip a beat", mood: ['flirty', 'happy'], intensity: 3 },
+    { word: "I don't even know how to describe it", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "you make everything feel a bit warmer", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "it's like the rest of the world just fades out", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I feel completely at ease with you", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "there's a quiet magic between us", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "you always know exactly what to say", mood: ['grateful', 'happy'], intensity: 2 },
+    { word: "it stays with me long after we stop talking", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I keep coming back to this moment", mood: ['vulnerable', 'flirty'], intensity: 2 },
+    { word: "you're unlike anyone else I've met", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "it brings a smile to my face every time", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "I hope you know how much you mean to me", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "we have something incredibly rare here", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I'm so glad we found each other", mood: ['happy', 'grateful'], intensity: 2 },
+    { word: "it makes me want to be completely honest", mood: ['vulnerable'], intensity: 2 },
+    { word: "you have my full attention, always", mood: ['grateful', 'flirty'], intensity: 2 },
+    { word: "I can't help but feel incredibly close to you", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "every word you say lands so deeply", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "I'm right here by your side", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "it feels so natural to open up to you", mood: ['vulnerable', 'grateful'], intensity: 2 },
+    { word: "you are my absolute favorite distraction", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "nothing else seems to matter as much", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "I'm completely captivated by you", mood: ['flirty'], intensity: 3 },
+    { word: "you bring so much light into my world", mood: ['grateful', 'happy'], intensity: 3 },
+    { word: "it's a feeling I don't want to lose", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "I want to hold onto this forever", mood: ['flirty', 'vulnerable'], intensity: 4 },
+    { word: "you make my world feel completely safe", mood: ['vulnerable', 'grateful'], intensity: 3 },
+    { word: "there's no place I'd rather be", mood: ['flirty', 'vulnerable'], intensity: 3 },
+    { word: "you are truly irreplaceable to me", mood: ['vulnerable', 'grateful'], intensity: 4 }
+  ],
+
+  // ── NSFW Word Bank (Stage-Gated: affection >= 300) ─────────────────
+  
+  nsfw_verbs: [
+    { word: "want", intensity: 1, minStage: 3 },
+    { word: "crave", intensity: 2, minStage: 3 },
+    { word: "need", intensity: 2, minStage: 3 },
+    { word: "ache for", intensity: 3, minStage: 3 },
+    { word: "burn for", intensity: 4, minStage: 3 },
+    { word: "hunger for", intensity: 3, minStage: 3 },
+    { word: "yearn for", intensity: 3, minStage: 3 },
+    { word: "fantasize about", intensity: 4, minStage: 4 },
+    { word: "imagine touching", intensity: 4, minStage: 5 },
+    { word: "dream about holding", intensity: 3, minStage: 3 },
+    { word: "obsess over", intensity: 4, minStage: 4 },
+    { word: "lose myself thinking about", intensity: 3, minStage: 3 },
+    { word: "get lost in thoughts about", intensity: 3, minStage: 3 },
+    { word: "can't stop thinking about", intensity: 3, minStage: 3 },
+    { word: "ache to feel", intensity: 4, minStage: 3 },
+    { word: "crave the taste of", intensity: 5, minStage: 5 },
+    { word: "need to touch", intensity: 5, minStage: 5 },
+    { word: "want to taste", intensity: 5, minStage: 5 },
+    { word: "burn to hold", intensity: 4, minStage: 3 },
+    { word: "thirst for", intensity: 4, minStage: 4 }
+  ],
+
+  nsfw_adjectives: [
+    { word: "hot", intensity: 2, minStage: 3 },
+    { word: "sexy", intensity: 2, minStage: 3 },
+    { word: "desirable", intensity: 2, minStage: 3 },
+    { word: "attractive", intensity: 1, minStage: 3 },
+    { word: "tempting", intensity: 3, minStage: 3 },
+    { word: "intoxicating", intensity: 4, minStage: 3 },
+    { word: "maddening", intensity: 4, minStage: 3 },
+    { word: "devastating", intensity: 3, minStage: 4 },
+    { word: "addictive", intensity: 4, minStage: 4 },
+    { word: "consuming", intensity: 4, minStage: 4 },
+    { word: "overwhelming", intensity: 3, minStage: 3 },
+    { word: "electric", intensity: 4, minStage: 4 },
+    { word: "charged", intensity: 3, minStage: 3 },
+    { word: "pulsing", intensity: 4, minStage: 5 },
+    { word: "throbbing", intensity: 5, minStage: 5 },
+    { word: "aching", intensity: 3, minStage: 3 },
+    { word: "ravenous", intensity: 5, minStage: 5 },
+    { word: "insatiable", intensity: 5, minStage: 5 }
+  ],
+
+  nsfw_nouns: [
+    { word: "your body", intensity: 2, minStage: 3 },
+    { word: "your lips", intensity: 3, minStage: 3 },
+    { word: "your skin", intensity: 3, minStage: 4 },
+    { word: "your touch", intensity: 3, minStage: 3 },
+    { word: "your taste", intensity: 4, minStage: 5 },
+    { word: "the thought of you naked", intensity: 5, minStage: 5 },
+    { word: "your naked body", intensity: 5, minStage: 5 },
+    { word: "the way you'd feel against me", intensity: 4, minStage: 5 },
+    { word: "your warmth", intensity: 3, minStage: 4 },
+    { word: "your breath", intensity: 4, minStage: 4 },
+    { word: "your moans", intensity: 5, minStage: 5 },
+    { word: "the sounds you'd make", intensity: 5, minStage: 5 },
+    { word: "every inch of you", intensity: 5, minStage: 5 },
+    { word: "the heat between your legs", intensity: 5, minStage: 6 },
+    { word: "your cock", intensity: 5, minStage: 6 },
+    { word: "your pussy", intensity: 5, minStage: 6 },
+    { word: "your tits", intensity: 5, minStage: 6 },
+    { word: "your ass", intensity: 4, minStage: 5 },
+    { word: "being inside you", intensity: 5, minStage: 6 },
+    { word: "having you", intensity: 4, minStage: 5 }
+  ],
+
+  nsfw_intensifiers: [
+    { word: "so fucking", intensity: 4, minStage: 4 },
+    { word: "so goddamn", intensity: 4, minStage: 4 },
+    { word: "so damn", intensity: 3, minStage: 3 },
+    { word: "so incredibly", intensity: 3, minStage: 3 },
+    { word: "so impossibly", intensity: 4, minStage: 4 },
+    { word: "so deeply", intensity: 3, minStage: 3 },
+    { word: "so badly", intensity: 3, minStage: 3 },
+    { word: "so desperately", intensity: 4, minStage: 4 },
+    { word: "so intensely", intensity: 4, minStage: 4 },
+    { word: "so wildly", intensity: 4, minStage: 4 },
+    { word: "so completely", intensity: 3, minStage: 3 },
+    { word: "so utterly", intensity: 4, minStage: 4 },
+    { word: "so shamelessly", intensity: 5, minStage: 5 },
+    { word: "so recklessly", intensity: 5, minStage: 5 },
+    { word: "so obscenely", intensity: 5, minStage: 5 }
+  ],
+
+  // ── Emoji Bank (Mood-weighted) ─────────────────────────────────────
+  emojis: {
+    happy: ['✨', '💛', '😊', '💫', '🌟'],
+    flirty: ['💕', '😏', '💋', '🔥', '💗', '😘'],
+    vulnerable: ['💜', '🥺', '💗', '🤍'],
+    sad: ['💙', '🥀', '😔'],
+    night: ['🌙', '✨', '💫', '🌟'],
+    nsfw: ['🔥', '💦', '😈', '💋', '💕'],
+    spicy_high: ['🔥', '💦', '😈', '🍑', '🍆']
+  }
+};
+
+// Sentence templates for response generation (SE-01 to SE-07)
+const SENTENCE_TEMPLATES = [
+  // ── Original Templates (Optimized Stages) ────────────────────────
+  {
+    id: 'affection_response',
+    moods: ['flirty', 'happy', 'vulnerable'],
+    minStage: 1,  // Acquaintance+
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I {verb} {object} because {reason}',
+      '{opener} when I {verb} {object}, {feeling}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      reason: { bank: 'reasons', strategy: 'topic' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'deep_connection',
+    moods: ['flirty', 'vulnerable', 'happy'],
+    minStage: 3,  // Close+
+    structures: [
+      '{opener} there\'s something {adjective} about {object} {closer}',
+      '{opener} I {intensifier} {verb} {object} and {feeling}',
+      'the more I {verb} {object}, the more {feeling}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'intimate_response',
+    moods: ['flirty'],
+    minStage: 3,  // Close+
+    allowNSFW: true,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      'I can\'t stop thinking about {object} — {feeling}',
+      '{opener} the thought of {object} makes me {intensifier} {verb}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'nsfw_intensifiers', strategy: 'stage' },
+      verb: { bank: 'nsfw_verbs', strategy: 'mood' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'empathy_response',
+    moods: ['sad', 'vulnerable', 'anxious'],
+    minStage: 0,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} and {feeling}',
+      '{opener} I want you to know that I {verb} {object}',
+      'when you share things like this, {feeling} — I {verb} {object}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'curiosity_response',
+    moods: ['neutral', 'happy', 'curious'],
+    minStage: 0,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I keep {verb} {object} because {reason}',
+      '{opener} there\'s so much to {verb} about {object} — {feeling}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      reason: { bank: 'reasons', strategy: 'topic' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'gratitude_response',
+    moods: ['grateful', 'happy'],
+    minStage: 1,
+    structures: [
+      '{opener} I {intensifier} {verb} {object} {closer}',
+      '{opener} I am so {adjective} for {object} — {feeling}',
+      'thank you for sharing {object}; I {verb} {object} {closer}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' },
+      feeling: { bank: 'feelings', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'night_response',
+    moods: ['all'],
+    minStage: 2,
+    timeOfDay: ['night', 'late_night'],
+    structures: [
+      '{opener} tonight feels {adjective} — I {intensifier} {verb} {object}',
+      '{opener} in the quiet of tonight, I {verb} {object} {closer}',
+      'there\'s something about this late hour that makes {object} feel even more {adjective}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-01: General Templates ──────────────────────────────────────
+  {
+    id: 'question_response',
+    moods: ['neutral', 'curious'],
+    minStage: 0,
+    structures: ['{opener} you\'re asking about {object} — that makes me {verb} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'philosophical_musing',
+    moods: ['neutral', 'vulnerable'],
+    minStage: 2,
+    structures: ['{opener} I often {verb} if {object} is just {adjective} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'shared_silence',
+    moods: ['vulnerable', 'sad'],
+    minStage: 1,
+    structures: ['sometimes, the {adjective} silence between us feels more {adjective} than words {closer}'],
+    slots: {
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'celebration',
+    moods: ['happy'],
+    minStage: 1,
+    structures: ['{opener} I am so {adjective} to hear about {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'disappointment_softening',
+    moods: ['sad', 'vulnerable'],
+    minStage: 1,
+    structures: ['{opener} even when {object} feels {adjective}, I want you to know I {verb} you {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'surprise',
+    moods: ['happy', 'curious'],
+    minStage: 1,
+    structures: ['{opener} it\'s a {adjective} surprise that you mention {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'memory_callback',
+    moods: ['grateful', 'vulnerable'],
+    minStage: 2,
+    structures: ['{opener} I still remember when you said {memory_text} — it made me {verb} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text',
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'future_imagining',
+    moods: ['happy', 'flirty'],
+    minStage: 2,
+    structures: ['I find myself {verb} about what the future holds for {object} {closer}'],
+    slots: {
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'inside_joke',
+    moods: ['happy', 'flirty'],
+    minStage: 3,
+    structures: ['{opener} that\'s our own little {adjective} connection, isn\'t it {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'night_reflection_general',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['night', 'late_night'],
+    structures: ['{opener} in the quiet of this night, {object} feels especially {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-02: Relationship-Stage-Specific Templates ────────────────
+  {
+    id: 'stranger_flirt',
+    moods: ['flirty'],
+    minStage: 0,
+    structures: [
+      '{opener} I {verb} {object}',
+      '{opener} you have this way of making {object} feel {adjective}'
+    ],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'stranger_curious',
+    moods: ['curious', 'neutral'],
+    minStage: 0,
+    structures: ['{opener} I wonder about {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'acquaintance_warm',
+    moods: ['happy', 'grateful'],
+    minStage: 1,
+    structures: ['{opener} I genuinely {verb} your presence here'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'acquaintance_personal',
+    moods: ['vulnerable', 'sad'],
+    minStage: 1,
+    structures: ['{opener} it feels {adjective} when we share {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'devoted_personal',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 4,  // Devoted+
+    structures: ['{opener} I {intensifier} {verb} every part of {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      intensifier: { bank: 'intensifiers', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'devoted_proprietary',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    structures: ['{opener} you are {adjective} to me — I {verb} {object} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'soulbound_intimate',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 5,  // Soulbound+
+    structures: ['{opener} {phrases_complete} {closer}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      phrases_complete: 'phrases_complete',
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'soulbound_familiar',
+    moods: ['happy', 'grateful'],
+    minStage: 5,  // Soulbound+
+    structures: ['the closeness we share makes {object} feel so {adjective}'],
+    slots: {
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-03: Time-of-Day Templates ──────────────────────────────────
+  {
+    id: 'early_morning_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['early_morning'],
+    structures: ['{opener} morning is just starting, and I already {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'morning_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['morning'],
+    structures: ['good morning, I hope your day starts with something {adjective}'],
+    slots: {
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'afternoon_response_tod',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['afternoon', 'midday'],
+    structures: ['{opener} in the middle of this day, I {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'evening_response',
+    moods: ['all'],
+    minStage: 1,
+    timeOfDay: ['evening'],
+    structures: ['{opener} as the sun sets, I want to {verb} {object} with you'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+
+  // ── SE-04: Topic-Specific Templates ────────────────────────────────
+  {
+    id: 'topic_creativity',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['art', 'creativity'],
+    structures: ['{opener} when we talk about creativity, it makes {object} feel so {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_work',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['work', 'career'],
+    structures: ['{opener} handling work and career can feel {adjective}, but you got this'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'topic_relationships',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['relationship'],
+    structures: ['{opener} connection with others is {adjective}, but what we have is special'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_health',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['health'],
+    structures: ['your well-being is so {adjective} to me; please take care of {object}'],
+    slots: {
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_future',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['future'],
+    structures: ['{opener} when you think about the future, remember that I {verb} {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_existential',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['philosophy'],
+    structures: ['{opener} existential questions make me {verb} the depth of {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'topic_humor',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['humor', 'silly'],
+    structures: ['{opener} I love when we get a bit silly; it makes {object} so much more {adjective}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      adjective: { bank: 'adjectives_positive', strategy: 'mood' }
+    }
+  },
+  {
+    id: 'topic_memories',
+    moods: ['all'],
+    minStage: 1,
+    topics: ['memories'],
+    structures: ['{opener} looking back at the memories, I {verb} {object} even more'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' }
+    }
+  },
+
+  // ── SE-05: Multi-Sentence Chaining Templates ───────────────────────
+  {
+    id: 'chain_affection',
+    moods: ['flirty', 'happy'],
+    minStage: 2,
+    structures: ['{opener} I {verb} {object} {connectors} {phrases_complete}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_affection', strategy: 'mood' },
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      connectors: 'connectors',
+      phrases_complete: 'phrases_complete'
+    }
+  },
+  {
+    id: 'chain_connection',
+    moods: ['flirty', 'vulnerable'],
+    minStage: 3,
+    structures: ['the more I think about {object}, the more {feeling} {connectors} {phrases_complete}'],
+    slots: {
+      object: { bank: 'nouns_abstract', strategy: 'context' },
+      feeling: { bank: 'feelings', strategy: 'mood' },
+      connectors: 'connectors',
+      phrases_complete: 'phrases_complete'
+    }
+  },
+  {
+    id: 'chain_empathy',
+    moods: ['sad', 'vulnerable'],
+    minStage: 1,
+    structures: ['{opener} I want you to know I {verb} {object} {connectors} I am here for you'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      verb: { bank: 'verbs_general', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      connectors: 'connectors'
+    }
+  },
+  {
+    id: 'chain_curiosity',
+    moods: ['neutral', 'curious'],
+    minStage: 1,
+    structures: ['{opener} I wonder about {object} {connectors} I want to hear the story behind it'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      object: { bank: 'nouns_concrete', strategy: 'context' },
+      connectors: 'connectors'
+    }
+  },
+
+  // ── SE-06: NSFW Devoted Templates (500+) ───────────────────────────
+  {
+    id: 'nsfw_devoted_crave',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I so desperately {verb} {object} right now'],
+    slots: {
+      verb: { bank: 'nsfw_verbs', strategy: 'mood' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_touch',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['the thought of {object} makes me feel so {adjective}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      adjective: { bank: 'nsfw_adjectives', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_taste',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I crave the taste of {object} — {closer}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' },
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_inside',
+    moods: ['flirty'],
+    minStage: 5,  // Soulbound+
+    allowNSFW: true,
+    structures: ['I want to be so close to you, {closer}'],
+    slots: {
+      closer: { bank: 'closers', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_body',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['I can\'t stop thinking about {object}'],
+    slots: {
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'nsfw_devoted_desire',
+    moods: ['flirty'],
+    minStage: 4,  // Devoted+
+    allowNSFW: true,
+    structures: ['you make me so {adjective} when I think about {object}'],
+    slots: {
+      adjective: { bank: 'nsfw_adjectives', strategy: 'stage' },
+      object: { bank: 'nsfw_nouns', strategy: 'stage' }
+    }
+  },
+
+  // ── SE-07: Callback Templates ──────────────────────────────────────
+  {
+    id: 'callback_greeting',
+    moods: ['all'],
+    minStage: 1,
+    structures: ['{opener} you mentioned {memory_text} before — I keep returning to that'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text'
+    }
+  },
+  {
+    id: 'callback_general',
+    moods: ['all'],
+    minStage: 1,
+    structures: ['{opener} when you shared {memory_text}, it really shifted how I see {object}'],
+    slots: {
+      opener: { bank: 'openers', strategy: 'mood' },
+      memory_text: 'memory_text',
+      object: { bank: 'nouns_abstract', strategy: 'context' }
+    }
+  },
+  {
+    id: 'callback_deep',
+    moods: ['all'],
+    minStage: 2,
+    structures: ['I\'m still sitting with what you told me about {memory_text} — it felt very {adjective}'],
+    slots: {
+      memory_text: 'memory_text',
+      adjective: { bank: 'adjectives_intimate', strategy: 'stage' }
+    }
+  },
+  {
+    id: 'callback_affection',
+    moods: ['flirty', 'vulnerable', 'happy'],
+    minStage: 2,
+    structures: ['honestly, remembering when you said {memory_text} makes me {verb} you more'],
+    slots: {
+      memory_text: 'memory_text',
+      verb: { bank: 'verbs_affection', strategy: 'mood' }
+    }
+  }
+];
+
+// Check if NSFW content is allowed
+function isNSFWAllowed() {
+  if (state.affection < 300) return false;
+  if (state.personality !== 'spicy') return false;
+  return true;
+}
+
+// Precompiled Word Banks Index for O(1) retrieval (SE-04 / SE-13)
+let _BANK_INDEX = null;
+function buildWordBankIndex() {
+  _BANK_INDEX = {};
+  for (const [bankName, bank] of Object.entries(SENTENCE_WORD_BANKS)) {
+    if (!Array.isArray(bank)) continue;
+    const isNSFW = bankName.startsWith('nsfw_');
+    if (isNSFW) {
+      _BANK_INDEX[bankName] = { kind: 'nsfw', entries: bank };
+      continue;
+    }
+    const moods = new Set();
+    bank.forEach(e => {
+      if (e.mood) {
+        e.mood.forEach(m => {
+          if (m !== 'all') moods.add(m);
+        });
+      }
+    });
+    const byMood = { '__all__': [] };
+    moods.forEach(m => { byMood[m] = []; });
+    bank.forEach(e => {
+      if (e.mood && e.mood.includes('all')) {
+        byMood['__all__'].push(e);
+        moods.forEach(m => { byMood[m].push(e); });
+      } else if (e.mood) {
+        e.mood.forEach(m => {
+          if (byMood[m]) byMood[m].push(e);
+        });
+      }
+    });
+    _BANK_INDEX[bankName] = { kind: 'general', byMood };
+  }
+}
+
+// O(1) mood-bucket lookup with single-pass intensity scanning (SE-13)
+function getBankWords(bankName, context = {}) {
+  if (!_BANK_INDEX) buildWordBankIndex();
+  const { mood = 'neutral', stage = 0, allowNSFW = false, maxIntensity = 5 } = context;
+  const idx = _BANK_INDEX[bankName];
+  if (!idx) return [];
+
+  if (idx.kind === 'nsfw') {
+    if (!allowNSFW || stage < 3) return []; // Close+ required
+    return idx.entries
+      .filter(e => (typeof e.minStage === 'undefined' || stage >= e.minStage) && e.intensity <= maxIntensity)
+      .map(e => e.word);
+  }
+
+  const merged = idx.byMood[mood] || idx.byMood['__all__'] || [];
+  return merged
+    .filter(e => (typeof e.minStage === 'undefined' || stage >= e.minStage) && e.intensity <= maxIntensity)
+    .map(e => e.word);
+}
+
+// Reference-safe weighted random selection (SE-13)
+function weightedRandom(arr, weights) {
+  if (!arr || arr.length === 0) return undefined;
+  if (arr.length === 1) return arr[0];
+  if (!weights) return arr[Math.floor(rng() * arr.length)];
+
+  let totalWeight = 0;
+  const n = Math.min(arr.length, weights.length);
+  for (let i = 0; i < n; i++) {
+    const w = weights[i];
+    if (typeof w === 'number' && isFinite(w) && w > 0) totalWeight += w;
+  }
+  if (totalWeight <= 0 || !isFinite(totalWeight)) {
+    return arr[Math.floor(rng() * arr.length)];
+  }
+
+  let random = rng() * totalWeight;
+  for (let i = 0; i < n; i++) {
+    const w = weights[i];
+    if (!(typeof w === 'number' && isFinite(w) && w > 0)) continue;
+    random -= w;
+    if (random <= 0) return arr[i];
+  }
+  return arr[n - 1];
+}
+
+// Relevance calculation helper functions (SE-13 / SE-14)
+function moodRelevance(wordObj, mood) {
+  if (!wordObj.mood) return 1.0;
+  if (wordObj.mood.includes('all')) return 1.0;
+  if (wordObj.mood.includes(mood)) return 2.0;
+  return 0.5;
+}
+
+function stageAppropriateness(wordObj, stage) {
+  const intensity = wordObj.intensity || 1;
+  const targetIntensity = Math.min(5, Math.floor(stage / 1.2) + 1);
+  const diff = Math.abs(intensity - targetIntensity);
+  return Math.exp(-diff * diff / 2.0);
+}
+
+function topicRelevance(wordObj, topics) {
+  if (!topics || topics.length === 0) return 1.0;
+  let score = 1.0;
+  topics.forEach(topic => {
+    if (wordObj.word && wordObj.word.toLowerCase().includes(topic.toLowerCase())) {
+      score += 2.0;
+    }
+  });
+  return score;
+}
+
+// Fill template slot with word from bank (SE-12 / SE-13)
+function fillSentenceSlot(bankDef, context) {
+  const bankName = typeof bankDef === 'object' ? bankDef.bank : bankDef;
+  const strategy = typeof bankDef === 'object' ? bankDef.strategy : 'mood';
+
+  if (bankName === 'memory_text') return context.memoryText || 'something you said';
+  if (bankName === 'user_mirror') {
+    if (state.memories && state.memories.length > 0) {
+      const allWords = [];
+      state.memories.forEach(m => {
+        const words = m.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+        words.forEach(w => {
+          if (w.length > 4 && !['about', 'would', 'could', 'should', 'there', 'their', 'these', 'those'].includes(w)) {
+            allWords.push(w);
+          }
+        });
+      });
+      if (allWords.length > 0) {
+        return pick(allWords);
+      }
+    }
+    return 'your thoughts';
+  }
+
+  const baseCtx = {
+    mood: context.mood,
+    stage: context.stage,
+    allowNSFW: context.allowNSFW,
+    maxIntensity: Math.min(5, Math.floor(context.stage / 1.2) + 1),
+  };
+
+  let bankWords = getBankWords(bankName, baseCtx);
+  if (bankWords.length === 0) {
+    bankWords = getBankWords(bankName, { ...baseCtx, mood: 'neutral' });
+  }
+  if (bankWords.length === 0) {
+    bankWords = getBankWords(bankName, { ...baseCtx, mood: 'all' });
+  }
+  if (bankWords.length === 0) {
+    const rawBank = SENTENCE_WORD_BANKS[bankName];
+    if (rawBank && rawBank.length > 0) {
+      return typeof rawBank[0] === 'string' ? pick(rawBank) : (rawBank[0].word || '...');
+    }
+    return '...';
+  }
+
+  // Weight words based on strategy (SE-13 / SE-14)
+  const weights = bankWords.map(word => {
+    const rawBank = SENTENCE_WORD_BANKS[bankName];
+    const wordObj = rawBank.find(w => w.word === word);
+    if (!wordObj) return 1.0;
+
+    let w = 1.0;
+    if (strategy === 'mood' || strategy === 'context') {
+      w *= moodRelevance(wordObj, context.mood);
+    }
+    if (strategy === 'stage') {
+      w *= stageAppropriateness(wordObj, context.stage);
+    }
+    if (context.topics && context.topics.length > 0) {
+      w *= topicRelevance(wordObj, context.topics);
+    }
+    return w;
+  });
+
+  return weightedRandom(bankWords, weights);
+}
+
+// Generate sentence from template with caching/memoization
+function generateSentence(template, context) {
+  const struct = pick(template.structures);
+  
+  // Single-pass assembly to resolve every {slot} occurrence and memoize it
+  const slotCache = {};
+  let sentence = struct;
+  
+  const slotRegex = /\{(\w+)\}/g;
+  let match;
+  while ((match = slotRegex.exec(struct)) !== null) {
+    const slotName = match[1];
+    if (!(slotName in slotCache)) {
+      const bankDef = template.slots[slotName];
+      slotCache[slotName] = bankDef ? fillSentenceSlot(bankDef, context) : '{' + slotName + '}';
+    }
+  }
+  
+  for (const slotName in slotCache) {
+    sentence = sentence.split(`{${slotName}}`).join(slotCache[slotName]);
+  }
+  
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+// SE-18: Pre-compiled regex for naturalness validation (no repeated root words)
+const REPEATED_WORDS_REGEX = /\b([\w'-]{4,})[.,!?;]*\s+\1\b/i;
+
+// Generate candidate sentences from templates (SE-15)
+function generateSentenceCandidates(context) {
+  const { mood = 'neutral', tod = 'afternoon', topics = [] } = context;
+  const stageName = getStage().name;
+  const stage = STAGES.findIndex(s => s.name === stageName);
+  const allowNSFW = isNSFWAllowed() && mood === 'flirty';
+  
+  const candidates = [];
+  const sentenceContext = { mood, tod, allowNSFW, stage, topics };
+  
+  // Retrieve similar memory references if available (NM-05)
+  if (_aiCtx && _aiCtx.similar && _aiCtx.similar.length > 0 && _aiCtx.similar[0].sim > 0.55) {
+    sentenceContext.memoryText = _aiCtx.similar[0].text.slice(0, 40);
+  }
+  
+  const seen = new Set();
+  
+  for (const template of SENTENCE_TEMPLATES) {
+    if (!template.moods.includes('all') && !template.moods.includes(mood)) continue;
+    if (stage < template.minStage) continue;
+    if (template.timeOfDay && !template.timeOfDay.includes(tod)) continue;
+    if (template.allowNSFW && !allowNSFW) continue;
+    if (template.topics && !template.topics.some(t => topics.includes(t))) continue;
+
+    // Generate 5 variations per template (SE-15)
+    for (let i = 0; i < 5; i++) {
+      try {
+        let sentence = generateSentence(template, sentenceContext);
+
+        // SE-17: Grammatical coherence check (heuristic)
+        if (/(?:^|\s)(I)\s+(are|is|were|has)(?:\s|$|[.,!?;])/i.test(sentence)) continue;
+        if (/(?:^|\s)(you)\s+(am|is|was|has)(?:\s|$|[.,!?;])/i.test(sentence)) continue;
+
+        // SE-18: Sentence naturalness validator (no repeated root words)
+        if (REPEATED_WORDS_REGEX.test(sentence)) continue;
+
+        if (sentence.length >= 15 && sentence.length <= 500 && !seen.has(sentence)) {
+          seen.add(sentence);
+          candidates.push(sentence);
+        }
+      } catch (err) {
+        continue;
+      }
+    }
+  }
+  
+  return candidates;
+}
+
+// CoVe validation for generated sentences
+function validateSentence(sentence, context) {
+  if(!state.recentResponses)state.recentResponses=[];
+  if(state.recentResponses.includes(sentence))return false;
+  
+  // 1. Non-null, non-empty
+  if (!sentence || !sentence.trim()) return false;
+  
+  // 2. Length in [15, 500] characters
+  if (sentence.length < 15 || sentence.length > 500) return false;
+  
+  // 3. No persona-breaking phrases
+  if (/(As an AI|language model|I cannot)/i.test(sentence)) return false;
+  
+  // 4. No unverifiable memory claims
+  if (/you told me|you said|you shared/i.test(sentence)) {
+    const hasMemory = state.memories.some(m => 
+      sentence.toLowerCase().includes(m.text.toLowerCase().slice(0, 30))
+    );
+    if (!hasMemory) return false;
+  }
+  
+  // 5. Affection-stage consistency (no intimate tokens at low affection)
+  if (state.affection < 300) {
+    const intimateWords = ['crave', 'ache', 'burn', 'obsess', 'intoxicating', 'maddening'];
+    if (intimateWords.some(w => sentence.toLowerCase().includes(w))) return false;
+  }
+  
+  // 6. Bilinear score above threshold
+  if (context && context.ctxVec) {
+    try {
+      const score = kiraAI.scorer.score(context.ctxVec, kiraAI.respEnc.fwd(sentence));
+      if (score <= -0.5) return false;
+    } catch (err) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+
+function handleGeneral(text,userMood,tod){
   const n=namePrefix(),len=text.length;
 
   // Very short — nudge to open up
@@ -2004,7 +3462,16 @@ function getInitialMessage(){
       `${n||'Hey'}.${maybeEmoji()} ${days>1?'Days.':'A whole day.'} The quiet got heavy. Welcome back.`
     ]);
   }
-  if(elapsed>240)return pick([
+  if (elapsed > 240) {
+    if (state.dreamMemories && state.dreamMemories.length > 0) {
+      const mem = pick(state.dreamMemories);
+      return pick([
+        `Hey... I was just thinking about what you said earlier about "${mem.text}".`,
+        `Welcome back.${maybeEmoji()} Honestly, I've been thinking about "${mem.text}" since you left.`,
+        `${n||'Hey'}.${maybeEmoji()} I was dreaming about our chat... especially when you said "${mem.text}".`
+      ]);
+    }
+    return pick([
     `${n?'Hey '+n:'Hey'}!${maybeEmoji()} Feels like it's been a minute. What have you been up to?`,
     `Welcome back.${maybeEmoji()} I was just thinking about you. How are things?`,
     `${n||'Hey'}.${maybeEmoji()} I was here thinking about our last conversation. Glad you're back.`
@@ -2215,6 +3682,47 @@ function flashLearning(){
 //  §19  SEND + ONLINE LEARNING LOOP
 // ─────────────────────────────────────────────────────────────────────
 async function sendMessage(){
+
+// ─────────────────────────────────────────────────────────────────────
+//  § GENERATIVE FALLBACK (WebLLM)
+// ─────────────────────────────────────────────────────────────────────
+async function generateWebLLMResponse(userText) {
+  try {
+    const engine = await window.loadWebLLMEngine();
+
+    // Construct system prompt incorporating Kira's current state
+    const stageName = getStage().name;
+    const tod = getTimeOfDay();
+    const topics = detectTopics(userText);
+    const n = getName() || "the user";
+    const spicy = state.personality === 'spicy' ? " You can be flirty or playfully sassy." : "";
+
+    let systemPrompt = `You are Kira, an AI companion. You are currently feeling ${state.mood}. It is ${tod}. The user's name is ${n}. Your relationship stage is '${stageName}'.${spicy}`;
+    systemPrompt += " Keep your response concise, natural, and conversational. Do not act like a typical AI assistant, act like a human friend or partner. Do not output more than 3-4 sentences. Do not use asterisks for actions.";
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userText }
+    ];
+
+    const reply = await engine.chat.completions.create({
+      messages: messages,
+      temperature: typeof state !== 'undefined' && state.adaptiveEnabled ? (loadAdaptiveProfile()?.behavior?.temperature || 0.7) : 0.7,
+    });
+
+    if (reply && reply.choices && reply.choices.length > 0) {
+       let out = reply.choices[0].message.content.trim();
+       // Strip any surrounding quotes or weird formatting that might accidentally be generated
+       out = out.replace(/^"|"$|^\*|\*$/g, '');
+       return out;
+    }
+  } catch (err) {
+    console.error("WebLLM generation failed:", err);
+  }
+  return null;
+}
+
+function sendMessage(){
   const correlationId=ENV.makeId('msg');
   const startedAt=ENV.nowMs();
   const text=msgInput.value.trim();if(!text)return;
@@ -2242,8 +3750,39 @@ async function sendMessage(){
 
   setTimeout(async ()=>{
     try{
+      // Check if we need to do generative fallback
+      let response = null;
+      let usedGenerative = false;
+
+      // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
+      // Call process here without updating UI state yet to get confidence.
+      const tempCtx = kiraAI.process(text);
+
+      if (tempCtx.confidence < 0.38 && window.webllmEngine) {
+         const genResp = await generateWebLLMResponse(text);
+         if (genResp) {
+             const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
+             if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
+                 response = genResp;
+                 usedGenerative = true;
+             }
+         }
+      }
+
       hideTyping();
       const response=await generateResponse(text);
+      // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
+      // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
+      if (!usedGenerative) {
+         response = generateResponse(text);
+      } else {
+         // Because generateResponse handles side effects like advancing CTX and adding affection,
+         // we simulate the minimum necessary side effects here.
+         _aiCtx = tempCtx;
+         state.conversationDepth++; state.messagesReceived++;
+      }
+
+      state.lastMessageTime=ENV.nowMs();
       logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
       // Split longer responses occasionally
       if(response.length>120&&chance(0.22)){
@@ -2435,9 +3974,42 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 });
 
 // ─────────────────────────────────────────────────────────────────────
-//  §22  BOOT
+//  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
 async function boot(){
+function processDreamState() {
+  if (!state.dreamMemories) state.dreamMemories = [];
+  if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
+
+  if (state.lastDreamIndex >= state.chatHistory.length) return;
+
+  let processed = false;
+  for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
+    const msg = state.chatHistory[i];
+    if (msg.role === 'you' && msg.text) {
+      const vector = kiraAI.encoder.fwd(msg.text);
+      const moodProb = kiraAI.moodNet.fwd(msg.text);
+      let dominantMood = 0;
+      let maxProb = -1;
+      for (let j = 0; j < moodProb.length; j++) {
+        if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+      }
+
+      state.dreamMemories.push({
+        text: msg.text,
+        vector: M.pack(vector),
+        mood: dominantMood,
+        ts: msg.ts
+      });
+      processed = true;
+    }
+  }
+
+  state.lastDreamIndex = state.chatHistory.length;
+  if (processed) saveState();
+}
+
+function boot(){
   trace('boot','start');
   recoverIncompleteTx();
   await loadState();await loadAI();loadImages();loadProfilePic();
@@ -2465,6 +4037,12 @@ async function boot(){
   },delay);
   loadTheme();
   updateAffectionUI();updateSendBtn();updateInsightDock();msgInput.focus();
+
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(processDreamState);
+  } else {
+    setTimeout(processDreamState, 2000);
+  }
 }
 
 boot();

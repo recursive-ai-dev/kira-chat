@@ -752,5 +752,6 @@ if (typeof module !== 'undefined' && module.exports) {
     weightedRandom,
     moodRelevance,
     isNSFWAllowed,
+    _buildIndex,
   };
 }

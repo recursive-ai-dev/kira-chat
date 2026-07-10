@@ -1,5 +1,5 @@
 const fs = require('fs');
-const content = fs.readFileSync('kira_v3.html', 'utf8');
+const content = fs.readFileSync('sentence_engine_wordbanks.js', 'utf8') + '\n' + fs.readFileSync('sentence_engine_templates.js', 'utf8');
 global.Float32Array = Float32Array;
 global.Map = Map;
 global.Math = Math;
@@ -11,7 +11,7 @@ global.localStorage = {
 };
 global.atob = (s) => Buffer.from(s, 'base64').toString('binary');
 global.btoa = (s) => Buffer.from(s, 'binary').toString('base64');
-const bankMatch = content.match(/const SENTENCE_WORD_BANKS = (\{[\s\S]*?\});/);
+const bankMatch = content.match(/const WORD_BANKS = (\{[\s\S]*?\});/);
 const templateMatch = content.match(/const SENTENCE_TEMPLATES = (\[[\s\S]*?\]);/);
 const SENTENCE_WORD_BANKS = eval('(' + bankMatch[1] + ')');
 const SENTENCE_TEMPLATES = eval('(' + templateMatch[1] + ')');

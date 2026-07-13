@@ -909,7 +909,93 @@ class KiraAIProxy {
 }
 
 const kiraAI = new KiraAIProxy();
+let _aiCtx=null;
 
+const VOCAB=128,EDIM=16;
+const MOOD_LABELS=['neutral','happy','sad','angry','anxious','flirty','bored','tired','curious','grateful','vulnerable'];
+const N_MOODS=MOOD_LABELS.length;
+const MEM_CAP=20;
+
+// ── Conversation context tracker ──────────────────────────────────────
+// Tracks what Kira is currently focused on so she can follow up naturally
+const CTX={
+  topic:null,       // last major topic
+  handler:null,     // last handler called
+  turnsSince:0,     // turns since context was set
+  pendingQ:null,    // question Kira asked (for follow-up detection)
+  depth:0,          // depth in current thread
+  mood:null         // last user mood
+};
+
+const DIAG={
+  traceEnabled:true,
+  traces:[],
+  errors:0,
+  lastRoute:'boot'
+};
+
+function trace(step,data,level='info'){
+  if(!DIAG.traceEnabled&&level!=='error')return;
+  DIAG.traces.push({ts:ENV.nowMs(),step,level,data});
+  if(DIAG.traces.length>40)DIAG.traces.shift();
+}
+
+function setRoute(route){
+  DIAG.lastRoute=route;
+  trace('route',route);
+}
+
+function logTransition(correlationId,stepName,startedAt,extra={},level='info'){
+  trace('transition',{
+    correlation_id:correlationId,
+    step_name:stepName,
+    latency_ms:Math.max(0,ENV.nowMs()-startedAt),
+    ...extra
+  },level);
+}
+
+function summarizeTrace(){
+  if(!DIAG.traces.length)return'none';
+  return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
+}
+
+function setCTX(handler,topic,question){
+  CTX.handler=handler;CTX.topic=topic||CTX.topic;
+  CTX.pendingQ=question||null;CTX.turnsSince=0;CTX.depth++;
+  if(topic)setContextPill(topic);
+}
+
+function advanceCTX(){CTX.turnsSince++;}
+
+// Detects if user's short reply is answering/continuing a previous question
+function isContinuation(t){
+  return CTX.pendingQ&&t.length<120&&CTX.turnsSince<=2;
+}
+
+// Follow-up continuation response
+async function handleContinuation(text,userMood){
+  const t=text.toLowerCase();
+  const n=namePrefix();
+  CTX.pendingQ=null;
+
+  // If they gave a real answer, dig deeper
+  if(text.length>20||/[a-z]{4,}/i.test(t)){
+    return await kiraAI.rank([
+      `${n}That's really interesting.${maybeEmoji()} What does that mean to you?`,
+      `I love that.${maybeEmoji()} Tell me more — I want the full picture.`,
+      `${n}Keep going.${maybeEmoji()} This is exactly what I wanted to hear.`,
+      `That says so much about you.${maybeEmoji()} What else is in that thought?`,
+      `Yes.${maybeEmoji()} And how does that make you feel?`
+    ],_aiCtx.ctxVec);
+  }
+  // Short/evasive — coax gently
+  return await kiraAI.rank([
+    `${n}Come on.${maybeEmoji()} I know there's more to it. You can tell me.`,
+    `That's a start.${maybeEmoji()} What's the part you're not saying yet?`,
+    `${n}Don't be shy.${maybeEmoji()} I genuinely want to know.`,
+    `Mmm.${maybeEmoji()} I feel like you're holding something back. What is it?`
+  ],_aiCtx.ctxVec);
+}
 
 //  §9  PRNG + TIME + STORAGE
 // ─────────────────────────────────────────────────────────────────────
@@ -1829,7 +1915,6 @@ async function handleGrateful(){
   ],_aiCtx.ctxVec);
 }
 
-async function handleGeneral(text,userMood,tod){
 // ─────────────────────────────────────────────────────────────────────
 //  §15B SENTENCE ENGINE  ·  Dynamic response generation from word banks
 //  Generates novel responses by filling semantic templates with words
@@ -3273,7 +3358,7 @@ function validateSentence(sentence, context) {
 }
 
 
-function handleGeneral(text,userMood,tod){
+async function handleGeneral(text,userMood,tod){
   const n=namePrefix(),len=text.length;
 
   // Very short — nudge to open up
@@ -3476,6 +3561,7 @@ function getInitialMessage(){
     `Welcome back.${maybeEmoji()} I was just thinking about you. How are things?`,
     `${n||'Hey'}.${maybeEmoji()} I was here thinking about our last conversation. Glad you're back.`
   ]);
+  }
   return pick([
     `${n?n+'! ':''}Back again so soon?${maybeEmoji()} I'm not complaining.`,
     `Hey!${maybeEmoji()} Missed me already? I get it.`,
@@ -3681,8 +3767,6 @@ function flashLearning(){
 // ─────────────────────────────────────────────────────────────────────
 //  §19  SEND + ONLINE LEARNING LOOP
 // ─────────────────────────────────────────────────────────────────────
-async function sendMessage(){
-
 // ─────────────────────────────────────────────────────────────────────
 //  § GENERATIVE FALLBACK (WebLLM)
 // ─────────────────────────────────────────────────────────────────────
@@ -3722,7 +3806,7 @@ async function generateWebLLMResponse(userText) {
   return null;
 }
 
-function sendMessage(){
+async function sendMessage(){
   const correlationId=ENV.makeId('msg');
   const startedAt=ENV.nowMs();
   const text=msgInput.value.trim();if(!text)return;
@@ -3735,6 +3819,13 @@ function sendMessage(){
   const signal=detectFeedback(text);
   const regexMoodNow=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMoodNow);
+
+  // Ensure the neural mood student has a forward-pass cache before training.
+  // generateResponse() calls kiraAI.process(text) once for this same text;
+  // calling it here too would double-push every message into the 20-slot
+  // attention memory, so prime with the lighter moodNet-only forward pass.
+  try { await kiraAI.moodNetFwd(text); } catch (e) { console.warn('moodNetFwd failed in sendMessage', e); }
+
   await kiraAI.feedback(signal,regexIdx);
   if(signal!==0)flashLearning();
   logTransition(correlationId,'feedback_analyzed',startedAt,{signal,regex_mood:regexMoodNow});
@@ -3756,7 +3847,7 @@ function sendMessage(){
 
       // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
       // Call process here without updating UI state yet to get confidence.
-      const tempCtx = kiraAI.process(text);
+      const tempCtx = await kiraAI.process(text);
 
       if (tempCtx.confidence < 0.38 && window.webllmEngine) {
          const genResp = await generateWebLLMResponse(text);
@@ -3770,11 +3861,10 @@ function sendMessage(){
       }
 
       hideTyping();
-      const response=await generateResponse(text);
       // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
       // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
       if (!usedGenerative) {
-         response = generateResponse(text);
+         response = await generateResponse(text);
       } else {
          // Because generateResponse handles side effects like advancing CTX and adding affection,
          // we simulate the minimum necessary side effects here.
@@ -3976,7 +4066,6 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 // ─────────────────────────────────────────────────────────────────────
 //  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
-async function boot(){
 function processDreamState() {
   if (!state.dreamMemories) state.dreamMemories = [];
   if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
@@ -3987,21 +4076,29 @@ function processDreamState() {
   for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
     const msg = state.chatHistory[i];
     if (msg.role === 'you' && msg.text) {
-      const vector = kiraAI.encoder.fwd(msg.text);
-      const moodProb = kiraAI.moodNet.fwd(msg.text);
-      let dominantMood = 0;
-      let maxProb = -1;
-      for (let j = 0; j < moodProb.length; j++) {
-        if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
-      }
+      // NOTE: kiraAI.encoder/.moodNet are only reachable inside the neural Worker;
+      // the main-thread KiraAIProxy doesn't expose a raw-embedding RPC yet, so dream
+      // consolidation is skipped rather than thrown. Follow-up: add an encoderFwd
+      // RPC (mirroring moodNetFwd) to restore this.
+      try {
+        const moodProb = kiraAI.moodNet.fwd(msg.text);
+        const vector = kiraAI.encoder.fwd(msg.text);
+        let dominantMood = 0;
+        let maxProb = -1;
+        for (let j = 0; j < moodProb.length; j++) {
+          if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+        }
 
-      state.dreamMemories.push({
-        text: msg.text,
-        vector: M.pack(vector),
-        mood: dominantMood,
-        ts: msg.ts
-      });
-      processed = true;
+        state.dreamMemories.push({
+          text: msg.text,
+          vector: M.pack(vector),
+          mood: dominantMood,
+          ts: msg.ts
+        });
+        processed = true;
+      } catch (e) {
+        // Skip this message's dream consolidation; still advance lastDreamIndex below.
+      }
     }
   }
 
@@ -4009,7 +4106,7 @@ function processDreamState() {
   if (processed) saveState();
 }
 
-function boot(){
+async function boot(){
   trace('boot','start');
   recoverIncompleteTx();
   await loadState();await loadAI();loadImages();loadProfilePic();

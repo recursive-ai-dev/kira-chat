@@ -530,6 +530,112 @@ class MoodNet{
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  §5B  COMPOUND MOOD NET  ·  NM-02: single Linear(16,3) head sharing
+//  MoodNet's HashEmbed. Detects sarcasm/nostalgia/excitement — signals
+//  the primary 11-class softmax has no room for. N_MOODS stays locked
+//  at 11 (INV-05); this is an additive parallel head, not an expansion.
+// ─────────────────────────────────────────────────────────────────────
+const COMPOUND_LABELS=['sarcastic','nostalgic','excited'];
+const N_COMPOUND=COMPOUND_LABELS.length;
+
+class CompoundMoodNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc; // shared with MoodNet — same learned embedding space, not owned here
+    this.l1=new Linear(EDIM,N_COMPOUND,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  // Only ever called with a positive regex-detected label (see detectCompoundMoodRegex) —
+  // there's no "none of the above" class, so we don't train toward an absence of signal.
+  // Deliberately does not backprop into the shared encoder: MoodNet.bwd() already trains
+  // it every turn, and this head runs far less often (only on positive matches).
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  §5C  NER NET  ·  NM-04: single Linear(16,4) head sharing MoodNet's
+//  HashEmbed. Coarse category signal only (name/age/preference/
+//  disclosure) — a 16-dim hash embedding can't do span extraction, so
+//  the actual value text still comes from extractPersonalInfo()'s
+//  regex. This head exists to flag disclosures the regex missed.
+// ─────────────────────────────────────────────────────────────────────
+const NER_LABELS=['name','age','preference','disclosure'];
+
+class NERNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc;
+    this.l1=new Linear(EDIM,NER_LABELS.length,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  // Only ever called with a positive regex-detected label — see NM-02's CompoundMoodNet
+  // for why there's no "none" class and no shared-encoder backprop here.
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  §5D  INTENT NET  ·  NM-01: single Linear(16,8) head sharing MoodNet's
+//  HashEmbed. Unlike NM-02/04, 'general' is a real class here, trained
+//  from detectIntentRegex()'s decision every turn (same as MoodNet's
+//  'neutral'). Never chosen as the primary router — generateResponse()
+//  only consults it at the tail, to rescue a message that matched
+//  nothing else in the deterministic cascade above it.
+// ─────────────────────────────────────────────────────────────────────
+const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
+
+class IntentNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc;
+    this.l1=new Linear(EDIM,INTENT_LABELS.length,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  §6  BILINEAR SCORER  ·  score = ctx^T · W · resp
 //  Learns a compatibility matrix W between context and response spaces
 // ─────────────────────────────────────────────────────────────────────
@@ -599,6 +705,9 @@ class AttentionMem{
 class KiraAI{
   constructor(){
     this.moodNet=new MoodNet();
+    this.compoundMoodNet=new CompoundMoodNet(this.moodNet.enc);
+    this.nerNet=new NERNet(this.moodNet.enc);
+    this.intentNet=new IntentNet(this.moodNet.enc);
     this.encoder=new HashEmbed(5e-4);
     this.respEnc=new HashEmbed(5e-4);
     this.scorer=new Scorer();
@@ -616,11 +725,23 @@ class KiraAI{
     const probs=this.moodNet.fwd(text);
     let moodIdx=0,maxP=0;
     for(let i=0;i<probs.length;i++)if(probs[i]>maxP){maxP=probs[i];moodIdx=i;}
+    const compoundProbs=this.compoundMoodNet.fwd(text);
+    let compoundIdx=0,compoundMaxP=0;
+    for(let i=0;i<compoundProbs.length;i++)if(compoundProbs[i]>compoundMaxP){compoundMaxP=compoundProbs[i];compoundIdx=i;}
+    const nerProbs=this.nerNet.fwd(text);
+    let nerIdx=0,nerMaxP=0;
+    for(let i=0;i<nerProbs.length;i++)if(nerProbs[i]>nerMaxP){nerMaxP=nerProbs[i];nerIdx=i;}
+    const intentProbs=this.intentNet.fwd(text);
+    let intentIdx=0,intentMaxP=0;
+    for(let i=0;i<intentProbs.length;i++)if(intentProbs[i]>intentMaxP){intentMaxP=intentProbs[i];intentIdx=i;}
     const similar=this.memory.topk(msgVec,2);
     const h1_sub=(this.moodNet._cache.h1||new Float32Array(32)).slice(0,EDIM);
     this.memory.push(M.normalize(msgVec),h1_sub,text.slice(0,60));
     this._lastCtx=ctxVec;this._lastMIdx=moodIdx;this.tick++;
-    return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP};
+    return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP,
+      compound:{label:COMPOUND_LABELS[compoundIdx],confidence:compoundMaxP},
+      ner:{label:NER_LABELS[nerIdx],confidence:nerMaxP},
+      intent:{label:INTENT_LABELS[intentIdx],confidence:intentMaxP}};
   }
 
   // Temperature-weighted sampling from top-K ranked candidates
@@ -653,10 +774,12 @@ class KiraAI{
     setTimeout(async ()=>{this.isLearning=false;},600);
   }
 
-  save(){return{mn:this.moodNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
+  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),intent:this.intentNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
   load(d){
     try{
-      if(d.mn)this.moodNet.load(d.mn);if(d.enc)this.encoder.load(d.enc);
+      if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.ner)this.nerNet.load(d.ner);
+      if(d.intent)this.intentNet.load(d.intent);
+      if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
     }catch(e){}
@@ -790,6 +913,18 @@ onmessage = function(e) {
       case 'moodNetFwd':
         result = kiraAI.moodNet.fwd(args[0]);
         break;
+      case 'compoundMoodBwd':
+        kiraAI.compoundMoodNet.bwd(args[0], args[1]);
+        result = true;
+        break;
+      case 'nerBwd':
+        kiraAI.nerNet.bwd(args[0], args[1]);
+        result = true;
+        break;
+      case 'intentBwd':
+        kiraAI.intentNet.bwd(args[0], args[1]);
+        result = true;
+        break;
       case 'save':
         result = kiraAI.save();
         break;
@@ -898,6 +1033,9 @@ class KiraAIProxy {
   async feedback(signal, regexMoodIdx) { return this._call('feedback', signal, regexMoodIdx); }
   async moodNetBwd(target, reward) { return this._call('moodNetBwd', target, reward); }
   async moodNetFwd(text) { return this._call('moodNetFwd', text); }
+  async compoundMoodBwd(target, reward) { return this._call('compoundMoodBwd', target, reward); }
+  async nerBwd(target, reward) { return this._call('nerBwd', target, reward); }
+  async intentBwd(target, reward) { return this._call('intentBwd', target, reward); }
   async requestSave() { return this._call('save'); }
   async load(d) { return this._call('load', d); }
   async init(seed, profile, aiState) { return this._call('init', seed, profile, aiState); }
@@ -909,7 +1047,94 @@ class KiraAIProxy {
 }
 
 const kiraAI = new KiraAIProxy();
+let _aiCtx=null;
 
+const VOCAB=128,EDIM=16;
+const MOOD_LABELS=['neutral','happy','sad','angry','anxious','flirty','bored','tired','curious','grateful','vulnerable'];
+const N_MOODS=MOOD_LABELS.length;
+const COMPOUND_LABELS=['sarcastic','nostalgic','excited'];
+const MEM_CAP=20;
+
+// ── Conversation context tracker ──────────────────────────────────────
+// Tracks what Kira is currently focused on so she can follow up naturally
+const CTX={
+  topic:null,       // last major topic
+  handler:null,     // last handler called
+  turnsSince:0,     // turns since context was set
+  pendingQ:null,    // question Kira asked (for follow-up detection)
+  depth:0,          // depth in current thread
+  mood:null         // last user mood
+};
+
+const DIAG={
+  traceEnabled:true,
+  traces:[],
+  errors:0,
+  lastRoute:'boot'
+};
+
+function trace(step,data,level='info'){
+  if(!DIAG.traceEnabled&&level!=='error')return;
+  DIAG.traces.push({ts:ENV.nowMs(),step,level,data});
+  if(DIAG.traces.length>40)DIAG.traces.shift();
+}
+
+function setRoute(route){
+  DIAG.lastRoute=route;
+  trace('route',route);
+}
+
+function logTransition(correlationId,stepName,startedAt,extra={},level='info'){
+  trace('transition',{
+    correlation_id:correlationId,
+    step_name:stepName,
+    latency_ms:Math.max(0,ENV.nowMs()-startedAt),
+    ...extra
+  },level);
+}
+
+function summarizeTrace(){
+  if(!DIAG.traces.length)return'none';
+  return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
+}
+
+function setCTX(handler,topic,question){
+  CTX.handler=handler;CTX.topic=topic||CTX.topic;
+  CTX.pendingQ=question||null;CTX.turnsSince=0;CTX.depth++;
+  if(topic)setContextPill(topic);
+}
+
+function advanceCTX(){CTX.turnsSince++;}
+
+// Detects if user's short reply is answering/continuing a previous question
+function isContinuation(t){
+  return CTX.pendingQ&&t.length<120&&CTX.turnsSince<=2;
+}
+
+// Follow-up continuation response
+async function handleContinuation(text,userMood){
+  const t=text.toLowerCase();
+  const n=namePrefix();
+  CTX.pendingQ=null;
+
+  // If they gave a real answer, dig deeper
+  if(text.length>20||/[a-z]{4,}/i.test(t)){
+    return await kiraAI.rank([
+      `${n}That's really interesting.${maybeEmoji()} What does that mean to you?`,
+      `I love that.${maybeEmoji()} Tell me more — I want the full picture.`,
+      `${n}Keep going.${maybeEmoji()} This is exactly what I wanted to hear.`,
+      `That says so much about you.${maybeEmoji()} What else is in that thought?`,
+      `Yes.${maybeEmoji()} And how does that make you feel?`
+    ],_aiCtx.ctxVec);
+  }
+  // Short/evasive — coax gently
+  return await kiraAI.rank([
+    `${n}Come on.${maybeEmoji()} I know there's more to it. You can tell me.`,
+    `That's a start.${maybeEmoji()} What's the part you're not saying yet?`,
+    `${n}Don't be shy.${maybeEmoji()} I genuinely want to know.`,
+    `Mmm.${maybeEmoji()} I feel like you're holding something back. What is it?`
+  ],_aiCtx.ctxVec);
+}
 
 //  §9  PRNG + TIME + STORAGE
 // ─────────────────────────────────────────────────────────────────────
@@ -1040,6 +1265,7 @@ function minutesSince(ts){return ts?Math.floor((ENV.nowMs()-ts)/60000):99999;}
 // ─────────────────────────────────────────────────────────────────────
 const DEFAULT_STATE={
   username:'',personality:'warm',affection:0,mood:'neutral',moodIntensity:0.5,energy:0.7,
+  lastCompoundMood:null,
   conversationCount:0,messagesSent:0,messagesReceived:0,firstMeet:null,lastVisit:null,
   lastMessageTime:null,currentStreak:0,longestStreak:0,topics:{},memories:[],
   petNames:[],userMoods:[],askedAbout:{},sharedAbout:{},lastGreeting:null,
@@ -1162,6 +1388,46 @@ function detectUserMoodRegex(text){
   return best;
 }
 
+// NM-02: weak-supervision teacher for CompoundMoodNet. Unlike detectUserMoodRegex,
+// this has no default — most messages are none of these, and returning null (rather
+// than forcing a guess) is what tells generateResponse() to skip training this turn.
+function detectCompoundMoodRegex(text){
+  const t=text.toLowerCase();
+  const signals={
+    sarcastic:/\b(yeah,? ?right|oh,? ?sure|as if|wow,? (?:shocking|surprising)|what a (?:surprise|shock)|totally(?:,| )(?:not|didn.t)|sure,? ?jan)\b/gi,
+    nostalgic:/\b(remember when|back in the day|used to|those were the days|good old days|reminds me of when|when i was (?:a kid|younger|little)|years ago|takes me back|miss those days)\b/gi,
+    excited:/\b(can.t wait|so excited|excited|pumped|hyped|stoked|thrilled)\b/gi
+  };
+  let best=null,maxM=0;
+  for(const[mood,rx]of Object.entries(signals)){
+    const m=t.match(rx);
+    if(m&&m.length>maxM){maxM=m.length;best=mood;}
+  }
+  return best;
+}
+
+// NM-01: weak-supervision teacher for IntentNet. Mirrors the 7 phrase-driven (not
+// mood-gated) routes from generateResponse()'s dispatch cascade, in the same
+// relative order, so 'general' here means "none of these seven patterns fired" —
+// it does NOT attempt to replicate every one of the cascade's ~20 branches (e.g.
+// topic/question/mood-gated routes aren't tracked), so a message routed elsewhere
+// by the real cascade may still get a non-'general' training label here. That's
+// acceptable label noise for a training signal; it's never used to route directly
+// (see the intent-rescue block in generateResponse, which only fires after the
+// full cascade has already found nothing).
+function detectIntentRegex(text){
+  const t=text.toLowerCase();
+  if(/^(hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))[\s!?.]*$/i.test(t)||
+    (t.length<=5&&/^(hey|hi|yo|sup)$/.test(t.replace(/[^a-z]/g,''))))return'greeting';
+  if(/^(?:how (?:are you|r u|you doing|have you been)|what'?s up|wyd|what are you (?:up to|doing))[\s?!]*$/i.test(t))return'how_are_you';
+  if(/(?:what(?:'s| is) your (?:name|favorite|fav)|tell me about (?:you|yourself)|who are you|what do you (?:like|enjoy|do))/i.test(t))return'about_her';
+  if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t))return'love_declaration';
+  if(/\bi miss (?:you|u)\b/i.test(t))return'miss_you';
+  if(/\b(?:good ?night|gn|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|bye|goodbye|ttyl|gotta go|heading out|talk later|see ya)\b/i.test(t))return'goodbye';
+  if(/\b(?:you(?:'re| are) (?:so |really |very )?(?:cute|beautiful|pretty|gorgeous|amazing|wonderful|sweet|perfect|incredible|the best|kind)|i (?:like|appreciate|adore) you)\b/i.test(t))return'compliment';
+  return'general';
+}
+
 function updateHerMood(userMood){
   const map={
     happy:['happy','affectionate'],sad:['worried','affectionate'],
@@ -1187,6 +1453,15 @@ function detectFeedback(text){
   if(/^(k\.?|ok\.?|okay\.?|sure\.?|fine\.?|whatever\.?|meh\.?|yep\.?|mmk\.?|uh huh\.?|hmm\.?)$/.test(t))return -1;
   return 0;
 }
+
+// NM-04 safety net: crisis-adjacent language must always win routing priority,
+// regardless of what else the message happens to also match (e.g. "goodbye").
+// This only affects which existing handler answers (handleUserFeelsBad's
+// 'vulnerable' branch) — no new response copy is introduced here.
+const CRISIS_PATTERN=/\b(suicid\w*|self.harm|kill myself|end my life|wanted? to die|hurt myself|don'?t want to (?:live|be here|exist)|no reason to (?:live|go on))\b/i;
+
+const NER_LABELS=['name','age','preference','disclosure'];
+const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
 
 // ─────────────────────────────────────────────────────────────────────
 //  §13  TOPICS + MEMORY
@@ -1236,9 +1511,18 @@ function extractPersonalInfo(text){
     }
   }
   const ageMatch=t.match(/i'm (\d{2}) (?:years|yrs)|i am (\d{2})/);
-  if(ageMatch)addMemory(`They are ${ageMatch[1]||ageMatch[2]} years old`,'personal');
+  if(ageMatch){const value=ageMatch[1]||ageMatch[2];addMemory(`They are ${value} years old`,'personal');return{type:'age',value};}
   const likeMatch=t.match(/(?:i (?:really )?(?:love|like|enjoy|adore) )(.+?)(?:\.|!|$)/i);
-  if(likeMatch)addMemory(`They love: ${likeMatch[1].trim()}`,'preference');
+  if(likeMatch){const value=likeMatch[1].trim();addMemory(`They love: ${value}`,'preference');return{type:'preference',value};}
+  // NM-04: emotional/personal disclosures beyond simple mood keywords — additive only,
+  // never touches state.username. Crisis-adjacent language is handled separately in
+  // generateResponse() with top routing priority, not authored as response copy here.
+  const disclosureMatch=t.match(/(?:i(?:'ve| have) been (?:struggling with|dealing with|battling)|i (?:have|was diagnosed with)|i suffer from)\s+([a-z][a-z .'-]{2,40}?)(?:\.|!|,|$)/i);
+  if(disclosureMatch){
+    const value=disclosureMatch[1].trim();
+    addMemory(`They shared: ${value}`,'disclosure');
+    return{type:'disclosure',value};
+  }
   return null;
 }
 
@@ -1280,14 +1564,42 @@ async function generateResponse(userText){
   const startedAt=ENV.nowMs();
   const text=userText.trim(),t=text.toLowerCase();
   trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
+  // NM-04 safety net: checked unconditionally, independent of extractPersonalInfo's
+  // own (narrower) disclosure pattern, so it can't be shadowed by an earlier regex
+  // match elsewhere in this function (e.g. a goodbye phrase in the same message).
+  const isCrisis=CRISIS_PATTERN.test(t);
   _aiCtx=await kiraAI.process(text);
   const regexMood=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNetBwd(regexIdx<0?0:regexIdx,0.8);
-  const userMood=_aiCtx.confidence>0.38?_aiCtx.mood:regexMood;
+  let userMood=isCrisis?'vulnerable':(_aiCtx.confidence>0.38?_aiCtx.mood:regexMood);
+
+  // NM-02: compound mood is a secondary, sparser signal — only train on positive
+  // regex matches (see detectCompoundMoodRegex), and only trust the neural label
+  // once it's confident; otherwise fall back to whatever the regex teacher saw.
+  const regexCompound=detectCompoundMoodRegex(text);
+  if(regexCompound)kiraAI.compoundMoodBwd(COMPOUND_LABELS.indexOf(regexCompound),0.8);
+  const compoundMood=(_aiCtx.compound&&_aiCtx.compound.confidence>0.38)?_aiCtx.compound.label:regexCompound;
+  state.lastCompoundMood=compoundMood||null;
+
   const topics=detectTopics(text);
   const info=extractPersonalInfo(text);
-  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),topics});
+
+  // NM-04: coarse neural second pass — only acts when the regex found nothing at all
+  // this turn, so it never overwrites or duplicates a more precise regex-driven memory.
+  const regexNER=info?info.type:null;
+  if(regexNER)kiraAI.nerBwd(NER_LABELS.indexOf(regexNER),0.8);
+  const nerMood=(_aiCtx.ner&&_aiCtx.ner.confidence>0.5)?_aiCtx.ner.label:null;
+  if(!info&&nerMood==='disclosure'&&text.length>=15){
+    addMemory(`They shared something personal: ${text.slice(0,80)}`,'disclosure');
+  }
+
+  // NM-01: 'general' is a real, always-available class here (see detectIntentRegex),
+  // so — like MoodNet — this trains every turn, not just on positive matches.
+  const regexIntent=detectIntentRegex(text);
+  kiraAI.intentBwd(INTENT_LABELS.indexOf(regexIntent),0.8);
+
+  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,ner:nerMood,topics});
   const tod=getTimeOfDay();
   updateHerMood(userMood);
   CTX.mood=userMood;advanceCTX();
@@ -1296,8 +1608,12 @@ async function generateResponse(userText){
   if(text.length>50)affGain++;if(text.length>150)affGain++;
   if(userMood==='flirty')affGain+=3;if(userMood==='grateful')affGain+=2;
   if(userMood==='vulnerable')affGain+=3;
+  if(compoundMood==='excited')affGain+=1;
   if(topics.includes('feelings')||topics.includes('philosophy'))affGain+=2;
   addAffection(affGain);
+
+  // ── Crisis-adjacent language always wins routing, ahead of every other check ──
+  if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
   // ── Continuation: did user reply to a question Kira just asked? ──
   if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
@@ -1373,8 +1689,33 @@ async function generateResponse(userText){
     {setCTX('topic',topics[0],null);setRoute('topic');return await handleTopicResponse(topics,userMood);}
   if(userMood==='grateful')
     {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
+
+  // NM-01: nothing above matched — before falling through to the generic pool, see
+  // if the intent classifier recognizes a confident paraphrase of one of the
+  // specific routes it was trained on (e.g. "I adore you" for love_declaration,
+  // which the regex above only catches for "love/luv/luh you"). This can only
+  // rescue 'general'; it never runs early enough to override an earlier match.
+  if(_aiCtx.intent&&_aiCtx.intent.confidence>0.5&&_aiCtx.intent.label!=='general'){
+    const rescueHandlers={
+      greeting:()=>handleGreeting(tod),
+      how_are_you:()=>handleHowAreYou(tod),
+      about_her:()=>handleAboutHer(t),
+      love_declaration:()=>handleILoveYou(),
+      miss_you:()=>handleIMissYou(),
+      goodbye:()=>handleGoodbye(t),
+      compliment:()=>handleCompliment()
+    };
+    const rescue=rescueHandlers[_aiCtx.intent.label];
+    if(rescue){
+      setRoute('intent-rescue:'+_aiCtx.intent.label);
+      const out=await rescue();
+      logTransition(correlationId,'route_intent_rescue',startedAt,{route:DIAG.lastRoute,response_length:out.length});
+      return out;
+    }
+  }
+
   setRoute('general');
-  const response=handleGeneral(text,userMood,tod);
+  const response=await handleGeneral(text,userMood,tod);
   logTransition(correlationId,'route_general',startedAt,{route:DIAG.lastRoute,response_length:response.length});
   return response;
 }
@@ -1829,7 +2170,6 @@ async function handleGrateful(){
   ],_aiCtx.ctxVec);
 }
 
-async function handleGeneral(text,userMood,tod){
 // ─────────────────────────────────────────────────────────────────────
 //  §15B SENTENCE ENGINE  ·  Dynamic response generation from word banks
 //  Generates novel responses by filling semantic templates with words
@@ -3273,7 +3613,7 @@ function validateSentence(sentence, context) {
 }
 
 
-function handleGeneral(text,userMood,tod){
+async function handleGeneral(text,userMood,tod){
   const n=namePrefix(),len=text.length;
 
   // Very short — nudge to open up
@@ -3476,6 +3816,7 @@ function getInitialMessage(){
     `Welcome back.${maybeEmoji()} I was just thinking about you. How are things?`,
     `${n||'Hey'}.${maybeEmoji()} I was here thinking about our last conversation. Glad you're back.`
   ]);
+  }
   return pick([
     `${n?n+'! ':''}Back again so soon?${maybeEmoji()} I'm not complaining.`,
     `Hey!${maybeEmoji()} Missed me already? I get it.`,
@@ -3681,8 +4022,6 @@ function flashLearning(){
 // ─────────────────────────────────────────────────────────────────────
 //  §19  SEND + ONLINE LEARNING LOOP
 // ─────────────────────────────────────────────────────────────────────
-async function sendMessage(){
-
 // ─────────────────────────────────────────────────────────────────────
 //  § GENERATIVE FALLBACK (WebLLM)
 // ─────────────────────────────────────────────────────────────────────
@@ -3722,7 +4061,7 @@ async function generateWebLLMResponse(userText) {
   return null;
 }
 
-function sendMessage(){
+async function sendMessage(){
   const correlationId=ENV.makeId('msg');
   const startedAt=ENV.nowMs();
   const text=msgInput.value.trim();if(!text)return;
@@ -3735,6 +4074,13 @@ function sendMessage(){
   const signal=detectFeedback(text);
   const regexMoodNow=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMoodNow);
+
+  // Ensure the neural mood student has a forward-pass cache before training.
+  // generateResponse() calls kiraAI.process(text) once for this same text;
+  // calling it here too would double-push every message into the 20-slot
+  // attention memory, so prime with the lighter moodNet-only forward pass.
+  try { await kiraAI.moodNetFwd(text); } catch (e) { console.warn('moodNetFwd failed in sendMessage', e); }
+
   await kiraAI.feedback(signal,regexIdx);
   if(signal!==0)flashLearning();
   logTransition(correlationId,'feedback_analyzed',startedAt,{signal,regex_mood:regexMoodNow});
@@ -3756,7 +4102,7 @@ function sendMessage(){
 
       // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
       // Call process here without updating UI state yet to get confidence.
-      const tempCtx = kiraAI.process(text);
+      const tempCtx = await kiraAI.process(text);
 
       if (tempCtx.confidence < 0.38 && window.webllmEngine) {
          const genResp = await generateWebLLMResponse(text);
@@ -3770,11 +4116,10 @@ function sendMessage(){
       }
 
       hideTyping();
-      const response=await generateResponse(text);
       // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
       // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
       if (!usedGenerative) {
-         response = generateResponse(text);
+         response = await generateResponse(text);
       } else {
          // Because generateResponse handles side effects like advancing CTX and adding affection,
          // we simulate the minimum necessary side effects here.
@@ -3900,7 +4245,10 @@ function updateInsightDock(){
 }
 
 async function renderAIStats(){
-  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM;
+  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM
+    +EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length
+    +EDIM*NER_LABELS.length+NER_LABELS.length
+    +EDIM*INTENT_LABELS.length+INTENT_LABELS.length;
   let aiState = null;
   try {
     aiState = await kiraAI.requestSave();
@@ -3908,15 +4256,21 @@ async function renderAIStats(){
   const memCount = aiState ? aiState.mem.K.length : 0;
   const tickCount = aiState ? aiState.tk : 0;
   const mnUpd = aiState ? aiState.mn.upd : 0;
+  const cmnUpd = aiState && aiState.cmn ? aiState.cmn.upd : 0;
+  const nerUpd = aiState && aiState.ner ? aiState.ner.upd : 0;
+  const intentUpd = aiState && aiState.intent ? aiState.intent.upd : 0;
   const scUpd = aiState ? aiState.sc.upd : 0;
   aiStats.innerHTML=
-    `<b>Model</b>: 3-layer MLP + Bilinear Scorer<br>`+
+    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER + Intent Heads<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
     `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
     `<b>Training</b>: Online distillation (regex→neural)<br>`+
     `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
     `<b>Messages processed</b>: ${tickCount}<br>`+
     `<b>Mood net updates</b>: ${mnUpd}<br>`+
+    `<b>Compound mood updates</b>: ${cmnUpd} (last: ${state.lastCompoundMood||'none'})<br>`+
+    `<b>NER updates</b>: ${nerUpd}<br>`+
+    `<b>Intent net updates</b>: ${intentUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
     `<b>Trace tail</b>: ${summarizeTrace()}`;
@@ -3976,7 +4330,6 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 // ─────────────────────────────────────────────────────────────────────
 //  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
-async function boot(){
 function processDreamState() {
   if (!state.dreamMemories) state.dreamMemories = [];
   if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
@@ -3987,21 +4340,29 @@ function processDreamState() {
   for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
     const msg = state.chatHistory[i];
     if (msg.role === 'you' && msg.text) {
-      const vector = kiraAI.encoder.fwd(msg.text);
-      const moodProb = kiraAI.moodNet.fwd(msg.text);
-      let dominantMood = 0;
-      let maxProb = -1;
-      for (let j = 0; j < moodProb.length; j++) {
-        if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
-      }
+      // NOTE: kiraAI.encoder/.moodNet are only reachable inside the neural Worker;
+      // the main-thread KiraAIProxy doesn't expose a raw-embedding RPC yet, so dream
+      // consolidation is skipped rather than thrown. Follow-up: add an encoderFwd
+      // RPC (mirroring moodNetFwd) to restore this.
+      try {
+        const moodProb = kiraAI.moodNet.fwd(msg.text);
+        const vector = kiraAI.encoder.fwd(msg.text);
+        let dominantMood = 0;
+        let maxProb = -1;
+        for (let j = 0; j < moodProb.length; j++) {
+          if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+        }
 
-      state.dreamMemories.push({
-        text: msg.text,
-        vector: M.pack(vector),
-        mood: dominantMood,
-        ts: msg.ts
-      });
-      processed = true;
+        state.dreamMemories.push({
+          text: msg.text,
+          vector: M.pack(vector),
+          mood: dominantMood,
+          ts: msg.ts
+        });
+        processed = true;
+      } catch (e) {
+        // Skip this message's dream consolidation; still advance lastDreamIndex below.
+      }
     }
   }
 
@@ -4009,7 +4370,7 @@ function processDreamState() {
   if (processed) saveState();
 }
 
-function boot(){
+async function boot(){
   trace('boot','start');
   recoverIncompleteTx();
   await loadState();await loadAI();loadImages();loadProfilePic();

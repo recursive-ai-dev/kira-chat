@@ -567,6 +567,41 @@ class CompoundMoodNet{
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  §5C  NER NET  ·  NM-04: single Linear(16,4) head sharing MoodNet's
+//  HashEmbed. Coarse category signal only (name/age/preference/
+//  disclosure) — a 16-dim hash embedding can't do span extraction, so
+//  the actual value text still comes from extractPersonalInfo()'s
+//  regex. This head exists to flag disclosures the regex missed.
+// ─────────────────────────────────────────────────────────────────────
+const NER_LABELS=['name','age','preference','disclosure'];
+
+class NERNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc;
+    this.l1=new Linear(EDIM,NER_LABELS.length,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  // Only ever called with a positive regex-detected label — see NM-02's CompoundMoodNet
+  // for why there's no "none" class and no shared-encoder backprop here.
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  §6  BILINEAR SCORER  ·  score = ctx^T · W · resp
 //  Learns a compatibility matrix W between context and response spaces
 // ─────────────────────────────────────────────────────────────────────
@@ -637,6 +672,7 @@ class KiraAI{
   constructor(){
     this.moodNet=new MoodNet();
     this.compoundMoodNet=new CompoundMoodNet(this.moodNet.enc);
+    this.nerNet=new NERNet(this.moodNet.enc);
     this.encoder=new HashEmbed(5e-4);
     this.respEnc=new HashEmbed(5e-4);
     this.scorer=new Scorer();
@@ -657,12 +693,16 @@ class KiraAI{
     const compoundProbs=this.compoundMoodNet.fwd(text);
     let compoundIdx=0,compoundMaxP=0;
     for(let i=0;i<compoundProbs.length;i++)if(compoundProbs[i]>compoundMaxP){compoundMaxP=compoundProbs[i];compoundIdx=i;}
+    const nerProbs=this.nerNet.fwd(text);
+    let nerIdx=0,nerMaxP=0;
+    for(let i=0;i<nerProbs.length;i++)if(nerProbs[i]>nerMaxP){nerMaxP=nerProbs[i];nerIdx=i;}
     const similar=this.memory.topk(msgVec,2);
     const h1_sub=(this.moodNet._cache.h1||new Float32Array(32)).slice(0,EDIM);
     this.memory.push(M.normalize(msgVec),h1_sub,text.slice(0,60));
     this._lastCtx=ctxVec;this._lastMIdx=moodIdx;this.tick++;
     return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP,
-      compound:{label:COMPOUND_LABELS[compoundIdx],confidence:compoundMaxP}};
+      compound:{label:COMPOUND_LABELS[compoundIdx],confidence:compoundMaxP},
+      ner:{label:NER_LABELS[nerIdx],confidence:nerMaxP}};
   }
 
   // Temperature-weighted sampling from top-K ranked candidates
@@ -695,10 +735,11 @@ class KiraAI{
     setTimeout(async ()=>{this.isLearning=false;},600);
   }
 
-  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
+  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
   load(d){
     try{
-      if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.enc)this.encoder.load(d.enc);
+      if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.ner)this.nerNet.load(d.ner);
+      if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
     }catch(e){}
@@ -836,6 +877,10 @@ onmessage = function(e) {
         kiraAI.compoundMoodNet.bwd(args[0], args[1]);
         result = true;
         break;
+      case 'nerBwd':
+        kiraAI.nerNet.bwd(args[0], args[1]);
+        result = true;
+        break;
       case 'save':
         result = kiraAI.save();
         break;
@@ -945,6 +990,7 @@ class KiraAIProxy {
   async moodNetBwd(target, reward) { return this._call('moodNetBwd', target, reward); }
   async moodNetFwd(text) { return this._call('moodNetFwd', text); }
   async compoundMoodBwd(target, reward) { return this._call('compoundMoodBwd', target, reward); }
+  async nerBwd(target, reward) { return this._call('nerBwd', target, reward); }
   async requestSave() { return this._call('save'); }
   async load(d) { return this._call('load', d); }
   async init(seed, profile, aiState) { return this._call('init', seed, profile, aiState); }
@@ -1341,6 +1387,14 @@ function detectFeedback(text){
   return 0;
 }
 
+// NM-04 safety net: crisis-adjacent language must always win routing priority,
+// regardless of what else the message happens to also match (e.g. "goodbye").
+// This only affects which existing handler answers (handleUserFeelsBad's
+// 'vulnerable' branch) — no new response copy is introduced here.
+const CRISIS_PATTERN=/\b(suicid\w*|self.harm|kill myself|end my life|wanted? to die|hurt myself|don'?t want to (?:live|be here|exist)|no reason to (?:live|go on))\b/i;
+
+const NER_LABELS=['name','age','preference','disclosure'];
+
 // ─────────────────────────────────────────────────────────────────────
 //  §13  TOPICS + MEMORY
 // ─────────────────────────────────────────────────────────────────────
@@ -1389,9 +1443,18 @@ function extractPersonalInfo(text){
     }
   }
   const ageMatch=t.match(/i'm (\d{2}) (?:years|yrs)|i am (\d{2})/);
-  if(ageMatch)addMemory(`They are ${ageMatch[1]||ageMatch[2]} years old`,'personal');
+  if(ageMatch){const value=ageMatch[1]||ageMatch[2];addMemory(`They are ${value} years old`,'personal');return{type:'age',value};}
   const likeMatch=t.match(/(?:i (?:really )?(?:love|like|enjoy|adore) )(.+?)(?:\.|!|$)/i);
-  if(likeMatch)addMemory(`They love: ${likeMatch[1].trim()}`,'preference');
+  if(likeMatch){const value=likeMatch[1].trim();addMemory(`They love: ${value}`,'preference');return{type:'preference',value};}
+  // NM-04: emotional/personal disclosures beyond simple mood keywords — additive only,
+  // never touches state.username. Crisis-adjacent language is handled separately in
+  // generateResponse() with top routing priority, not authored as response copy here.
+  const disclosureMatch=t.match(/(?:i(?:'ve| have) been (?:struggling with|dealing with|battling)|i (?:have|was diagnosed with)|i suffer from)\s+([a-z][a-z .'-]{2,40}?)(?:\.|!|,|$)/i);
+  if(disclosureMatch){
+    const value=disclosureMatch[1].trim();
+    addMemory(`They shared: ${value}`,'disclosure');
+    return{type:'disclosure',value};
+  }
   return null;
 }
 
@@ -1433,11 +1496,15 @@ async function generateResponse(userText){
   const startedAt=ENV.nowMs();
   const text=userText.trim(),t=text.toLowerCase();
   trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
+  // NM-04 safety net: checked unconditionally, independent of extractPersonalInfo's
+  // own (narrower) disclosure pattern, so it can't be shadowed by an earlier regex
+  // match elsewhere in this function (e.g. a goodbye phrase in the same message).
+  const isCrisis=CRISIS_PATTERN.test(t);
   _aiCtx=await kiraAI.process(text);
   const regexMood=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNetBwd(regexIdx<0?0:regexIdx,0.8);
-  const userMood=_aiCtx.confidence>0.38?_aiCtx.mood:regexMood;
+  let userMood=isCrisis?'vulnerable':(_aiCtx.confidence>0.38?_aiCtx.mood:regexMood);
 
   // NM-02: compound mood is a secondary, sparser signal — only train on positive
   // regex matches (see detectCompoundMoodRegex), and only trust the neural label
@@ -1449,7 +1516,17 @@ async function generateResponse(userText){
 
   const topics=detectTopics(text);
   const info=extractPersonalInfo(text);
-  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,topics});
+
+  // NM-04: coarse neural second pass — only acts when the regex found nothing at all
+  // this turn, so it never overwrites or duplicates a more precise regex-driven memory.
+  const regexNER=info?info.type:null;
+  if(regexNER)kiraAI.nerBwd(NER_LABELS.indexOf(regexNER),0.8);
+  const nerMood=(_aiCtx.ner&&_aiCtx.ner.confidence>0.5)?_aiCtx.ner.label:null;
+  if(!info&&nerMood==='disclosure'&&text.length>=15){
+    addMemory(`They shared something personal: ${text.slice(0,80)}`,'disclosure');
+  }
+
+  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,ner:nerMood,topics});
   const tod=getTimeOfDay();
   updateHerMood(userMood);
   CTX.mood=userMood;advanceCTX();
@@ -1461,6 +1538,9 @@ async function generateResponse(userText){
   if(compoundMood==='excited')affGain+=1;
   if(topics.includes('feelings')||topics.includes('philosophy'))affGain+=2;
   addAffection(affGain);
+
+  // ── Crisis-adjacent language always wins routing, ahead of every other check ──
+  if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
   // ── Continuation: did user reply to a question Kira just asked? ──
   if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
@@ -4067,7 +4147,9 @@ function updateInsightDock(){
 }
 
 async function renderAIStats(){
-  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM+EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length;
+  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM
+    +EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length
+    +EDIM*NER_LABELS.length+NER_LABELS.length;
   let aiState = null;
   try {
     aiState = await kiraAI.requestSave();
@@ -4076,9 +4158,10 @@ async function renderAIStats(){
   const tickCount = aiState ? aiState.tk : 0;
   const mnUpd = aiState ? aiState.mn.upd : 0;
   const cmnUpd = aiState && aiState.cmn ? aiState.cmn.upd : 0;
+  const nerUpd = aiState && aiState.ner ? aiState.ner.upd : 0;
   const scUpd = aiState ? aiState.sc.upd : 0;
   aiStats.innerHTML=
-    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood Head<br>`+
+    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER Heads<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
     `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
     `<b>Training</b>: Online distillation (regex→neural)<br>`+
@@ -4086,6 +4169,7 @@ async function renderAIStats(){
     `<b>Messages processed</b>: ${tickCount}<br>`+
     `<b>Mood net updates</b>: ${mnUpd}<br>`+
     `<b>Compound mood updates</b>: ${cmnUpd} (last: ${state.lastCompoundMood||'none'})<br>`+
+    `<b>NER updates</b>: ${nerUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
     `<b>Trace tail</b>: ${summarizeTrace()}`;

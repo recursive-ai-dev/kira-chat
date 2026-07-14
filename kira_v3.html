@@ -530,6 +530,43 @@ class MoodNet{
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  §5B  COMPOUND MOOD NET  ·  NM-02: single Linear(16,3) head sharing
+//  MoodNet's HashEmbed. Detects sarcasm/nostalgia/excitement — signals
+//  the primary 11-class softmax has no room for. N_MOODS stays locked
+//  at 11 (INV-05); this is an additive parallel head, not an expansion.
+// ─────────────────────────────────────────────────────────────────────
+const COMPOUND_LABELS=['sarcastic','nostalgic','excited'];
+const N_COMPOUND=COMPOUND_LABELS.length;
+
+class CompoundMoodNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc; // shared with MoodNet — same learned embedding space, not owned here
+    this.l1=new Linear(EDIM,N_COMPOUND,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  // Only ever called with a positive regex-detected label (see detectCompoundMoodRegex) —
+  // there's no "none of the above" class, so we don't train toward an absence of signal.
+  // Deliberately does not backprop into the shared encoder: MoodNet.bwd() already trains
+  // it every turn, and this head runs far less often (only on positive matches).
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  §6  BILINEAR SCORER  ·  score = ctx^T · W · resp
 //  Learns a compatibility matrix W between context and response spaces
 // ─────────────────────────────────────────────────────────────────────
@@ -599,6 +636,7 @@ class AttentionMem{
 class KiraAI{
   constructor(){
     this.moodNet=new MoodNet();
+    this.compoundMoodNet=new CompoundMoodNet(this.moodNet.enc);
     this.encoder=new HashEmbed(5e-4);
     this.respEnc=new HashEmbed(5e-4);
     this.scorer=new Scorer();
@@ -616,11 +654,15 @@ class KiraAI{
     const probs=this.moodNet.fwd(text);
     let moodIdx=0,maxP=0;
     for(let i=0;i<probs.length;i++)if(probs[i]>maxP){maxP=probs[i];moodIdx=i;}
+    const compoundProbs=this.compoundMoodNet.fwd(text);
+    let compoundIdx=0,compoundMaxP=0;
+    for(let i=0;i<compoundProbs.length;i++)if(compoundProbs[i]>compoundMaxP){compoundMaxP=compoundProbs[i];compoundIdx=i;}
     const similar=this.memory.topk(msgVec,2);
     const h1_sub=(this.moodNet._cache.h1||new Float32Array(32)).slice(0,EDIM);
     this.memory.push(M.normalize(msgVec),h1_sub,text.slice(0,60));
     this._lastCtx=ctxVec;this._lastMIdx=moodIdx;this.tick++;
-    return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP};
+    return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP,
+      compound:{label:COMPOUND_LABELS[compoundIdx],confidence:compoundMaxP}};
   }
 
   // Temperature-weighted sampling from top-K ranked candidates
@@ -653,10 +695,10 @@ class KiraAI{
     setTimeout(async ()=>{this.isLearning=false;},600);
   }
 
-  save(){return{mn:this.moodNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
+  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
   load(d){
     try{
-      if(d.mn)this.moodNet.load(d.mn);if(d.enc)this.encoder.load(d.enc);
+      if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
     }catch(e){}
@@ -790,6 +832,10 @@ onmessage = function(e) {
       case 'moodNetFwd':
         result = kiraAI.moodNet.fwd(args[0]);
         break;
+      case 'compoundMoodBwd':
+        kiraAI.compoundMoodNet.bwd(args[0], args[1]);
+        result = true;
+        break;
       case 'save':
         result = kiraAI.save();
         break;
@@ -898,6 +944,7 @@ class KiraAIProxy {
   async feedback(signal, regexMoodIdx) { return this._call('feedback', signal, regexMoodIdx); }
   async moodNetBwd(target, reward) { return this._call('moodNetBwd', target, reward); }
   async moodNetFwd(text) { return this._call('moodNetFwd', text); }
+  async compoundMoodBwd(target, reward) { return this._call('compoundMoodBwd', target, reward); }
   async requestSave() { return this._call('save'); }
   async load(d) { return this._call('load', d); }
   async init(seed, profile, aiState) { return this._call('init', seed, profile, aiState); }
@@ -914,6 +961,7 @@ let _aiCtx=null;
 const VOCAB=128,EDIM=16;
 const MOOD_LABELS=['neutral','happy','sad','angry','anxious','flirty','bored','tired','curious','grateful','vulnerable'];
 const N_MOODS=MOOD_LABELS.length;
+const COMPOUND_LABELS=['sarcastic','nostalgic','excited'];
 const MEM_CAP=20;
 
 // ── Conversation context tracker ──────────────────────────────────────
@@ -1126,6 +1174,7 @@ function minutesSince(ts){return ts?Math.floor((ENV.nowMs()-ts)/60000):99999;}
 // ─────────────────────────────────────────────────────────────────────
 const DEFAULT_STATE={
   username:'',personality:'warm',affection:0,mood:'neutral',moodIntensity:0.5,energy:0.7,
+  lastCompoundMood:null,
   conversationCount:0,messagesSent:0,messagesReceived:0,firstMeet:null,lastVisit:null,
   lastMessageTime:null,currentStreak:0,longestStreak:0,topics:{},memories:[],
   petNames:[],userMoods:[],askedAbout:{},sharedAbout:{},lastGreeting:null,
@@ -1245,6 +1294,24 @@ function detectUserMoodRegex(text){
   }
   state.userMoods.push(best);
   if(state.userMoods.length>10)state.userMoods.shift();
+  return best;
+}
+
+// NM-02: weak-supervision teacher for CompoundMoodNet. Unlike detectUserMoodRegex,
+// this has no default — most messages are none of these, and returning null (rather
+// than forcing a guess) is what tells generateResponse() to skip training this turn.
+function detectCompoundMoodRegex(text){
+  const t=text.toLowerCase();
+  const signals={
+    sarcastic:/\b(yeah,? ?right|oh,? ?sure|as if|wow,? (?:shocking|surprising)|what a (?:surprise|shock)|totally(?:,| )(?:not|didn.t)|sure,? ?jan)\b/gi,
+    nostalgic:/\b(remember when|back in the day|used to|those were the days|good old days|reminds me of when|when i was (?:a kid|younger|little)|years ago|takes me back|miss those days)\b/gi,
+    excited:/\b(can.t wait|so excited|excited|pumped|hyped|stoked|thrilled)\b/gi
+  };
+  let best=null,maxM=0;
+  for(const[mood,rx]of Object.entries(signals)){
+    const m=t.match(rx);
+    if(m&&m.length>maxM){maxM=m.length;best=mood;}
+  }
   return best;
 }
 
@@ -1371,9 +1438,18 @@ async function generateResponse(userText){
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNetBwd(regexIdx<0?0:regexIdx,0.8);
   const userMood=_aiCtx.confidence>0.38?_aiCtx.mood:regexMood;
+
+  // NM-02: compound mood is a secondary, sparser signal — only train on positive
+  // regex matches (see detectCompoundMoodRegex), and only trust the neural label
+  // once it's confident; otherwise fall back to whatever the regex teacher saw.
+  const regexCompound=detectCompoundMoodRegex(text);
+  if(regexCompound)kiraAI.compoundMoodBwd(COMPOUND_LABELS.indexOf(regexCompound),0.8);
+  const compoundMood=(_aiCtx.compound&&_aiCtx.compound.confidence>0.38)?_aiCtx.compound.label:regexCompound;
+  state.lastCompoundMood=compoundMood||null;
+
   const topics=detectTopics(text);
   const info=extractPersonalInfo(text);
-  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),topics});
+  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,topics});
   const tod=getTimeOfDay();
   updateHerMood(userMood);
   CTX.mood=userMood;advanceCTX();
@@ -1382,6 +1458,7 @@ async function generateResponse(userText){
   if(text.length>50)affGain++;if(text.length>150)affGain++;
   if(userMood==='flirty')affGain+=3;if(userMood==='grateful')affGain+=2;
   if(userMood==='vulnerable')affGain+=3;
+  if(compoundMood==='excited')affGain+=1;
   if(topics.includes('feelings')||topics.includes('philosophy'))affGain+=2;
   addAffection(affGain);
 
@@ -3990,7 +4067,7 @@ function updateInsightDock(){
 }
 
 async function renderAIStats(){
-  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM;
+  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM+EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length;
   let aiState = null;
   try {
     aiState = await kiraAI.requestSave();
@@ -3998,15 +4075,17 @@ async function renderAIStats(){
   const memCount = aiState ? aiState.mem.K.length : 0;
   const tickCount = aiState ? aiState.tk : 0;
   const mnUpd = aiState ? aiState.mn.upd : 0;
+  const cmnUpd = aiState && aiState.cmn ? aiState.cmn.upd : 0;
   const scUpd = aiState ? aiState.sc.upd : 0;
   aiStats.innerHTML=
-    `<b>Model</b>: 3-layer MLP + Bilinear Scorer<br>`+
+    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood Head<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
     `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
     `<b>Training</b>: Online distillation (regex→neural)<br>`+
     `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
     `<b>Messages processed</b>: ${tickCount}<br>`+
     `<b>Mood net updates</b>: ${mnUpd}<br>`+
+    `<b>Compound mood updates</b>: ${cmnUpd} (last: ${state.lastCompoundMood||'none'})<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
     `<b>Trace tail</b>: ${summarizeTrace()}`;

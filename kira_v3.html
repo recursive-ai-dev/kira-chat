@@ -602,6 +602,40 @@ class NERNet{
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  §5D  INTENT NET  ·  NM-01: single Linear(16,8) head sharing MoodNet's
+//  HashEmbed. Unlike NM-02/04, 'general' is a real class here, trained
+//  from detectIntentRegex()'s decision every turn (same as MoodNet's
+//  'neutral'). Never chosen as the primary router — generateResponse()
+//  only consults it at the tail, to rescue a message that matched
+//  nothing else in the deterministic cascade above it.
+// ─────────────────────────────────────────────────────────────────────
+const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
+
+class IntentNet{
+  constructor(sharedEnc){
+    this.enc=sharedEnc;
+    this.l1=new Linear(EDIM,INTENT_LABELS.length,5e-4);
+    this._cache={};this.updates=0;
+  }
+  fwd(text){
+    const emb=this.enc.fwd(text);
+    const z1=this.l1.fwd(emb);
+    const p=M.softmax(z1);
+    this._cache={p};
+    return p;
+  }
+  bwd(target,reward=1.0){
+    const{p}=this._cache;
+    const ls=Math.abs(reward)*0.06;
+    const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
+    this.l1.bwd(dz1);
+    this.updates++;
+  }
+  save(){return{l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  §6  BILINEAR SCORER  ·  score = ctx^T · W · resp
 //  Learns a compatibility matrix W between context and response spaces
 // ─────────────────────────────────────────────────────────────────────
@@ -673,6 +707,7 @@ class KiraAI{
     this.moodNet=new MoodNet();
     this.compoundMoodNet=new CompoundMoodNet(this.moodNet.enc);
     this.nerNet=new NERNet(this.moodNet.enc);
+    this.intentNet=new IntentNet(this.moodNet.enc);
     this.encoder=new HashEmbed(5e-4);
     this.respEnc=new HashEmbed(5e-4);
     this.scorer=new Scorer();
@@ -696,13 +731,17 @@ class KiraAI{
     const nerProbs=this.nerNet.fwd(text);
     let nerIdx=0,nerMaxP=0;
     for(let i=0;i<nerProbs.length;i++)if(nerProbs[i]>nerMaxP){nerMaxP=nerProbs[i];nerIdx=i;}
+    const intentProbs=this.intentNet.fwd(text);
+    let intentIdx=0,intentMaxP=0;
+    for(let i=0;i<intentProbs.length;i++)if(intentProbs[i]>intentMaxP){intentMaxP=intentProbs[i];intentIdx=i;}
     const similar=this.memory.topk(msgVec,2);
     const h1_sub=(this.moodNet._cache.h1||new Float32Array(32)).slice(0,EDIM);
     this.memory.push(M.normalize(msgVec),h1_sub,text.slice(0,60));
     this._lastCtx=ctxVec;this._lastMIdx=moodIdx;this.tick++;
     return{mood:MOOD_LABELS[moodIdx],probs,ctxVec,similar,confidence:maxP,
       compound:{label:COMPOUND_LABELS[compoundIdx],confidence:compoundMaxP},
-      ner:{label:NER_LABELS[nerIdx],confidence:nerMaxP}};
+      ner:{label:NER_LABELS[nerIdx],confidence:nerMaxP},
+      intent:{label:INTENT_LABELS[intentIdx],confidence:intentMaxP}};
   }
 
   // Temperature-weighted sampling from top-K ranked candidates
@@ -735,10 +774,11 @@ class KiraAI{
     setTimeout(async ()=>{this.isLearning=false;},600);
   }
 
-  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
+  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),intent:this.intentNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
   load(d){
     try{
       if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.ner)this.nerNet.load(d.ner);
+      if(d.intent)this.intentNet.load(d.intent);
       if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
@@ -881,6 +921,10 @@ onmessage = function(e) {
         kiraAI.nerNet.bwd(args[0], args[1]);
         result = true;
         break;
+      case 'intentBwd':
+        kiraAI.intentNet.bwd(args[0], args[1]);
+        result = true;
+        break;
       case 'save':
         result = kiraAI.save();
         break;
@@ -991,6 +1035,7 @@ class KiraAIProxy {
   async moodNetFwd(text) { return this._call('moodNetFwd', text); }
   async compoundMoodBwd(target, reward) { return this._call('compoundMoodBwd', target, reward); }
   async nerBwd(target, reward) { return this._call('nerBwd', target, reward); }
+  async intentBwd(target, reward) { return this._call('intentBwd', target, reward); }
   async requestSave() { return this._call('save'); }
   async load(d) { return this._call('load', d); }
   async init(seed, profile, aiState) { return this._call('init', seed, profile, aiState); }
@@ -1361,6 +1406,28 @@ function detectCompoundMoodRegex(text){
   return best;
 }
 
+// NM-01: weak-supervision teacher for IntentNet. Mirrors the 7 phrase-driven (not
+// mood-gated) routes from generateResponse()'s dispatch cascade, in the same
+// relative order, so 'general' here means "none of these seven patterns fired" —
+// it does NOT attempt to replicate every one of the cascade's ~20 branches (e.g.
+// topic/question/mood-gated routes aren't tracked), so a message routed elsewhere
+// by the real cascade may still get a non-'general' training label here. That's
+// acceptable label noise for a training signal; it's never used to route directly
+// (see the intent-rescue block in generateResponse, which only fires after the
+// full cascade has already found nothing).
+function detectIntentRegex(text){
+  const t=text.toLowerCase();
+  if(/^(hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))[\s!?.]*$/i.test(t)||
+    (t.length<=5&&/^(hey|hi|yo|sup)$/.test(t.replace(/[^a-z]/g,''))))return'greeting';
+  if(/^(?:how (?:are you|r u|you doing|have you been)|what'?s up|wyd|what are you (?:up to|doing))[\s?!]*$/i.test(t))return'how_are_you';
+  if(/(?:what(?:'s| is) your (?:name|favorite|fav)|tell me about (?:you|yourself)|who are you|what do you (?:like|enjoy|do))/i.test(t))return'about_her';
+  if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t))return'love_declaration';
+  if(/\bi miss (?:you|u)\b/i.test(t))return'miss_you';
+  if(/\b(?:good ?night|gn|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|bye|goodbye|ttyl|gotta go|heading out|talk later|see ya)\b/i.test(t))return'goodbye';
+  if(/\b(?:you(?:'re| are) (?:so |really |very )?(?:cute|beautiful|pretty|gorgeous|amazing|wonderful|sweet|perfect|incredible|the best|kind)|i (?:like|appreciate|adore) you)\b/i.test(t))return'compliment';
+  return'general';
+}
+
 function updateHerMood(userMood){
   const map={
     happy:['happy','affectionate'],sad:['worried','affectionate'],
@@ -1394,6 +1461,7 @@ function detectFeedback(text){
 const CRISIS_PATTERN=/\b(suicid\w*|self.harm|kill myself|end my life|wanted? to die|hurt myself|don'?t want to (?:live|be here|exist)|no reason to (?:live|go on))\b/i;
 
 const NER_LABELS=['name','age','preference','disclosure'];
+const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
 
 // ─────────────────────────────────────────────────────────────────────
 //  §13  TOPICS + MEMORY
@@ -1526,6 +1594,11 @@ async function generateResponse(userText){
     addMemory(`They shared something personal: ${text.slice(0,80)}`,'disclosure');
   }
 
+  // NM-01: 'general' is a real, always-available class here (see detectIntentRegex),
+  // so — like MoodNet — this trains every turn, not just on positive matches.
+  const regexIntent=detectIntentRegex(text);
+  kiraAI.intentBwd(INTENT_LABELS.indexOf(regexIntent),0.8);
+
   trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,ner:nerMood,topics});
   const tod=getTimeOfDay();
   updateHerMood(userMood);
@@ -1616,8 +1689,33 @@ async function generateResponse(userText){
     {setCTX('topic',topics[0],null);setRoute('topic');return await handleTopicResponse(topics,userMood);}
   if(userMood==='grateful')
     {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
+
+  // NM-01: nothing above matched — before falling through to the generic pool, see
+  // if the intent classifier recognizes a confident paraphrase of one of the
+  // specific routes it was trained on (e.g. "I adore you" for love_declaration,
+  // which the regex above only catches for "love/luv/luh you"). This can only
+  // rescue 'general'; it never runs early enough to override an earlier match.
+  if(_aiCtx.intent&&_aiCtx.intent.confidence>0.5&&_aiCtx.intent.label!=='general'){
+    const rescueHandlers={
+      greeting:()=>handleGreeting(tod),
+      how_are_you:()=>handleHowAreYou(tod),
+      about_her:()=>handleAboutHer(t),
+      love_declaration:()=>handleILoveYou(),
+      miss_you:()=>handleIMissYou(),
+      goodbye:()=>handleGoodbye(t),
+      compliment:()=>handleCompliment()
+    };
+    const rescue=rescueHandlers[_aiCtx.intent.label];
+    if(rescue){
+      setRoute('intent-rescue:'+_aiCtx.intent.label);
+      const out=await rescue();
+      logTransition(correlationId,'route_intent_rescue',startedAt,{route:DIAG.lastRoute,response_length:out.length});
+      return out;
+    }
+  }
+
   setRoute('general');
-  const response=handleGeneral(text,userMood,tod);
+  const response=await handleGeneral(text,userMood,tod);
   logTransition(correlationId,'route_general',startedAt,{route:DIAG.lastRoute,response_length:response.length});
   return response;
 }
@@ -4149,7 +4247,8 @@ function updateInsightDock(){
 async function renderAIStats(){
   const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM
     +EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length
-    +EDIM*NER_LABELS.length+NER_LABELS.length;
+    +EDIM*NER_LABELS.length+NER_LABELS.length
+    +EDIM*INTENT_LABELS.length+INTENT_LABELS.length;
   let aiState = null;
   try {
     aiState = await kiraAI.requestSave();
@@ -4159,9 +4258,10 @@ async function renderAIStats(){
   const mnUpd = aiState ? aiState.mn.upd : 0;
   const cmnUpd = aiState && aiState.cmn ? aiState.cmn.upd : 0;
   const nerUpd = aiState && aiState.ner ? aiState.ner.upd : 0;
+  const intentUpd = aiState && aiState.intent ? aiState.intent.upd : 0;
   const scUpd = aiState ? aiState.sc.upd : 0;
   aiStats.innerHTML=
-    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER Heads<br>`+
+    `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER + Intent Heads<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
     `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
     `<b>Training</b>: Online distillation (regex→neural)<br>`+
@@ -4170,6 +4270,7 @@ async function renderAIStats(){
     `<b>Mood net updates</b>: ${mnUpd}<br>`+
     `<b>Compound mood updates</b>: ${cmnUpd} (last: ${state.lastCompoundMood||'none'})<br>`+
     `<b>NER updates</b>: ${nerUpd}<br>`+
+    `<b>Intent net updates</b>: ${intentUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
     `<b>Trace tail</b>: ${summarizeTrace()}`;

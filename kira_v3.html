@@ -222,7 +222,7 @@ body.theme-aurora{
       const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
       window.webllmEngine = await CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
         initProgressCallback: (progress) => {
-          console.log("WebLLM loading:", progress.text);
+          // Intentionally left empty
         }
       });
     }

@@ -827,6 +827,15 @@ function logTransition(correlationId,stepName,startedAt,extra={},level='info'){
   },level);
 }
 
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function summarizeTrace(){
   if(!DIAG.traces.length)return'none';
   return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
@@ -1093,6 +1102,15 @@ function logTransition(correlationId,stepName,startedAt,extra={},level='info'){
   },level);
 }
 
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function summarizeTrace(){
   if(!DIAG.traces.length)return'none';
   return DIAG.traces.slice(-4).map(t=>`${t.step}:${typeof t.data==='string'?t.data:JSON.stringify(t.data)}`).join(' | ');
@@ -4268,12 +4286,12 @@ async function renderAIStats(){
     `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
     `<b>Messages processed</b>: ${tickCount}<br>`+
     `<b>Mood net updates</b>: ${mnUpd}<br>`+
-    `<b>Compound mood updates</b>: ${cmnUpd} (last: ${state.lastCompoundMood||'none'})<br>`+
+    `<b>Compound mood updates</b>: ${cmnUpd} (last: ${escapeHTML(state.lastCompoundMood||'none')})<br>`+
     `<b>NER updates</b>: ${nerUpd}<br>`+
     `<b>Intent net updates</b>: ${intentUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
-    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${DIAG.lastRoute}<br>`+
-    `<b>Trace tail</b>: ${summarizeTrace()}`;
+    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}<br>`+
+    `<b>Trace tail</b>: ${escapeHTML(summarizeTrace())}`;
 }
 
 function renderPersonalityChips(){

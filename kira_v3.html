@@ -4278,6 +4278,7 @@ async function renderAIStats(){
 
 function renderPersonalityChips(){
   personalityChips.innerHTML='';
+  const frag = document.createDocumentFragment();
   for(const p of Object.keys(PERSONALITIES)){
     const chip=document.createElement('button');
     chip.className='settings-chip'+(state.personality===p?' active':'');
@@ -4286,8 +4287,9 @@ function renderPersonalityChips(){
       personalityChips.querySelectorAll('.settings-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');state.personality=p;
     });
-    personalityChips.appendChild(chip);
+    frag.appendChild(chip);
   }
+  personalityChips.appendChild(frag);
 }
 
 settingsBtn.addEventListener('click',()=>{

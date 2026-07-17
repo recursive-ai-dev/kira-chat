@@ -1178,17 +1178,17 @@ function pruneImages(){
 let _profilePic=null; // base64 data URL, stored separately
 
 function loadProfilePic(){
-  try{_profilePic=localStorage.getItem(PIC_KEY)||null;}catch(e){}
+  try{_profilePic=localStorage.getItem(PIC_KEY)||null;}catch(e){trace('loadProfilePic', {error: String(e&&e.message||e)}, 'error');}
 }
 
 function saveProfilePic(dataURL){
   _profilePic=dataURL;
-  try{localStorage.setItem(PIC_KEY,dataURL);}catch(e){}
+  try{localStorage.setItem(PIC_KEY,dataURL);}catch(e){trace('saveProfilePic', {error: String(e&&e.message||e)}, 'error');}
 }
 
 function removeProfilePic(){
   _profilePic=null;
-  try{localStorage.removeItem(PIC_KEY);}catch(e){}
+  try{localStorage.removeItem(PIC_KEY);}catch(e){trace('removeProfilePic', {error: String(e&&e.message||e)}, 'error');}
 }
 
 function applyProfilePic(){

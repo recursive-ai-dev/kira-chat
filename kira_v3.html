@@ -3361,17 +3361,22 @@ function getBankWords(bankName, context = {}) {
   const idx = _BANK_INDEX[bankName];
   if (!idx) return [];
 
+  let sourceArray;
   if (idx.kind === 'nsfw') {
     if (!allowNSFW || stage < 3) return []; // Close+ required
-    return idx.entries
-      .filter(e => (typeof e.minStage === 'undefined' || stage >= e.minStage) && e.intensity <= maxIntensity)
-      .map(e => e.word);
+    sourceArray = idx.entries;
+  } else {
+    sourceArray = idx.byMood[mood] || idx.byMood['__all__'] || [];
   }
 
-  const merged = idx.byMood[mood] || idx.byMood['__all__'] || [];
-  return merged
-    .filter(e => (typeof e.minStage === 'undefined' || stage >= e.minStage) && e.intensity <= maxIntensity)
-    .map(e => e.word);
+  const result = [];
+  for (let i = 0; i < sourceArray.length; i++) {
+    const e = sourceArray[i];
+    if ((typeof e.minStage === 'undefined' || stage >= e.minStage) && e.intensity <= maxIntensity) {
+      result.push(e.word);
+    }
+  }
+  return result;
 }
 
 // Reference-safe weighted random selection (SE-13)

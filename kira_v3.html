@@ -4228,7 +4228,7 @@ function applyTheme(mode){
   themeBtn.textContent=aurora?'☾':'✦';
   themeBtn.title=aurora?'Switch to rose mode':'Switch to aurora mode';
   themeBtn.setAttribute('aria-pressed',aurora?'true':'false');
-  try{localStorage.setItem(THEME_KEY,aurora?'aurora':'rose');}catch(e){}
+  try{localStorage.setItem(THEME_KEY,aurora?'aurora':'rose');}catch(e){console.warn('Failed to save theme', e);}
 }
 
 function loadTheme(){

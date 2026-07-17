@@ -1178,17 +1178,17 @@ function pruneImages(){
 let _profilePic=null; // base64 data URL, stored separately
 
 function loadProfilePic(){
-  try{_profilePic=localStorage.getItem(PIC_KEY)||null;}catch(e){}
+  try{_profilePic=localStorage.getItem(PIC_KEY)||null;}catch(e){console.error('Error loading profile pic', e);}
 }
 
 function saveProfilePic(dataURL){
   _profilePic=dataURL;
-  try{localStorage.setItem(PIC_KEY,dataURL);}catch(e){}
+  try{localStorage.setItem(PIC_KEY,dataURL);}catch(e){console.error('Error saving profile pic', e);}
 }
 
 function removeProfilePic(){
   _profilePic=null;
-  try{localStorage.removeItem(PIC_KEY);}catch(e){}
+  try{localStorage.removeItem(PIC_KEY);}catch(e){console.error('Error removing profile pic', e);}
 }
 
 function applyProfilePic(){

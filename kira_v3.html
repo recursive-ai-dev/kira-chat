@@ -782,7 +782,7 @@ class KiraAI{
       if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
-    }catch(e){}
+    }catch(e){trace('KiraAI.load',{error:String(e&&e.message||e)},'error');}
   }
 }
 
@@ -1319,7 +1319,7 @@ function loadState(){
   try{
     const raw=localStorage.getItem(STORE_KEY);
     state=raw?{...DEFAULT_STATE,...JSON.parse(raw)}:{...DEFAULT_STATE,firstMeet:ENV.nowMs()};
-  }catch(e){state={...DEFAULT_STATE,firstMeet:ENV.nowMs()};}
+  }catch(e){trace('loadState',{error:String(e&&e.message||e)},'error');state={...DEFAULT_STATE,firstMeet:ENV.nowMs()};}
 }
 
 function saveState(){
@@ -1327,7 +1327,7 @@ function saveState(){
 }
 
 async function loadAI(){
-  try{const raw=localStorage.getItem(AI_KEY);if(raw)await kiraAI.load(JSON.parse(raw));}catch(e){}
+  try{const raw=localStorage.getItem(AI_KEY);if(raw)await kiraAI.load(JSON.parse(raw));}catch(e){trace('loadAI',{error:String(e&&e.message||e)},'error');}
 }
 
 function saveAI(){
@@ -3986,8 +3986,10 @@ function addDateSeparator(ts){
 }
 
 function addSystemMessage(text){
-  const div=document.createElement('div');div.className='system-msg';div.textContent=text;
-  chatArea.appendChild(div);scrollToBottom();
+  try{
+    const div=document.createElement("div");div.className="system-msg";div.textContent=text;
+    chatArea.appendChild(div);scrollToBottom();
+  }catch(e){trace("addSystemMessage",{error:String(e&&e.message||e)},"error");}
 }
 
 function addMessage(role,text,ts,skipSave){

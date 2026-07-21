@@ -3518,21 +3518,14 @@ function generateSentence(template, context) {
   
   // Single-pass assembly to resolve every {slot} occurrence and memoize it
   const slotCache = {};
-  let sentence = struct;
   
-  const slotRegex = /\{(\w+)\}/g;
-  let match;
-  while ((match = slotRegex.exec(struct)) !== null) {
-    const slotName = match[1];
+  const sentence = struct.replace(/\{(\w+)\}/g, function(match, slotName) {
     if (!(slotName in slotCache)) {
       const bankDef = template.slots[slotName];
-      slotCache[slotName] = bankDef ? fillSentenceSlot(bankDef, context) : '{' + slotName + '}';
+      slotCache[slotName] = bankDef ? fillSentenceSlot(bankDef, context) : "{" + slotName + "}";
     }
-  }
-  
-  for (const slotName in slotCache) {
-    sentence = sentence.split(`{${slotName}}`).join(slotCache[slotName]);
-  }
+    return slotCache[slotName];
+  });
   
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
 }

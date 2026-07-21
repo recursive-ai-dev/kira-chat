@@ -1557,26 +1557,16 @@ function namePrefix(){
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  §15  RESPONSE ENGINE  ·  Core dispatch
+//  §14.5 RESPONSE ENGINE HELPERS
 // ─────────────────────────────────────────────────────────────────────
-async function generateResponse(userText){
-  const correlationId=ENV.makeId('resp');
-  const startedAt=ENV.nowMs();
-  const text=userText.trim(),t=text.toLowerCase();
-  trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
-  // NM-04 safety net: checked unconditionally, independent of extractPersonalInfo's
-  // own (narrower) disclosure pattern, so it can't be shadowed by an earlier regex
-  // match elsewhere in this function (e.g. a goodbye phrase in the same message).
-  const isCrisis=CRISIS_PATTERN.test(t);
+
+async function analyzeInputContext(text, t, isCrisis) {
   _aiCtx=await kiraAI.process(text);
   const regexMood=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNetBwd(regexIdx<0?0:regexIdx,0.8);
   let userMood=isCrisis?'vulnerable':(_aiCtx.confidence>0.38?_aiCtx.mood:regexMood);
 
-  // NM-02: compound mood is a secondary, sparser signal — only train on positive
-  // regex matches (see detectCompoundMoodRegex), and only trust the neural label
-  // once it's confident; otherwise fall back to whatever the regex teacher saw.
   const regexCompound=detectCompoundMoodRegex(text);
   if(regexCompound)kiraAI.compoundMoodBwd(COMPOUND_LABELS.indexOf(regexCompound),0.8);
   const compoundMood=(_aiCtx.compound&&_aiCtx.compound.confidence>0.38)?_aiCtx.compound.label:regexCompound;
@@ -1585,8 +1575,6 @@ async function generateResponse(userText){
   const topics=detectTopics(text);
   const info=extractPersonalInfo(text);
 
-  // NM-04: coarse neural second pass — only acts when the regex found nothing at all
-  // this turn, so it never overwrites or duplicates a more precise regex-driven memory.
   const regexNER=info?info.type:null;
   if(regexNER)kiraAI.nerBwd(NER_LABELS.indexOf(regexNER),0.8);
   const nerMood=(_aiCtx.ner&&_aiCtx.ner.confidence>0.5)?_aiCtx.ner.label:null;
@@ -1594,13 +1582,13 @@ async function generateResponse(userText){
     addMemory(`They shared something personal: ${text.slice(0,80)}`,'disclosure');
   }
 
-  // NM-01: 'general' is a real, always-available class here (see detectIntentRegex),
-  // so — like MoodNet — this trains every turn, not just on positive matches.
   const regexIntent=detectIntentRegex(text);
   kiraAI.intentBwd(INTENT_LABELS.indexOf(regexIntent),0.8);
 
-  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood,userMood:_aiCtx.mood,conf:+_aiCtx.confidence.toFixed(3),compoundMood,ner:nerMood,topics});
-  const tod=getTimeOfDay();
+  return { regexMood, userMood, compoundMood, topics, info, nerMood };
+}
+
+function updateConversationState(text, userMood, compoundMood, topics) {
   updateHerMood(userMood);
   CTX.mood=userMood;advanceCTX();
   state.conversationDepth++;state.messagesReceived++;
@@ -1611,11 +1599,13 @@ async function generateResponse(userText){
   if(compoundMood==='excited')affGain+=1;
   if(topics.includes('feelings')||topics.includes('philosophy'))affGain+=2;
   addAffection(affGain);
+}
 
-  // ── Crisis-adjacent language always wins routing, ahead of every other check ──
+async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt) {
+  const { userMood, topics, info } = analysis;
+
   if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
-  // ── Continuation: did user reply to a question Kira just asked? ──
   if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
   if(info&&info.type==='name'){setRoute('name-detected');const out=await kiraAI.rank([
@@ -1718,6 +1708,28 @@ async function generateResponse(userText){
   const response=await handleGeneral(text,userMood,tod);
   logTransition(correlationId,'route_general',startedAt,{route:DIAG.lastRoute,response_length:response.length});
   return response;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  §15  RESPONSE ENGINE  ·  Core dispatch
+// ─────────────────────────────────────────────────────────────────────
+async function generateResponse(userText){
+  const correlationId=ENV.makeId('resp');
+  const startedAt=ENV.nowMs();
+  const text=userText.trim(),t=text.toLowerCase();
+  trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
+
+  const isCrisis=CRISIS_PATTERN.test(t);
+
+  const analysis = await analyzeInputContext(text, t, isCrisis);
+
+  trace('analysis',{correlation_id:correlationId,step_name:'analysis_complete',regexMood:analysis.regexMood,userMood:analysis.userMood,conf:+_aiCtx.confidence.toFixed(3),compoundMood:analysis.compoundMood,ner:analysis.nerMood,topics:analysis.topics});
+
+  const tod=getTimeOfDay();
+
+  updateConversationState(text, analysis.userMood, analysis.compoundMood, analysis.topics);
+
+  return await routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt);
 }
 
 // ─────────────────────────────────────────────────────────────────────

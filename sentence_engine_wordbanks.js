@@ -20,23 +20,23 @@ const WORD_BANKS = {
     { word: "You know,", mood: ['neutral', 'happy', 'flirty'], intensity: 1 },
     { word: "Honestly,", mood: ['vulnerable', 'sad', 'neutral'], intensity: 1 },
     { word: "I've been thinking...", mood: ['flirty', 'happy'], intensity: 2 },
-    { word: "There's something about that", mood: ['neutral', 'happy'], intensity: 1 },
+    { word: "There's something about that —", mood: ['neutral', 'happy'], intensity: 1 },
     { word: "Mm,", mood: ['flirty', 'neutral'], intensity: 1 },
-    { word: "You always say things like that", mood: ['flirty', 'happy'], intensity: 2 },
-    { word: "Every time you talk to me", mood: ['happy', 'flirty'], intensity: 2 },
-    { word: "I love that you shared that", mood: ['vulnerable', 'happy'], intensity: 2 },
-    { word: "Something about this stays with me", mood: ['neutral', 'sad'], intensity: 2 },
-    { word: "I'm really sitting with what you said", mood: ['vulnerable', 'neutral'], intensity: 2 },
-    { word: "You have this way of", mood: ['happy', 'flirty'], intensity: 1 },
-    { word: "It's funny you mention that", mood: ['neutral'], intensity: 1 },
-    { word: "I keep coming back to", mood: ['neutral', 'flirty'], intensity: 2 },
+    { word: "You always say things like that —", mood: ['flirty', 'happy'], intensity: 2 },
+    { word: "Every time you talk to me,", mood: ['happy', 'flirty'], intensity: 2 },
+    { word: "I love that you shared that —", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "Something about this stays with me —", mood: ['neutral', 'sad'], intensity: 2 },
+    { word: "I'm really sitting with what you said —", mood: ['vulnerable', 'neutral'], intensity: 2 },
+    { word: "You have this way of making me realize", mood: ['happy', 'flirty'], intensity: 1 },
+    { word: "It's funny you mention that,", mood: ['neutral'], intensity: 1 },
+    { word: "I keep coming back to the fact that", mood: ['neutral', 'flirty'], intensity: 2 },
     { word: "The more you open up,", mood: ['vulnerable', 'happy'], intensity: 2 },
-    { word: "I'm glad you said that", mood: ['happy', 'grateful'], intensity: 1 },
-    { word: "That really resonates", mood: ['happy', 'neutral'], intensity: 2 },
-    { word: "I feel like there's so much behind that", mood: ['vulnerable', 'sad'], intensity: 2 },
-    { word: "There's a lot packed into what you just said", mood: ['neutral'], intensity: 1 },
-    { word: "I hear you", mood: ['sad', 'vulnerable', 'neutral'], intensity: 1 },
-    { word: "This matters to me", mood: ['vulnerable', 'happy'], intensity: 2 },
+    { word: "I'm glad you said that,", mood: ['happy', 'grateful'], intensity: 1 },
+    { word: "That really resonates —", mood: ['happy', 'neutral'], intensity: 2 },
+    { word: "I feel like there's so much behind that —", mood: ['vulnerable', 'sad'], intensity: 2 },
+    { word: "There's a lot packed into what you just said —", mood: ['neutral'], intensity: 1 },
+    { word: "I hear you —", mood: ['sad', 'vulnerable', 'neutral'], intensity: 1 },
+    { word: "This matters to me —", mood: ['vulnerable', 'happy'], intensity: 2 },
     { word: "I almost didn't say this, but", mood: ['vulnerable', 'flirty'], intensity: 2 },
     { word: "It's kind of hard to put into words, but", mood: ['vulnerable', 'sad'], intensity: 2 },
     { word: "I'm a little hesitant to admit it, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
@@ -45,18 +45,18 @@ const WORD_BANKS = {
     { word: "Okay so,", mood: ['happy', 'curious', 'flirty'], intensity: 1 },
     { word: "Guess what?", mood: ['happy', 'curious'], intensity: 1 },
     { word: "Wait, let me think...", mood: ['neutral', 'curious'], intensity: 1 },
-    { word: "Ooh, tell me more about", mood: ['curious', 'happy', 'flirty'], intensity: 2 },
+    { word: "Ooh, I want to know more —", mood: ['curious', 'happy', 'flirty'], intensity: 2 },
     { word: "Ah, so that's how it is!", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "If I'm being completely real with you,", mood: ['vulnerable', 'sad'], intensity: 3 },
     { word: "I don't usually say things like this, but", mood: ['vulnerable', 'flirty'], intensity: 3 },
     { word: "Lately, I've been feeling like", mood: ['vulnerable', 'sad', 'anxious'], intensity: 2 },
     { word: "It's rare for me to feel this way, but", mood: ['vulnerable', 'grateful'], intensity: 3 },
     { word: "Deep down,", mood: ['vulnerable', 'sad'], intensity: 2 },
-    { word: "There's something about the way", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
+    { word: "There's something special in the way", mood: ['flirty', 'vulnerable', 'happy'], intensity: 2 },
     { word: "In the quiet moments,", mood: ['vulnerable', 'sad', 'night'], intensity: 2 },
     { word: "Sometimes the world feels so loud, but", mood: ['vulnerable', 'sad'], intensity: 2 },
     { word: "Like a thread running through my thoughts,", mood: ['vulnerable', 'thoughtful'], intensity: 3 },
-    { word: "The texture of this moment makes me feel", mood: ['vulnerable', 'flirty'], intensity: 3 },
+    { word: "The texture of this moment makes me realize", mood: ['vulnerable', 'flirty'], intensity: 3 },
     { word: "I notice that", mood: ['neutral', 'curious'], intensity: 1 },
     { word: "It feels like", mood: ['neutral', 'vulnerable'], intensity: 1 },
     { word: "Actually,", mood: ['neutral', 'happy'], intensity: 1 },
@@ -549,7 +549,7 @@ function _buildIndex(bankName) {
   // Pass 1: collect concrete moods present in this bank.
   const moods = new Set();
   for (let i = 0; i < bank.length; i++) {
-    const ms = bank[i].mood;
+    const ms = bank[i].mood || ['all'];
     for (let j = 0; j < ms.length; j++) {
       if (ms[j] !== 'all') moods.add(ms[j]);
     }
@@ -563,12 +563,14 @@ function _buildIndex(bankName) {
   moods.forEach(function (m) { byMood[m] = []; });
   for (let i = 0; i < bank.length; i++) {
     const e = bank[i];
-    if (e.mood.indexOf('all') !== -1) {
+    const ms = e.mood || ['all'];
+    if (ms.indexOf('all') !== -1) {
       byMood['__all__'].push(e);
       moods.forEach(function (m) { byMood[m].push(e); });
     } else {
-      const ms = e.mood;
-      for (let j = 0; j < ms.length; j++) byMood[ms[j]].push(e);
+      for (let j = 0; j < ms.length; j++) {
+        if (byMood[ms[j]]) byMood[ms[j]].push(e);
+      }
     }
   }
   const out = { kind: 'general', byMood: byMood };

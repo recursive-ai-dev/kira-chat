@@ -112,9 +112,13 @@ def delete_memory(mem_id):
     cursor = conn.cursor()
     cursor.execute("DELETE FROM memories WHERE id = ?", (mem_id,))
     conn.commit()
+    deleted = cursor.rowcount > 0
     conn.close()
-    print(f"[OK] Deleted memory ID {mem_id}")
-    sync_to_kira()
+    if deleted:
+        print(f"[OK] Deleted memory ID {mem_id}")
+        sync_to_kira()
+    else:
+        print(f"[WARN] Memory ID {mem_id} not found. Nothing deleted.")
 
 def edit_memory(mem_id, new_text):
     init_db()
@@ -123,9 +127,13 @@ def edit_memory(mem_id, new_text):
     ts = int(time.time() * 1000)
     cursor.execute("UPDATE memories SET text = ?, timestamp = ? WHERE id = ?", (new_text, ts, mem_id))
     conn.commit()
+    updated = cursor.rowcount > 0
     conn.close()
-    print(f"[OK] Updated memory ID {mem_id}: \"{new_text}\"")
-    sync_to_kira()
+    if updated:
+        print(f"[OK] Updated memory ID {mem_id}: \"{new_text}\"")
+        sync_to_kira()
+    else:
+        print(f"[WARN] Memory ID {mem_id} not found. Nothing updated.")
 
 def set_profile(key, value):
     init_db()

@@ -1,6 +1,6 @@
 {
   "source": "kira_memory.db",
-  "updated_at": 1784929754529,
+  "updated_at": 1784930987280,
   "memories": [
     {
       "id": 1,
@@ -72,6 +72,86 @@
       "text": "Enjoys dark roast coffee",
       "affection": 0,
       "timestamp": 1784929754483,
+      "tags": ""
+    },
+    {
+      "id": 10,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784930146574,
+      "tags": ""
+    },
+    {
+      "id": 11,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784930146629,
+      "tags": ""
+    },
+    {
+      "id": 12,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784930162783,
+      "tags": ""
+    },
+    {
+      "id": 13,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784930162825,
+      "tags": ""
+    },
+    {
+      "id": 14,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784930855309,
+      "tags": ""
+    },
+    {
+      "id": 15,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784930855354,
+      "tags": ""
+    },
+    {
+      "id": 16,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784930966612,
+      "tags": ""
+    },
+    {
+      "id": 17,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784930966663,
+      "tags": ""
+    },
+    {
+      "id": 18,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784930987187,
+      "tags": ""
+    },
+    {
+      "id": 19,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784930987231,
       "tags": ""
     }
   ],

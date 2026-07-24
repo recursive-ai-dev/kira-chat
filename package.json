@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "compromise": "^14.16.0",
+    "jsdom": "^29.1.1",
+    "natural": "^8.1.1"
+  }
+}

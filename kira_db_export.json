@@ -1,0 +1,82 @@
+{
+  "source": "kira_memory.db",
+  "updated_at": 1784929754529,
+  "memories": [
+    {
+      "id": 1,
+      "category": "preference",
+      "text": "Loves building AI models",
+      "affection": 0,
+      "timestamp": 1784929017882,
+      "tags": ""
+    },
+    {
+      "id": 2,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784929608671,
+      "tags": ""
+    },
+    {
+      "id": 3,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784929608724,
+      "tags": ""
+    },
+    {
+      "id": 4,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784929627805,
+      "tags": ""
+    },
+    {
+      "id": 5,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784929627866,
+      "tags": ""
+    },
+    {
+      "id": 6,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784929636139,
+      "tags": ""
+    },
+    {
+      "id": 7,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784929636347,
+      "tags": ""
+    },
+    {
+      "id": 8,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1784929754435,
+      "tags": ""
+    },
+    {
+      "id": 9,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1784929754483,
+      "tags": ""
+    }
+  ],
+  "profile": {
+    "username": "Damien"
+  },
+  "word_banks": []
+}

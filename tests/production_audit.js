@@ -76,3 +76,5 @@ if (testTemplates() && testInvariants()) {
 } else {
   process.exit(1);
 }
+
+require('./test_generateFromTemplates.js');

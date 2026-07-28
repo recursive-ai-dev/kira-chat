@@ -1190,7 +1190,7 @@ const ENV={
   nowMs(){return Date.now()+this.clockOffsetMs;},
   nowDate(){return new Date(this.nowMs());},
   makeId(prefix='cid'){
-    const x=Math.floor(rng()*0xFFFFFFFF).toString(16).padStart(8,'0');
+    const x=(typeof crypto !== 'undefined' && crypto.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random()*0xFFFFFFFF)).toString(16).padStart(8,'0');
     return `${prefix}-${this.nowMs()}-${x}`;
   }
 };

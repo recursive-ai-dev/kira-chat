@@ -3499,14 +3499,29 @@ function fillSentenceSlot(bankDef, context) {
     }
     if (state.memories && state.memories.length > 0) {
       const allWords = [];
-      state.memories.forEach(m => {
-        const words = m.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
-        words.forEach(w => {
-          if (w.length > 4 && !['about', 'would', 'could', 'should', 'there', 'their', 'these', 'those'].includes(w)) {
-            allWords.push(w);
+      for (let i = 0; i < state.memories.length; i++) {
+        const m = state.memories[i];
+        let extracted = m._extractedWords;
+        if (!extracted) {
+          extracted = [];
+          const words = m.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+          for (let k = 0; k < words.length; k++) {
+            const w = words[k];
+            if (w.length > 4 && w !== 'about' && w !== 'would' && w !== 'could' && w !== 'should' && w !== 'there' && w !== 'their' && w !== 'these' && w !== 'those') {
+              extracted.push(w);
+            }
           }
-        });
-      });
+          Object.defineProperty(m, '_extractedWords', {
+            value: extracted,
+            enumerable: false,
+            configurable: true,
+            writable: true
+          });
+        }
+        for (let k = 0; k < extracted.length; k++) {
+          allWords.push(extracted[k]);
+        }
+      }
       if (allWords.length > 0) {
         return pick(allWords);
       }

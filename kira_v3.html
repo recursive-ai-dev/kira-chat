@@ -4252,15 +4252,16 @@ async function generateWebLLMResponse(userText) {
   return null;
 }
 
-async function sendMessage(){
-  const correlationId=ENV.makeId('msg');
-  const startedAt=ENV.nowMs();
-  const text=msgInput.value.trim();if(!text)return;
+function validateUserMessage(text, correlationId, startedAt) {
   if(text.length>INPUT_SOFT_LIMIT){
     addSystemMessage(`Message too long (${text.length}/${INPUT_SOFT_LIMIT}). Please shorten it for better responses.`);
     logTransition(correlationId,'validate_input',startedAt,{reason:'too-long',len:text.length},'warn');
-    return;
+    return false;
   }
+  return true;
+}
+
+async function processUserMessage(text, correlationId, startedAt) {
   // Online feedback: detect engagement signal from this message
   const signal=detectFeedback(text);
   const regexMoodNow=detectUserMoodRegex(text);
@@ -4281,68 +4282,84 @@ async function sendMessage(){
   logTransition(correlationId,'user_message_persisted',startedAt,{messages_sent:state.messagesSent});
 
   _seed=(ENV.nowMs()^(state.messagesSent*2654435761))>>>0;rng=mulberry32(_seed);kiraAI.setSeed(_seed);
+}
+
+async function processBotResponse(text, correlationId, startedAt) {
+  try{
+    // Check if we need to do generative fallback
+    let response = null;
+    let usedGenerative = false;
+
+    // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
+    // Call process here without updating UI state yet to get confidence.
+    const tempCtx = await kiraAI.process(text);
+
+    if (tempCtx.confidence < 0.38 && window.webllmEngine) {
+       const genResp = await generateWebLLMResponse(text);
+       if (genResp) {
+           const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
+           if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
+               response = genResp;
+               usedGenerative = true;
+           }
+       }
+    }
+
+    hideTyping();
+    // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
+    // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
+    if (!usedGenerative) {
+       response = await generateResponse(text);
+    } else {
+       // Because generateResponse handles side effects like advancing CTX and adding affection,
+       // we simulate the minimum necessary side effects here.
+       _aiCtx = tempCtx;
+       state.conversationDepth++; state.messagesReceived++;
+    }
+
+    state.lastMessageTime=ENV.nowMs();
+    logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
+    // Split longer responses occasionally
+    if(response.length>120&&chance(0.22)){
+      const sentences=response.match(/[^.!?]+[.!?]+/g)||[response];
+      if(sentences.length>=2){
+        const mid=Math.ceil(sentences.length/2);
+        const p1=sentences.slice(0,mid).join('').trim();
+        const p2=sentences.slice(mid).join('').trim();
+        if(p2.length>0){
+          addMessage('her',p1);state.messagesReceived++;showTyping();
+          setTimeout(async ()=>{hideTyping();addMessage('her',p2);state.conversationCount++;persistAtomically('send_message_split');logTransition(correlationId,'response_split_persisted',startedAt,{conversation_count:state.conversationCount});},randInt(600,1500));
+          return;
+        }
+      }
+    }
+    addMessage('her',response);state.conversationCount++;persistAtomically('send_message_single');
+    logTransition(correlationId,'response_persisted',startedAt,{conversation_count:state.conversationCount});
+  }catch(err){
+    hideTyping();
+    DIAG.errors++;
+    logTransition(correlationId,'send_message_error',startedAt,{scope:'sendMessage',message:String(err&&err.message||err)},'error');
+    addMessage('her',`I tripped over my thoughts for a second. Could you try that again? ${maybeEmoji()}`);
+    persistAtomically('send_message_error_recovery');
+  }
+}
+
+async function sendMessage(){
+  const correlationId=ENV.makeId('msg');
+  const startedAt=ENV.nowMs();
+  const text=msgInput.value.trim();if(!text)return;
+
+  if (!validateUserMessage(text, correlationId, startedAt)) {
+    return;
+  }
+
+  await processUserMessage(text, correlationId, startedAt);
 
   const thinkTime=Math.min(400+text.length*8+randInt(200,800),3000);
   showTyping();
 
   setTimeout(async ()=>{
-    try{
-      // Check if we need to do generative fallback
-      let response = null;
-      let usedGenerative = false;
-
-      // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
-      // Call process here without updating UI state yet to get confidence.
-      const tempCtx = await kiraAI.process(text);
-
-      if (tempCtx.confidence < 0.38 && window.webllmEngine) {
-         const genResp = await generateWebLLMResponse(text);
-         if (genResp) {
-             const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
-             if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
-                 response = genResp;
-                 usedGenerative = true;
-             }
-         }
-      }
-
-      hideTyping();
-      // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
-      // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
-      if (!usedGenerative) {
-         response = await generateResponse(text);
-      } else {
-         // Because generateResponse handles side effects like advancing CTX and adding affection,
-         // we simulate the minimum necessary side effects here.
-         _aiCtx = tempCtx;
-         state.conversationDepth++; state.messagesReceived++;
-      }
-
-      state.lastMessageTime=ENV.nowMs();
-      logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
-      // Split longer responses occasionally
-      if(response.length>120&&chance(0.22)){
-        const sentences=response.match(/[^.!?]+[.!?]+/g)||[response];
-        if(sentences.length>=2){
-          const mid=Math.ceil(sentences.length/2);
-          const p1=sentences.slice(0,mid).join('').trim();
-          const p2=sentences.slice(mid).join('').trim();
-          if(p2.length>0){
-            addMessage('her',p1);state.messagesReceived++;showTyping();
-            setTimeout(async ()=>{hideTyping();addMessage('her',p2);state.conversationCount++;persistAtomically('send_message_split');logTransition(correlationId,'response_split_persisted',startedAt,{conversation_count:state.conversationCount});},randInt(600,1500));
-            return;
-          }
-        }
-      }
-      addMessage('her',response);state.conversationCount++;persistAtomically('send_message_single');
-      logTransition(correlationId,'response_persisted',startedAt,{conversation_count:state.conversationCount});
-    }catch(err){
-      hideTyping();
-      DIAG.errors++;
-      logTransition(correlationId,'send_message_error',startedAt,{scope:'sendMessage',message:String(err&&err.message||err)},'error');
-      addMessage('her',`I tripped over my thoughts for a second. Could you try that again? ${maybeEmoji()}`);
-      persistAtomically('send_message_error_recovery');
-    }
+    await processBotResponse(text, correlationId, startedAt);
   },thinkTime);
 }
 

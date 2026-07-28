@@ -573,20 +573,46 @@ class CompoundMoodNet{
 //  the actual value text still comes from extractPersonalInfo()'s
 //  regex. This head exists to flag disclosures the regex missed.
 // ─────────────────────────────────────────────────────────────────────
-const NER_LABELS=['name','age','preference','disclosure'];
+const NER_LABELS=['name','age','preference','disclosure','vulnerability'];
 
 class NERNet{
   constructor(sharedEnc){
     this.enc=sharedEnc;
-    this.l1=new Linear(EDIM,NER_LABELS.length,5e-4);
+    this.l1=new Linear(EDIM*2,NER_LABELS.length,5e-4);
     this._cache={};this.updates=0;
   }
   fwd(text){
-    const emb=this.enc.fwd(text);
-    const z1=this.l1.fwd(emb);
-    const p=M.softmax(z1);
-    this._cache={p};
-    return p;
+    const sentenceEmb=this.enc.fwd(text);
+    const words=text.toLowerCase().split(/\s+/).filter(w=>w.length>0);
+    if(words.length===0){
+      const x=new Float32Array(EDIM*2);
+      x.set(sentenceEmb,0);
+      const z1=this.l1.fwd(x);
+      const p=M.softmax(z1);
+      this._cache={p};
+      return p;
+    }
+    let maxP=new Float32Array(NER_LABELS.length);
+    let maxX=null;
+    let maxConf=-1;
+    for(const w of words){
+      const wordEmb=this.enc.fwd(w);
+      const x=new Float32Array(EDIM*2);
+      x.set(sentenceEmb,0);
+      x.set(wordEmb,EDIM);
+      const z1=this.l1.fwd(x);
+      const p=M.softmax(z1);
+      let conf=0;
+      for(let i=0;i<p.length;i++)if(p[i]>conf)conf=p[i];
+      if(conf>maxConf){
+        maxConf=conf;
+        maxP=p;
+        maxX=x;
+      }
+    }
+    this.l1.fwd(maxX); // set this.l1._x for bwd
+    this._cache={p:maxP};
+    return maxP;
   }
   // Only ever called with a positive regex-detected label — see NM-02's CompoundMoodNet
   // for why there's no "none" class and no shared-encoder backprop here.
@@ -1047,7 +1073,7 @@ function escapeHTML(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/'/g, '&#039;');
 }
 function summarizeTrace(){
   if(!DIAG.traces.length)return'none';
@@ -1412,7 +1438,7 @@ function detectFeedback(text){
 // 'vulnerable' branch) — no new response copy is introduced here.
 const CRISIS_PATTERN=/\b(suicid\w*|self.harm|kill myself|end my life|wanted? to die|hurt myself|don'?t want to (?:live|be here|exist)|no reason to (?:live|go on))\b/i;
 
-const NER_LABELS=['name','age','preference','disclosure'];
+const NER_LABELS=['name','age','preference','disclosure','vulnerability'];
 const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1607,9 +1633,7 @@ function updateConversationState(text, userMood, compoundMood, topics) {
   addAffection(affGain);
 }
 
-async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt) {
-  const { userMood, topics, info } = analysis;
-
+async function checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt) {
   if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
   if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
@@ -1622,6 +1646,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
     `${info.value}.${maybeEmoji()} Let me say it again — ${info.value}. Yeah. That lands.`
   ],_aiCtx.ctxVec);logTransition(correlationId,'route_name_detected',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
+  return null;
+}
+
+async function checkGreetingRoutes(t, tod) {
   if(/^(hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))[\s!?.]*$/i.test(t)||
     (t.length<=5&&/^(hey|hi|yo|sup)$/.test(t.replace(/[^a-z]/g,''))))
     {setCTX('greeting',null,'How are you doing?');setRoute('greeting');return await handleGreeting(tod);}
@@ -1632,7 +1660,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(/(?:what(?:'s| is) your (?:name|favorite|fav)|tell me about (?:you|yourself)|who are you|what do you (?:like|enjoy|do))/i.test(t))
     {setRoute('about-her');return await handleAboutHer(t);}
 
-  // ── Enriched dispatch ─────────────────────────────────────────────
+  return null;
+}
+
+async function checkEnrichedRoutes(text, t, userMood) {
   // "What's on your mind / what are you thinking"
   if(/what(?:'s| is)(?: on)? (?:your )?mind|what(?:'re| are) you thinking(?: about)?|penny for your thoughts/i.test(t))
     {setRoute('on-your-mind');return await handleWhatOnMind();}
@@ -1657,6 +1688,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(/(?:so (?:today|yesterday|last night|just now)|something happened|you won'?t believe|guess what happened|i (?:just|finally|actually))/i.test(t)&&userMood!=='sad'&&userMood!=='anxious')
     {setRoute('something-happened');return await handleSomethingHappened(text);}
 
+  return null;
+}
+
+async function checkEmotionalRoutes(text, t, userMood, topics, tod) {
   if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t)){setRoute('i-love-you');return await handleILoveYou();}
   if(/\bi miss (?:you|u)\b/i.test(t)){setRoute('i-miss-you');return await handleIMissYou();}
   if(/\b(?:good ?night|gn|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|bye|goodbye|ttyl|gotta go|heading out|talk later|see ya)\b/i.test(t))
@@ -1681,11 +1716,19 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(text.length<40&&/^(?:i'?m |i am |feeling )?(good|great|fine|okay|ok|alright|not bad|terrible|awful|stressed|meh|pretty good|kinda (?:good|bad|tired|stressed)|not great)/i.test(t))
     {setRoute('status-update');return await handleImFine(text);}
 
+  return null;
+}
+
+async function checkTopicRoutes(topics, userMood) {
   if(topics.length>0)
     {setCTX('topic',topics[0],null);setRoute('topic');return await handleTopicResponse(topics,userMood);}
   if(userMood==='grateful')
     {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
 
+  return null;
+}
+
+async function checkIntentRescue(t, tod, correlationId, startedAt) {
   // NM-01: nothing above matched — before falling through to the generic pool, see
   // if the intent classifier recognizes a confident paraphrase of one of the
   // specific routes it was trained on (e.g. "I adore you" for love_declaration,
@@ -1709,9 +1752,32 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
       return out;
     }
   }
+  return null;
+}
+
+async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt) {
+  const { userMood, topics, info } = analysis;
+
+  let response = await checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt);
+  if (response) return response;
+
+  response = await checkGreetingRoutes(t, tod);
+  if (response) return response;
+
+  response = await checkEnrichedRoutes(text, t, userMood);
+  if (response) return response;
+
+  response = await checkEmotionalRoutes(text, t, userMood, topics, tod);
+  if (response) return response;
+
+  response = await checkTopicRoutes(topics, userMood);
+  if (response) return response;
+
+  response = await checkIntentRescue(t, tod, correlationId, startedAt);
+  if (response) return response;
 
   setRoute('general');
-  const response=await handleGeneral(text,userMood,tod);
+  response=await handleGeneral(text,userMood,tod);
   logTransition(correlationId,'route_general',startedAt,{route:DIAG.lastRoute,response_length:response.length});
   return response;
 }
@@ -3722,6 +3788,7 @@ function generateSentenceCandidates(context) {
     if (template.topics && !template.topics.some(t => topics.includes(t))) continue;
 
     // Generate 5 variations per template (SE-15)
+    let consecutiveDups = 0;
     for (let i = 0; i < 5; i++) {
       try {
         let sentence = generateSentence(template, sentenceContext);
@@ -3733,9 +3800,15 @@ function generateSentenceCandidates(context) {
         // SE-18: Sentence naturalness validator (no repeated root words)
         if (REPEATED_WORDS_REGEX.test(sentence)) continue;
 
-        if (sentence.length >= 15 && sentence.length <= 500 && !seen.has(sentence)) {
-          seen.add(sentence);
-          candidates.push(sentence);
+        if (sentence.length >= 15 && sentence.length <= 500) {
+          if (!seen.has(sentence)) {
+            seen.add(sentence);
+            candidates.push(sentence);
+            consecutiveDups = 0;
+          } else {
+            consecutiveDups++;
+            if (consecutiveDups >= 2) break;
+          }
         }
       } catch (err) {
         continue;
@@ -4252,15 +4325,16 @@ async function generateWebLLMResponse(userText) {
   return null;
 }
 
-async function sendMessage(){
-  const correlationId=ENV.makeId('msg');
-  const startedAt=ENV.nowMs();
-  const text=msgInput.value.trim();if(!text)return;
+function validateUserMessage(text, correlationId, startedAt) {
   if(text.length>INPUT_SOFT_LIMIT){
     addSystemMessage(`Message too long (${text.length}/${INPUT_SOFT_LIMIT}). Please shorten it for better responses.`);
     logTransition(correlationId,'validate_input',startedAt,{reason:'too-long',len:text.length},'warn');
-    return;
+    return false;
   }
+  return true;
+}
+
+async function processUserMessage(text, correlationId, startedAt) {
   // Online feedback: detect engagement signal from this message
   const signal=detectFeedback(text);
   const regexMoodNow=detectUserMoodRegex(text);
@@ -4281,68 +4355,84 @@ async function sendMessage(){
   logTransition(correlationId,'user_message_persisted',startedAt,{messages_sent:state.messagesSent});
 
   _seed=(ENV.nowMs()^(state.messagesSent*2654435761))>>>0;rng=mulberry32(_seed);kiraAI.setSeed(_seed);
+}
+
+async function processBotResponse(text, correlationId, startedAt) {
+  try{
+    // Check if we need to do generative fallback
+    let response = null;
+    let usedGenerative = false;
+
+    // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
+    // Call process here without updating UI state yet to get confidence.
+    const tempCtx = await kiraAI.process(text);
+
+    if (tempCtx.confidence < 0.38 && window.webllmEngine) {
+       const genResp = await generateWebLLMResponse(text);
+       if (genResp) {
+           const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
+           if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
+               response = genResp;
+               usedGenerative = true;
+           }
+       }
+    }
+
+    hideTyping();
+    // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
+    // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
+    if (!usedGenerative) {
+       response = await generateResponse(text);
+    } else {
+       // Because generateResponse handles side effects like advancing CTX and adding affection,
+       // we simulate the minimum necessary side effects here.
+       _aiCtx = tempCtx;
+       state.conversationDepth++; state.messagesReceived++;
+    }
+
+    state.lastMessageTime=ENV.nowMs();
+    logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
+    // Split longer responses occasionally
+    if(response.length>120&&chance(0.22)){
+      const sentences=response.match(/[^.!?]+[.!?]+/g)||[response];
+      if(sentences.length>=2){
+        const mid=Math.ceil(sentences.length/2);
+        const p1=sentences.slice(0,mid).join('').trim();
+        const p2=sentences.slice(mid).join('').trim();
+        if(p2.length>0){
+          addMessage('her',p1);state.messagesReceived++;showTyping();
+          setTimeout(async ()=>{hideTyping();addMessage('her',p2);state.conversationCount++;persistAtomically('send_message_split');logTransition(correlationId,'response_split_persisted',startedAt,{conversation_count:state.conversationCount});},randInt(600,1500));
+          return;
+        }
+      }
+    }
+    addMessage('her',response);state.conversationCount++;persistAtomically('send_message_single');
+    logTransition(correlationId,'response_persisted',startedAt,{conversation_count:state.conversationCount});
+  }catch(err){
+    hideTyping();
+    DIAG.errors++;
+    logTransition(correlationId,'send_message_error',startedAt,{scope:'sendMessage',message:String(err&&err.message||err)},'error');
+    addMessage('her',`I tripped over my thoughts for a second. Could you try that again? ${maybeEmoji()}`);
+    persistAtomically('send_message_error_recovery');
+  }
+}
+
+async function sendMessage(){
+  const correlationId=ENV.makeId('msg');
+  const startedAt=ENV.nowMs();
+  const text=msgInput.value.trim();if(!text)return;
+
+  if (!validateUserMessage(text, correlationId, startedAt)) {
+    return;
+  }
+
+  await processUserMessage(text, correlationId, startedAt);
 
   const thinkTime=Math.min(400+text.length*8+randInt(200,800),3000);
   showTyping();
 
   setTimeout(async ()=>{
-    try{
-      // Check if we need to do generative fallback
-      let response = null;
-      let usedGenerative = false;
-
-      // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
-      // Call process here without updating UI state yet to get confidence.
-      const tempCtx = await kiraAI.process(text);
-
-      if (tempCtx.confidence < 0.38 && window.webllmEngine) {
-         const genResp = await generateWebLLMResponse(text);
-         if (genResp) {
-             const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
-             if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
-                 response = genResp;
-                 usedGenerative = true;
-             }
-         }
-      }
-
-      hideTyping();
-      // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
-      // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
-      if (!usedGenerative) {
-         response = await generateResponse(text);
-      } else {
-         // Because generateResponse handles side effects like advancing CTX and adding affection,
-         // we simulate the minimum necessary side effects here.
-         _aiCtx = tempCtx;
-         state.conversationDepth++; state.messagesReceived++;
-      }
-
-      state.lastMessageTime=ENV.nowMs();
-      logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});
-      // Split longer responses occasionally
-      if(response.length>120&&chance(0.22)){
-        const sentences=response.match(/[^.!?]+[.!?]+/g)||[response];
-        if(sentences.length>=2){
-          const mid=Math.ceil(sentences.length/2);
-          const p1=sentences.slice(0,mid).join('').trim();
-          const p2=sentences.slice(mid).join('').trim();
-          if(p2.length>0){
-            addMessage('her',p1);state.messagesReceived++;showTyping();
-            setTimeout(async ()=>{hideTyping();addMessage('her',p2);state.conversationCount++;persistAtomically('send_message_split');logTransition(correlationId,'response_split_persisted',startedAt,{conversation_count:state.conversationCount});},randInt(600,1500));
-            return;
-          }
-        }
-      }
-      addMessage('her',response);state.conversationCount++;persistAtomically('send_message_single');
-      logTransition(correlationId,'response_persisted',startedAt,{conversation_count:state.conversationCount});
-    }catch(err){
-      hideTyping();
-      DIAG.errors++;
-      logTransition(correlationId,'send_message_error',startedAt,{scope:'sendMessage',message:String(err&&err.message||err)},'error');
-      addMessage('her',`I tripped over my thoughts for a second. Could you try that again? ${maybeEmoji()}`);
-      persistAtomically('send_message_error_recovery');
-    }
+    await processBotResponse(text, correlationId, startedAt);
   },thinkTime);
 }
 
@@ -4463,7 +4553,7 @@ async function renderAIStats(){
     `<b>NER updates</b>: ${nerUpd}<br>`+
     `<b>Intent net updates</b>: ${intentUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
-    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}<br>`+
+    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}, conf ${typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A"}<br>`+
     `<b>Trace tail</b>: ${escapeHTML(summarizeTrace())}`;
 }
 
@@ -4522,46 +4612,65 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 //  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
 async function processDreamState() {
-  if (!state.dreamMemories) state.dreamMemories = [];
-  if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
+  return new Promise((resolve) => {
+    if (!state.dreamMemories) state.dreamMemories = [];
+    if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
 
-  if (state.lastDreamIndex >= state.chatHistory.length) return;
-
-  let processed = false;
-  for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
-    const msg = state.chatHistory[i];
-    if (msg.role === 'you' && msg.text) {
-      try {
-        const moodProb = await kiraAI.moodNetFwd(msg.text);
-        const vector = await kiraAI.encoderFwd(msg.text);
-        if (moodProb && vector) {
-          let dominantMood = 0;
-          let maxProb = -1;
-          for (let j = 0; j < moodProb.length; j++) {
-            if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
-          }
-
-          const bytes = new Uint8Array(new Float32Array(vector).buffer);
-          let s = ''; const C = 8192;
-          for (let k = 0; k < bytes.length; k += C) s += String.fromCharCode(...bytes.subarray(k, Math.min(k + C, bytes.length)));
-          const packedVec = btoa(s);
-
-          state.dreamMemories.push({
-            text: msg.text,
-            vector: packedVec,
-            mood: dominantMood,
-            ts: msg.ts
-          });
-          processed = true;
-        }
-      } catch (e) {
-        // Skip this message's dream consolidation
-      }
+    if (state.lastDreamIndex >= state.chatHistory.length) {
+      resolve();
+      return;
     }
-  }
 
-  state.lastDreamIndex = state.chatHistory.length;
-  if (processed) saveState();
+    let processed = false;
+    const CHUNK_SIZE = 10;
+
+    const processChunk = async () => {
+      const endIndex = Math.min(state.lastDreamIndex + CHUNK_SIZE, state.chatHistory.length);
+
+      for (let i = state.lastDreamIndex; i < endIndex; i++) {
+        const msg = state.chatHistory[i];
+        if (msg.role === 'you' && msg.text) {
+          try {
+            const moodProb = await kiraAI.moodNetFwd(msg.text);
+            const vector = await kiraAI.encoderFwd(msg.text);
+            if (moodProb && vector) {
+              let dominantMood = 0;
+              let maxProb = -1;
+              for (let j = 0; j < moodProb.length; j++) {
+                if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+              }
+
+              const bytes = new Uint8Array(new Float32Array(vector).buffer);
+              let s = ''; const C = 8192;
+              for (let k = 0; k < bytes.length; k += C) s += String.fromCharCode(...bytes.subarray(k, Math.min(k + C, bytes.length)));
+              const packedVec = btoa(s);
+
+              state.dreamMemories.push({
+                text: msg.text,
+                vector: packedVec,
+                mood: dominantMood,
+                ts: msg.ts
+              });
+              processed = true;
+            }
+          } catch (e) {
+            // Skip this message's dream consolidation
+          }
+        }
+      }
+
+      state.lastDreamIndex = endIndex;
+
+      if (state.lastDreamIndex < state.chatHistory.length) {
+        setTimeout(processChunk, 10);
+      } else {
+        if (processed) saveState();
+        resolve();
+      }
+    };
+
+    processChunk();
+  });
 }
 
 async function boot(){

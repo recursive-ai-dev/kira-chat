@@ -536,14 +536,15 @@ const WORD_BANKS = {
 // is provably stable for the module's lifetime.
 const _BANK_INDEX = Object.create(null);
 
-function _buildIndex(bankName) {
-  const bank = WORD_BANKS[bankName];
+function _buildIndex(bankName, _overrideBanks) {
+  const sourceBanks = _overrideBanks || WORD_BANKS;
+  const bank = sourceBanks[bankName];
   if (!Array.isArray(bank)) return null;
   const isNSFW = bankName.indexOf('nsfw_') === 0;
   if (isNSFW) {
     // NSFW banks key only by (minStage, intensity); no mood dimension.
     const out = { kind: 'nsfw', entries: bank };
-    _BANK_INDEX[bankName] = out;
+    if (!_overrideBanks) _BANK_INDEX[bankName] = out;
     return out;
   }
   // Pass 1: collect concrete moods present in this bank.
@@ -574,7 +575,7 @@ function _buildIndex(bankName) {
     }
   }
   const out = { kind: 'general', byMood: byMood };
-  _BANK_INDEX[bankName] = out;
+  if (!_overrideBanks) _BANK_INDEX[bankName] = out;
   return out;
 }
 
@@ -585,8 +586,9 @@ function _buildIndex(bankName) {
 /**
  * Get words from a bank filtered by mood, stage, and intensity
  */
-function getBankWords(bankName, context = {}) {
-  const bank = WORD_BANKS[bankName];
+function getBankWords(bankName, context = {}, _overrideBanks) {
+  const sourceBanks = _overrideBanks || WORD_BANKS;
+  const bank = sourceBanks[bankName];
   if (!bank) return [];
 
   // Handle emoji banks specially
@@ -634,7 +636,7 @@ function getBankWords(bankName, context = {}) {
     allowNSFW = false,
   } = context;
 
-  const idx = _BANK_INDEX[bankName] || _buildIndex(bankName);
+  const idx = _overrideBanks ? _buildIndex(bankName, _overrideBanks) : (_BANK_INDEX[bankName] || _buildIndex(bankName));
   if (!idx) return [];
 
   // NSFW: gated on explicit permission + affection threshold

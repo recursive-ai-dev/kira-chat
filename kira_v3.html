@@ -3722,6 +3722,7 @@ function generateSentenceCandidates(context) {
     if (template.topics && !template.topics.some(t => topics.includes(t))) continue;
 
     // Generate 5 variations per template (SE-15)
+    let consecutiveDups = 0;
     for (let i = 0; i < 5; i++) {
       try {
         let sentence = generateSentence(template, sentenceContext);
@@ -3733,9 +3734,15 @@ function generateSentenceCandidates(context) {
         // SE-18: Sentence naturalness validator (no repeated root words)
         if (REPEATED_WORDS_REGEX.test(sentence)) continue;
 
-        if (sentence.length >= 15 && sentence.length <= 500 && !seen.has(sentence)) {
-          seen.add(sentence);
-          candidates.push(sentence);
+        if (sentence.length >= 15 && sentence.length <= 500) {
+          if (!seen.has(sentence)) {
+            seen.add(sentence);
+            candidates.push(sentence);
+            consecutiveDups = 0;
+          } else {
+            consecutiveDups++;
+            if (consecutiveDups >= 2) break;
+          }
         }
       } catch (err) {
         continue;

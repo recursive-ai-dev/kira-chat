@@ -1727,7 +1727,7 @@ async function generateResponse(userText){
   const correlationId=ENV.makeId('resp');
   const startedAt=ENV.nowMs();
   const text=userText.trim(),t=text.toLowerCase();
-  trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length,sample:t.slice(0,80)});
+  trace('input',{correlation_id:correlationId,step_name:'input_received',len:text.length});
 
   const isCrisis=CRISIS_PATTERN.test(t);
 

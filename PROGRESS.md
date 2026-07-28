@@ -104,6 +104,6 @@ Kira adapts her behavior, personality, and memories over time using gradual **Ex
 * [x] **NM-03: Generative Fallback** — Integrate quantized WebLLM/ONNX runtime to generate open-ended long-tail responses when confidence is low.
 
 ### Phase 2 — Testing & Tooling
-* [ ] **DEV-12: Build & Minify Script** — Create a build tool to compile/inline the standalone JS files into [kira_v3.html](file:///home/lubuntu/Pictures/kira-chat/kira_v3.html) and produce a minified version.
+* [x] **DEV-12: Build & Minify Script** — Create a build tool to compile/inline the standalone JS files into [kira_v3.html](file:///home/lubuntu/Pictures/kira-chat/kira_v3.html) and produce a minified version.
 * [ ] **DEV-06: Headless simulation runner** — Build `tests/simulate.js` to run end-to-end conversation trees in a simulated DOM.
 * [ ] **NEURAL-03 / NEURAL-04**: Log confidence and `DIAG.lastRoute` to settings UI.

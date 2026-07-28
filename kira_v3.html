@@ -573,20 +573,46 @@ class CompoundMoodNet{
 //  the actual value text still comes from extractPersonalInfo()'s
 //  regex. This head exists to flag disclosures the regex missed.
 // ─────────────────────────────────────────────────────────────────────
-const NER_LABELS=['name','age','preference','disclosure'];
+const NER_LABELS=['name','age','preference','disclosure','vulnerability'];
 
 class NERNet{
   constructor(sharedEnc){
     this.enc=sharedEnc;
-    this.l1=new Linear(EDIM,NER_LABELS.length,5e-4);
+    this.l1=new Linear(EDIM*2,NER_LABELS.length,5e-4);
     this._cache={};this.updates=0;
   }
   fwd(text){
-    const emb=this.enc.fwd(text);
-    const z1=this.l1.fwd(emb);
-    const p=M.softmax(z1);
-    this._cache={p};
-    return p;
+    const sentenceEmb=this.enc.fwd(text);
+    const words=text.toLowerCase().split(/\s+/).filter(w=>w.length>0);
+    if(words.length===0){
+      const x=new Float32Array(EDIM*2);
+      x.set(sentenceEmb,0);
+      const z1=this.l1.fwd(x);
+      const p=M.softmax(z1);
+      this._cache={p};
+      return p;
+    }
+    let maxP=new Float32Array(NER_LABELS.length);
+    let maxX=null;
+    let maxConf=-1;
+    for(const w of words){
+      const wordEmb=this.enc.fwd(w);
+      const x=new Float32Array(EDIM*2);
+      x.set(sentenceEmb,0);
+      x.set(wordEmb,EDIM);
+      const z1=this.l1.fwd(x);
+      const p=M.softmax(z1);
+      let conf=0;
+      for(let i=0;i<p.length;i++)if(p[i]>conf)conf=p[i];
+      if(conf>maxConf){
+        maxConf=conf;
+        maxP=p;
+        maxX=x;
+      }
+    }
+    this.l1.fwd(maxX); // set this.l1._x for bwd
+    this._cache={p:maxP};
+    return maxP;
   }
   // Only ever called with a positive regex-detected label — see NM-02's CompoundMoodNet
   // for why there's no "none" class and no shared-encoder backprop here.
@@ -1412,7 +1438,7 @@ function detectFeedback(text){
 // 'vulnerable' branch) — no new response copy is introduced here.
 const CRISIS_PATTERN=/\b(suicid\w*|self.harm|kill myself|end my life|wanted? to die|hurt myself|don'?t want to (?:live|be here|exist)|no reason to (?:live|go on))\b/i;
 
-const NER_LABELS=['name','age','preference','disclosure'];
+const NER_LABELS=['name','age','preference','disclosure','vulnerability'];
 const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
 
 // ─────────────────────────────────────────────────────────────────────

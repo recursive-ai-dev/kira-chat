@@ -99,7 +99,7 @@ Kira adapts her behavior, personality, and memories over time using gradual **Ex
 
 ### Phase 1 — Nano-Modules
 * [ ] **NM-01: Intent Router** — Constrain intent mapping with a `Linear(EDIM*2, 17)` head applied to FNV-1a HashEmbed, replacing the 20-handler regex cascade.
-* [ ] **NM-02: Emotion Granularity** — Train parallel MLP head (`Linear(EDIM, 3)`) for `sarcastic`, `nostalgic`, and `excited` mood detection.
+* [x] **NM-02: Emotion Granularity** — Train parallel MLP head (`Linear(EDIM, 3)`) for `sarcastic`, `nostalgic`, and `excited` mood detection.
 * [ ] **NM-04: Semantic NER** — Implement a token-level slots classifier (`Linear(EDIM*2, 5)`) for name, age, preference, and vulnerability disclosures.
 * [x] **NM-03: Generative Fallback** — Integrate quantized WebLLM/ONNX runtime to generate open-ended long-tail responses when confidence is low.
 

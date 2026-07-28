@@ -1607,9 +1607,7 @@ function updateConversationState(text, userMood, compoundMood, topics) {
   addAffection(affGain);
 }
 
-async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt) {
-  const { userMood, topics, info } = analysis;
-
+async function checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt) {
   if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
   if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
@@ -1622,6 +1620,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
     `${info.value}.${maybeEmoji()} Let me say it again — ${info.value}. Yeah. That lands.`
   ],_aiCtx.ctxVec);logTransition(correlationId,'route_name_detected',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
+  return null;
+}
+
+async function checkGreetingRoutes(t, tod) {
   if(/^(hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))[\s!?.]*$/i.test(t)||
     (t.length<=5&&/^(hey|hi|yo|sup)$/.test(t.replace(/[^a-z]/g,''))))
     {setCTX('greeting',null,'How are you doing?');setRoute('greeting');return await handleGreeting(tod);}
@@ -1632,7 +1634,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(/(?:what(?:'s| is) your (?:name|favorite|fav)|tell me about (?:you|yourself)|who are you|what do you (?:like|enjoy|do))/i.test(t))
     {setRoute('about-her');return await handleAboutHer(t);}
 
-  // ── Enriched dispatch ─────────────────────────────────────────────
+  return null;
+}
+
+async function checkEnrichedRoutes(text, t, userMood) {
   // "What's on your mind / what are you thinking"
   if(/what(?:'s| is)(?: on)? (?:your )?mind|what(?:'re| are) you thinking(?: about)?|penny for your thoughts/i.test(t))
     {setRoute('on-your-mind');return await handleWhatOnMind();}
@@ -1657,6 +1662,10 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(/(?:so (?:today|yesterday|last night|just now)|something happened|you won'?t believe|guess what happened|i (?:just|finally|actually))/i.test(t)&&userMood!=='sad'&&userMood!=='anxious')
     {setRoute('something-happened');return await handleSomethingHappened(text);}
 
+  return null;
+}
+
+async function checkEmotionalRoutes(text, t, userMood, topics, tod) {
   if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t)){setRoute('i-love-you');return await handleILoveYou();}
   if(/\bi miss (?:you|u)\b/i.test(t)){setRoute('i-miss-you');return await handleIMissYou();}
   if(/\b(?:good ?night|gn|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|bye|goodbye|ttyl|gotta go|heading out|talk later|see ya)\b/i.test(t))
@@ -1681,11 +1690,19 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   if(text.length<40&&/^(?:i'?m |i am |feeling )?(good|great|fine|okay|ok|alright|not bad|terrible|awful|stressed|meh|pretty good|kinda (?:good|bad|tired|stressed)|not great)/i.test(t))
     {setRoute('status-update');return await handleImFine(text);}
 
+  return null;
+}
+
+async function checkTopicRoutes(topics, userMood) {
   if(topics.length>0)
     {setCTX('topic',topics[0],null);setRoute('topic');return await handleTopicResponse(topics,userMood);}
   if(userMood==='grateful')
     {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
 
+  return null;
+}
+
+async function checkIntentRescue(t, tod, correlationId, startedAt) {
   // NM-01: nothing above matched — before falling through to the generic pool, see
   // if the intent classifier recognizes a confident paraphrase of one of the
   // specific routes it was trained on (e.g. "I adore you" for love_declaration,
@@ -1709,9 +1726,32 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
       return out;
     }
   }
+  return null;
+}
+
+async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, startedAt) {
+  const { userMood, topics, info } = analysis;
+
+  let response = await checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt);
+  if (response) return response;
+
+  response = await checkGreetingRoutes(t, tod);
+  if (response) return response;
+
+  response = await checkEnrichedRoutes(text, t, userMood);
+  if (response) return response;
+
+  response = await checkEmotionalRoutes(text, t, userMood, topics, tod);
+  if (response) return response;
+
+  response = await checkTopicRoutes(topics, userMood);
+  if (response) return response;
+
+  response = await checkIntentRescue(t, tod, correlationId, startedAt);
+  if (response) return response;
 
   setRoute('general');
-  const response=await handleGeneral(text,userMood,tod);
+  response=await handleGeneral(text,userMood,tod);
   logTransition(correlationId,'route_general',startedAt,{route:DIAG.lastRoute,response_length:response.length});
   return response;
 }

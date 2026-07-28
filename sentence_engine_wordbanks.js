@@ -504,7 +504,7 @@ const WORD_BANKS = {
 // "silent mid-chain corruption" bugs where one caller's mutation corrupts
 // a different caller's memoized view. Safe: no in-repo consumer mutates
 // WORD_BANKS, and freezing is a no-op on already-frozen objects.
-(function _deepFreezeBanks(root) {
+function _deepFreezeBanks(root) {
   if (typeof Object.freeze !== 'function' || Object.isFrozen(root)) return;
   const stack = [root];
   while (stack.length) {
@@ -517,7 +517,8 @@ const WORD_BANKS = {
       if (v !== null && typeof v === 'object') stack.push(v);
     }
   }
-})(WORD_BANKS);
+}
+_deepFreezeBanks(WORD_BANKS);
 
 // ─────────────────────────────────────────────────────────────────────
 // PRECOMPILED BANK INDEX — Enhancement #1 (Stat: Speed)
@@ -754,6 +755,7 @@ if (typeof module !== 'undefined' && module.exports) {
     weightedRandom,
     moodRelevance,
     isNSFWAllowed,
+    _deepFreezeBanks,
     _buildIndex,
   };
 }

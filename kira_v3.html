@@ -3483,6 +3483,8 @@ function extractConceptTriple(text) {
   return null;
 }
 
+const USER_MIRROR_STOP_WORDS = new Set(['about', 'would', 'could', 'should', 'there', 'their', 'these', 'those']);
+
 // Fill template slot with word from bank (SE-12 / SE-13)
 function fillSentenceSlot(bankDef, context) {
   const bankName = typeof bankDef === 'object' ? bankDef.bank : bankDef;

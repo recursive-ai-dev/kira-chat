@@ -1231,7 +1231,7 @@ let state={};
 const TX_KEY='kira_tx_v1';
 
 function snapshotState(){
-  const copy=JSON.parse(JSON.stringify(state));
+  const copy={...state};
   if(copy.chatHistory.length>200)copy.chatHistory=copy.chatHistory.slice(-200);
   if(copy.memories.length>60)copy.memories=copy.memories.slice(-60);
   if(copy.userMoods.length>10)copy.userMoods=copy.userMoods.slice(-10);

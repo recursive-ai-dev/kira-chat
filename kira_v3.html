@@ -4522,46 +4522,65 @@ document.querySelectorAll('.quick-chip').forEach((chip)=>{
 //  §22  DREAM STATE & BOOT
 // ─────────────────────────────────────────────────────────────────────
 async function processDreamState() {
-  if (!state.dreamMemories) state.dreamMemories = [];
-  if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
+  return new Promise((resolve) => {
+    if (!state.dreamMemories) state.dreamMemories = [];
+    if (state.lastDreamIndex === undefined) state.lastDreamIndex = 0;
 
-  if (state.lastDreamIndex >= state.chatHistory.length) return;
-
-  let processed = false;
-  for (let i = state.lastDreamIndex; i < state.chatHistory.length; i++) {
-    const msg = state.chatHistory[i];
-    if (msg.role === 'you' && msg.text) {
-      try {
-        const moodProb = await kiraAI.moodNetFwd(msg.text);
-        const vector = await kiraAI.encoderFwd(msg.text);
-        if (moodProb && vector) {
-          let dominantMood = 0;
-          let maxProb = -1;
-          for (let j = 0; j < moodProb.length; j++) {
-            if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
-          }
-
-          const bytes = new Uint8Array(new Float32Array(vector).buffer);
-          let s = ''; const C = 8192;
-          for (let k = 0; k < bytes.length; k += C) s += String.fromCharCode(...bytes.subarray(k, Math.min(k + C, bytes.length)));
-          const packedVec = btoa(s);
-
-          state.dreamMemories.push({
-            text: msg.text,
-            vector: packedVec,
-            mood: dominantMood,
-            ts: msg.ts
-          });
-          processed = true;
-        }
-      } catch (e) {
-        // Skip this message's dream consolidation
-      }
+    if (state.lastDreamIndex >= state.chatHistory.length) {
+      resolve();
+      return;
     }
-  }
 
-  state.lastDreamIndex = state.chatHistory.length;
-  if (processed) saveState();
+    let processed = false;
+    const CHUNK_SIZE = 10;
+
+    const processChunk = async () => {
+      const endIndex = Math.min(state.lastDreamIndex + CHUNK_SIZE, state.chatHistory.length);
+
+      for (let i = state.lastDreamIndex; i < endIndex; i++) {
+        const msg = state.chatHistory[i];
+        if (msg.role === 'you' && msg.text) {
+          try {
+            const moodProb = await kiraAI.moodNetFwd(msg.text);
+            const vector = await kiraAI.encoderFwd(msg.text);
+            if (moodProb && vector) {
+              let dominantMood = 0;
+              let maxProb = -1;
+              for (let j = 0; j < moodProb.length; j++) {
+                if (moodProb[j] > maxProb) { maxProb = moodProb[j]; dominantMood = j; }
+              }
+
+              const bytes = new Uint8Array(new Float32Array(vector).buffer);
+              let s = ''; const C = 8192;
+              for (let k = 0; k < bytes.length; k += C) s += String.fromCharCode(...bytes.subarray(k, Math.min(k + C, bytes.length)));
+              const packedVec = btoa(s);
+
+              state.dreamMemories.push({
+                text: msg.text,
+                vector: packedVec,
+                mood: dominantMood,
+                ts: msg.ts
+              });
+              processed = true;
+            }
+          } catch (e) {
+            // Skip this message's dream consolidation
+          }
+        }
+      }
+
+      state.lastDreamIndex = endIndex;
+
+      if (state.lastDreamIndex < state.chatHistory.length) {
+        setTimeout(processChunk, 10);
+      } else {
+        if (processed) saveState();
+        resolve();
+      }
+    };
+
+    processChunk();
+  });
 }
 
 async function boot(){

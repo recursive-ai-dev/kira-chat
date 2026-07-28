@@ -4463,7 +4463,7 @@ async function renderAIStats(){
     `<b>NER updates</b>: ${nerUpd}<br>`+
     `<b>Intent net updates</b>: ${intentUpd}<br>`+
     `<b>Scorer updates</b>: ${scUpd}<br>`+
-    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}<br>`+
+    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}, conf ${typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A"}<br>`+
     `<b>Trace tail</b>: ${escapeHTML(summarizeTrace())}`;
 }
 

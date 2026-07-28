@@ -1286,10 +1286,6 @@ async function loadAI(){
   try{const raw=localStorage.getItem(AI_KEY);if(raw)await kiraAI.load(JSON.parse(raw));}catch(e){trace('loadAI',{error:String(e&&e.message||e)},'error');}
 }
 
-function saveAI(){
-  persistAtomically('save_ai');
-}
-
 // ─────────────────────────────────────────────────────────────────────
 //  §11  RELATIONSHIP STAGES
 // ─────────────────────────────────────────────────────────────────────

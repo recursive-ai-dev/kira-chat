@@ -3487,6 +3487,8 @@ function extractConceptTriple(text) {
   return null;
 }
 
+const USER_MIRROR_STOP_WORDS = new Set(['about', 'would', 'could', 'should', 'there', 'their', 'these', 'those']);
+
 // Fill template slot with word from bank (SE-12 / SE-13)
 function fillSentenceSlot(bankDef, context) {
   const bankName = typeof bankDef === 'object' ? bankDef.bank : bankDef;
@@ -3502,7 +3504,7 @@ function fillSentenceSlot(bankDef, context) {
       state.memories.forEach(m => {
         const words = m.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
         words.forEach(w => {
-          if (w.length > 4 && !['about', 'would', 'could', 'should', 'there', 'their', 'these', 'those'].includes(w)) {
+          if (w.length > 4 && !USER_MIRROR_STOP_WORDS.has(w)) {
             allWords.push(w);
           }
         });

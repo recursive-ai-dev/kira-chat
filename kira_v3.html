@@ -366,18 +366,20 @@ const M={
     return{dW,db,dx};
   },
 
-  relu:(x)=>x.map(v=>v>0?v:0),
-  reluBack:(dy,z)=>Float32Array.from(dy,(v,i)=>z[i]>0?v:0),
+  relu:(x)=>{const y=new Float32Array(x.length);for(let i=0;i<x.length;i++)y[i]=x[i]>0?x[i]:0;return y;},
+  reluBack:(dy,z)=>{const y=new Float32Array(dy.length);for(let i=0;i<dy.length;i++)y[i]=z[i]>0?dy[i]:0;return y;},
 
   softmax:(x)=>{
-    let mx=-Infinity;for(const v of x)if(v>mx)mx=v;
-    let s=0;const e=x.map(v=>{const t=Math.exp(v-mx);s+=t;return t;});
-    return e.map(v=>v/(s+1e-30));
+    let mx=-Infinity;for(let i=0;i<x.length;i++)if(x[i]>mx)mx=x[i];
+    let s=0;const y=new Float32Array(x.length);
+    for(let i=0;i<x.length;i++){const t=Math.exp(x[i]-mx);s+=t;y[i]=t;}
+    const invS=1/(s+1e-30);for(let i=0;i<x.length;i++)y[i]*=invS;
+    return y;
   },
 
   dot:(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;},
-  add:(a,b)=>Float32Array.from(a,(v,i)=>v+b[i]),
-  scale:(a,s)=>a.map(v=>v*s),
+  add:(a,b)=>{const y=new Float32Array(a.length);for(let i=0;i<a.length;i++)y[i]=a[i]+b[i];return y;},
+  scale:(a,s)=>{const y=new Float32Array(a.length);for(let i=0;i<a.length;i++)y[i]=a[i]*s;return y;},
 
   cosine:(a,b)=>{
     let d=0,na=0,nb=0;
@@ -385,11 +387,11 @@ const M={
     return d/(Math.sqrt(na*nb)+1e-10);
   },
 
-  l2:(a)=>{let n=0;for(const v of a)n+=v*v;return Math.sqrt(n)+1e-10;},
-  normalize:(a)=>{const n=M.l2(a);return a.map(v=>v/n);},
+  l2:(a)=>{let n=0;for(let i=0;i<a.length;i++)n+=a[i]*a[i];return Math.sqrt(n)+1e-10;},
+  normalize:(a)=>{const n=M.l2(a),y=new Float32Array(a.length),invN=1/n;for(let i=0;i<a.length;i++)y[i]=a[i]*invN;return y;},
 
   // Gradient clipping by global norm
-  clipNorm:(g,maxN=1.0)=>{const n=M.l2(g);return n<=maxN?g:g.map(v=>v*maxN/n);},
+  clipNorm:(g,maxN=1.0)=>{const n=M.l2(g);if(n<=maxN)return g;const y=new Float32Array(g.length),s=maxN/n;for(let i=0;i<g.length;i++)y[i]=g[i]*s;return y;},
 
   // Pack Float32Array to base64 for localStorage
   pack:(arr)=>{

@@ -4651,9 +4651,9 @@ function updateInsightDock(){
 }
 
 async function renderAIStats(){
-  const totalParams=VOCAB*EDIM*3+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM
+  const totalParams=VOCAB*EDIM*5+EDIM*32+32+32*N_MOODS+N_MOODS+EDIM*EDIM
     +EDIM*COMPOUND_LABELS.length+COMPOUND_LABELS.length
-    +EDIM*NER_LABELS.length+NER_LABELS.length
+    +EDIM*2*NER_LABELS.length+NER_LABELS.length
     +EDIM*INTENT_LABELS.length+INTENT_LABELS.length;
   let aiState = null;
   try {

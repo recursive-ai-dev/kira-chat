@@ -541,8 +541,10 @@ const COMPOUND_LABELS=['sarcastic','nostalgic','excited'];
 const N_COMPOUND=COMPOUND_LABELS.length;
 
 class CompoundMoodNet{
-  constructor(sharedEnc){
-    this.enc=sharedEnc; // shared with MoodNet — same learned embedding space, not owned here
+  constructor(){
+    // Own trainable embedding: the compound/intent/ner heads each need a
+    // representation optimized for their own task, not MoodNet's mood space.
+    this.enc=new HashEmbed(5e-4);
     this.l1=new Linear(EDIM,N_COMPOUND,5e-4);
     this._cache={};this.updates=0;
   }
@@ -555,17 +557,16 @@ class CompoundMoodNet{
   }
   // Only ever called with a positive regex-detected label (see detectCompoundMoodRegex) —
   // there's no "none of the above" class, so we don't train toward an absence of signal.
-  // Deliberately does not backprop into the shared encoder: MoodNet.bwd() already trains
-  // it every turn, and this head runs far less often (only on positive matches).
   bwd(target,reward=1.0){
     const{p}=this._cache;
     const ls=Math.abs(reward)*0.06;
     const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
-    this.l1.bwd(dz1);
+    const dx=this.l1.bwd(dz1); // dx is EDIM-length; matches HashEmbed backprop
+    this.enc.bwd(dx); // train this head's own embedding
     this.updates++;
   }
-  save(){return{l1:this.l1.save(),upd:this.updates};}
-  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+  save(){return{enc:this.enc.save(),l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){if(d.enc)this.enc.load(d.enc);this.l1.load(d.l1);this.updates=d.upd||0;}}
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -578,8 +579,8 @@ class CompoundMoodNet{
 const NER_LABELS=['name','age','preference','disclosure','vulnerability'];
 
 class NERNet{
-  constructor(sharedEnc){
-    this.enc=sharedEnc;
+  constructor(){
+    this.enc=new HashEmbed(5e-4);
     this.l1=new Linear(EDIM*2,NER_LABELS.length,5e-4);
     this._cache={};this.updates=0;
   }
@@ -616,17 +617,17 @@ class NERNet{
     this._cache={p:maxP};
     return maxP;
   }
-  // Only ever called with a positive regex-detected label — see NM-02's CompoundMoodNet
-  // for why there's no "none" class and no shared-encoder backprop here.
+  // Only ever called with a positive regex-detected label — no "none" class.
   bwd(target,reward=1.0){
     const{p}=this._cache;
     const ls=Math.abs(reward)*0.06;
     const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
-    this.l1.bwd(dz1);
+    const dx=this.l1.bwd(dz1); // length EDIM*2 (sentence emb || word emb)
+    this.enc.bwd(dx.subarray(EDIM)); // backprop only the word-embedding half (EDIM), keeps dims aligned
     this.updates++;
   }
-  save(){return{l1:this.l1.save(),upd:this.updates};}
-  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+  save(){return{enc:this.enc.save(),l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){if(d.enc)this.enc.load(d.enc);this.l1.load(d.l1);this.updates=d.upd||0;}}
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -640,8 +641,8 @@ class NERNet{
 const INTENT_LABELS=['greeting','how_are_you','about_her','love_declaration','miss_you','goodbye','compliment','general'];
 
 class IntentNet{
-  constructor(sharedEnc){
-    this.enc=sharedEnc;
+  constructor(){
+    this.enc=new HashEmbed(5e-4);
     this.l1=new Linear(EDIM,INTENT_LABELS.length,5e-4);
     this._cache={};this.updates=0;
   }
@@ -656,11 +657,12 @@ class IntentNet{
     const{p}=this._cache;
     const ls=Math.abs(reward)*0.06;
     const dz1=Float32Array.from(p,(v,i)=>(v-(i===target?1.0:0.0))*ls*Math.sign(reward));
-    this.l1.bwd(dz1);
+    const dx=this.l1.bwd(dz1); // dx is EDIM-length; matches HashEmbed backprop
+    this.enc.bwd(dx); // train this head's own embedding
     this.updates++;
   }
-  save(){return{l1:this.l1.save(),upd:this.updates};}
-  load(d){if(d){this.l1.load(d.l1);this.updates=d.upd||0;}}
+  save(){return{enc:this.enc.save(),l1:this.l1.save(),upd:this.updates};}
+  load(d){if(d){if(d.enc)this.enc.load(d.enc);this.l1.load(d.l1);this.updates=d.upd||0;}}
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -668,22 +670,32 @@ class IntentNet{
 //  Learns a compatibility matrix W between context and response spaces
 // ─────────────────────────────────────────────────────────────────────
 class Scorer{
-  constructor(){
+  // `respEnc` is the response-side HashEmbed; we backprop into it so the
+  // bilinear ranker learns *representations*, not just a fixed linear map over
+  // frozen-random input vectors (the previous behavior, which could never
+  // capture semantic context↔response compatibility).
+  constructor(respEnc){
     this.W=M.randn(EDIM*EDIM,0.04);
     this.opt=new Adam(EDIM*EDIM,3e-4);
+    this.respEnc=respEnc;
     this._cache={};this.updates=0;
   }
   score(ctx,resp){
     const Wv=M.zeros(EDIM);
     for(let i=0;i<EDIM;i++)for(let j=0;j<EDIM;j++)Wv[i]+=this.W[i*EDIM+j]*resp[j];
-    this._cache={ctx,resp};
+    this._cache={ctx,resp,Wv};
     return M.dot(ctx,Wv);
   }
   bwd(grad){
-    const{ctx,resp}=this._cache;
+    const{ctx,resp,Wv}=this._cache;
+    // ∂L/∂W[i,j] = grad · ctx[i] · resp[j]
     const dW=M.zeros(EDIM*EDIM);
     for(let i=0;i<EDIM;i++)for(let j=0;j<EDIM;j++)dW[i*EDIM+j]=grad*ctx[i]*resp[j];
     this.opt.step(this.W,M.clipNorm(dW,0.5));
+    // ∂L/∂resp[j] = grad · Σ_i W[i,j]·ctx[i]  →  train the response embedding
+    const dResp=M.zeros(EDIM);
+    for(let j=0;j<EDIM;j++)for(let i=0;i<EDIM;i++)dResp[j]+=grad*this.W[i*EDIM+j]*ctx[i];
+    this.respEnc.bwd(dResp);
     this.updates++;
   }
   save(){return{W:M.pack(this.W),opt:this.opt.save(),upd:this.updates};}
@@ -730,18 +742,72 @@ class AttentionMem{
 // ─────────────────────────────────────────────────────────────────────
 //  §8  KIRAAI ENGINE  ·  Orchestrates all neural components
 // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+//  §8B  WARM-START CURRICULUM  ·  synthetic labeled corpus distilled into
+//  the neural student at cold start. Mirrors the regex-teacher keyword
+//  sets so the hash-embedding space learns n-gram → class associations
+//  before the first real user message. Respects INV-05 (dims locked) and
+//  INV-08 (no network). Overwritten by load() when a saved state exists.
+// ─────────────────────────────────────────────────────────────────────
+const WS_CURRICULUM={
+  mood:{
+    happy:["haha that's great","i'm so happy today","awesome lol","that's amazing yay","i love it","wonderful news"],
+    sad:["i feel so sad","i'm lonely and alone","this hurts so much","crying right now","everything feels empty","terrible day"],
+    angry:["i'm so angry","this is annoying","i hate that","furious right now","so frustrated"],
+    anxious:["i'm really anxious","feeling worried","so nervous about this","stressed out","freaking out"],
+    flirty:["you're so cute","i miss you babe","love you","you're gorgeous","kiss me"],
+    bored:["so bored","nothing to do","meh whatever","this is boring","blah"],
+    tired:["i'm tired","exhausted today","need sleep","so sleepy","drained"],
+    curious:["i wonder why","tell me more","what do you think","curious about this","your opinion"],
+    grateful:["thank you so much","i appreciate that","means a lot","you're the best","so kind of you"],
+    vulnerable:["i feel like no one gets me","do you even care","be honest with me","am i enough","tell me the truth"],
+    neutral:["okay","sure","i see","that makes sense","alright then","hmm"]
+  },
+  intent:{
+    greeting:["hi","hello","hey there","good morning","what's up","yo"],
+    how_are_you:["how are you","how are you doing","how have you been","what's up with you"],
+    about_her:["what's your name","tell me about you","who are you","what do you like"],
+    love_declaration:["i love you","i luv you"],
+    miss_you:["i miss you"],
+    goodbye:["goodbye","bye","good night","talk later","see ya"],
+    compliment:["you're so amazing","you're beautiful","i appreciate you","you're perfect"],
+    general:["the weather is nice","i ate pizza","the movie was long","my cat slept"]
+  },
+  compound:{
+    sarcastic:["yeah right","oh sure","as if","totally not","what a surprise"],
+    nostalgic:["remember when","back in the day","those were the days","used to love that","takes me back"],
+    excited:["i can't wait","so excited","i'm pumped","hyped for this","thrilled"]
+  },
+  ner:{
+    name:["my name is alex","call me sam","i'm jordan"],
+    age:["i'm 25 years old","i am 30"],
+    preference:["i love painting","i really like coffee","i enjoy hiking"],
+    disclosure:["i've been struggling with anxiety","i was diagnosed with depression","i suffer from insomnia"],
+    vulnerability:["i feel so alone","nobody understands me"]
+  },
+  // Plausible Kira responses used to give the response embedding + bilinear
+  // scorer structure at cold start (refined further by online feedback).
+  responses:["i'm really glad you're here","tell me more about that","you matter to me","i'm listening",
+    "that sounds wonderful","i love talking with you","you're not alone in this","what's on your mind",
+    "i appreciate you too","that means a lot to me","i'm here for you","tell me everything"]
+};
+
 class KiraAI{
   constructor(){
     this.moodNet=new MoodNet();
-    this.compoundMoodNet=new CompoundMoodNet(this.moodNet.enc);
-    this.nerNet=new NERNet(this.moodNet.enc);
-    this.intentNet=new IntentNet(this.moodNet.enc);
-    this.encoder=new HashEmbed(5e-4);
+    this.compoundMoodNet=new CompoundMoodNet();
+    this.nerNet=new NERNet();
+    this.intentNet=new IntentNet();
+    // Context vectors share MoodNet's *trained* embedding space, so attention
+    // memory, mood-confidence gating, and ranking all operate in a meaningful
+    // (not random) representation from the very first turn.
+    this.encoder=this.moodNet.enc;
     this.respEnc=new HashEmbed(5e-4);
-    this.scorer=new Scorer();
+    this.scorer=new Scorer(this.respEnc);
     this.memory=new AttentionMem();
     this._lastCtx=null;this._lastRVec=null;this._lastMIdx=0;
     this.tick=0;this.isLearning=false;
+    this.warmStart(); // deterministic; overwritten by load() if a saved state exists
   }
 
   process(text){
@@ -798,18 +864,70 @@ class KiraAI{
     if(signal===0&&regexMoodIdx<0)return;
     this.isLearning=true;
     if(regexMoodIdx>=0){const reward=signal>=0?1.0:0.4;this.moodNet.bwd(regexMoodIdx,reward);}
-    if(signal!==0&&this._lastCtx&&this._lastRVec)this.scorer.bwd(-signal*0.08);
+    // Recompute the score for the *chosen* (ctx,resp) pair before backprop — the
+    // scorer cache otherwise holds the last candidate scored in rank(), not the
+    // one the user actually reacted to.
+    if(signal!==0&&this._lastCtx&&this._lastRVec){
+      this.scorer.score(this._lastCtx,this._lastRVec);
+      this.scorer.bwd(-signal*0.08);
+    }
     setTimeout(async ()=>{this.isLearning=false;},600);
   }
 
-  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),intent:this.intentNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick};}
+  // ── §8C  WARM-START DISTILLATION ──────────────────────────────────────
+  // Re-initialize every net deterministically from a fixed seed, then distill
+  // the weak-supervision curriculum (WS_CURRICULUM) so the student starts warm
+  // instead of at random He-init. Idempotent; overwritten by load() if a saved
+  // state is supplied. No network, dims locked (INV-05/INV-08).
+  warmStart(){
+    if(this._warmStarted)return;this._warmStarted=true;
+    const savedRng=rng;rng=mulberry32(0x5EED);
+    // Fresh, seeded initialization (deterministic canonical starting point)
+    this.moodNet=new MoodNet();
+    this.compoundMoodNet=new CompoundMoodNet();
+    this.nerNet=new NERNet();
+    this.intentNet=new IntentNet();
+    this.encoder=this.moodNet.enc;
+    this.respEnc=new HashEmbed(5e-4);
+    this.scorer=new Scorer(this.respEnc);
+    const distill=(net,labels,table,lr,epochs=60)=>{
+      const entries=Object.entries(table);
+      for(let e=0;e<epochs;e++){
+        for(const[label,phrases]of entries){
+          const idx=labels.indexOf(label);if(idx<0)continue;
+          for(const p of phrases){net.fwd(p);net.bwd(idx,lr);}
+        }
+      }
+    };
+    distill(this.moodNet,MOOD_LABELS,WS_CURRICULUM.mood,1.0,80);
+    distill(this.compoundMoodNet,COMPOUND_LABELS,WS_CURRICULUM.compound,1.0,80);
+    distill(this.intentNet,INTENT_LABELS,WS_CURRICULUM.intent,1.0,80);
+    distill(this.nerNet,NER_LABELS,WS_CURRICULUM.ner,1.0,80);
+    // Warm the response embedding + bilinear scorer: each user utterance is
+    // taught to score highly against a plausible Kira response.
+    const ctxTexts=[].concat(
+      ...Object.values(WS_CURRICULUM.mood),
+      ...Object.values(WS_CURRICULUM.intent),
+      ...Object.values(WS_CURRICULUM.compound),
+      ...Object.values(WS_CURRICULUM.ner)
+    );
+    for(const c of ctxTexts){
+      const ctx=this.encoder.fwd(c);
+      const rv=this.respEnc.fwd(WS_CURRICULUM.responses[Math.floor(rng()*WS_CURRICULUM.responses.length)]);
+      this.scorer.score(ctx,rv);this.scorer.bwd(0.05);
+    }
+    rng=savedRng;
+  }
+
+  save(){return{mn:this.moodNet.save(),cmn:this.compoundMoodNet.save(),ner:this.nerNet.save(),intent:this.intentNet.save(),enc:this.encoder.save(),re:this.respEnc.save(),sc:this.scorer.save(),mem:this.memory.save(),tk:this.tick,ws:!!this._warmStarted};}
   load(d){
     try{
       if(d.mn)this.moodNet.load(d.mn);if(d.cmn)this.compoundMoodNet.load(d.cmn);if(d.ner)this.nerNet.load(d.ner);
       if(d.intent)this.intentNet.load(d.intent);
-      if(d.enc)this.encoder.load(d.enc);
       if(d.re)this.respEnc.load(d.re);if(d.sc)this.scorer.load(d.sc);
       if(d.mem)this.memory.load(d.mem);this.tick=d.tk||0;
+      // Keep context vectors in the (now loaded) trained embedding space.
+      this.encoder=this.moodNet.enc;
     }catch(e){console.error('KiraAI.load error:', e);}
   }
 }
@@ -4552,15 +4670,17 @@ async function renderAIStats(){
     `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER + Intent Heads<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
     `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
-    `<b>Training</b>: Online distillation (regex→neural)<br>`+
-    `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
-    `<b>Messages processed</b>: ${tickCount}<br>`+
-    `<b>Mood net updates</b>: ${mnUpd}<br>`+
-    `<b>Compound mood updates</b>: ${cmnUpd} (last: ${escapeHTML(state.lastCompoundMood||'none')})<br>`+
-    `<b>NER updates</b>: ${nerUpd}<br>`+
-    `<b>Intent net updates</b>: ${intentUpd}<br>`+
-    `<b>Scorer updates</b>: ${scUpd}<br>`+
-    `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}, conf ${typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A"}<br>`+
+     `<b>Training</b>: Online distillation (regex→neural)<br>`+
+     `<b>Warm-start</b>: ${aiState && aiState.ws ? 'distilled (warm)' : 'seeded init'}<br>`+
+     `<b>Embeddings</b>: MoodNet-shared context (trained), response (trainable)<br>`+
+     `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
+     `<b>Messages processed</b>: ${tickCount}<br>`+
+     `<b>Mood net updates</b>: ${mnUpd}<br>`+
+     `<b>Compound mood updates</b>: ${cmnUpd} (last: ${escapeHTML(state.lastCompoundMood||'none')})<br>`+
+     `<b>NER updates</b>: ${nerUpd}<br>`+
+     `<b>Intent net updates</b>: ${intentUpd}<br>`+
+     `<b>Scorer updates</b>: ${scUpd} (response-embedding + bilinear W)<br>`+
+     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}, conf ${typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A"}<br>`+
     `<b>Trace tail</b>: ${escapeHTML(summarizeTrace())}`;
 }
 

@@ -53,9 +53,10 @@ function runTests() {
   }
 
   // 1. null / undefined
-  runCase('null/undefined returns empty string', () => {
+  runCase('null/undefined/empty string returns empty string', () => {
     assertStrictEqual(escapeHTML(null), '');
     assertStrictEqual(escapeHTML(undefined), '');
+    assertStrictEqual(escapeHTML(''), '');
   });
 
   // 2. No special characters

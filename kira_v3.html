@@ -4669,18 +4669,18 @@ async function renderAIStats(){
   aiStats.innerHTML=
     `<b>Model</b>: 3-layer MLP + Bilinear Scorer + Compound Mood + NER + Intent Heads<br>`+
     `<b>Optimizer</b>: Adam (β₁=0.9, β₂=0.999) + Grad Clip<br>`+
-    `<b>Params</b>: ~${(totalParams/1000).toFixed(1)}K (Float32, ${(totalParams*4/1024).toFixed(0)} KB)<br>`+
+    `<b>Params</b>: ~${escapeHTML((totalParams/1000).toFixed(1))}K (Float32, ${escapeHTML((totalParams*4/1024).toFixed(0))} KB)<br>`+
      `<b>Training</b>: Online distillation (regex→neural)<br>`+
-     `<b>Warm-start</b>: ${aiState && aiState.ws ? 'distilled (warm)' : 'seeded init'}<br>`+
+     `<b>Warm-start</b>: ${escapeHTML(aiState && aiState.ws ? 'distilled (warm)' : 'seeded init')}<br>`+
      `<b>Embeddings</b>: MoodNet-shared context (trained), response (trainable)<br>`+
-     `<b>Attention</b>: Scaled dot-product, ${memCount}/${MEM_CAP} slots<br>`+
-     `<b>Messages processed</b>: ${tickCount}<br>`+
-     `<b>Mood net updates</b>: ${mnUpd}<br>`+
-     `<b>Compound mood updates</b>: ${cmnUpd} (last: ${escapeHTML(state.lastCompoundMood||'none')})<br>`+
-     `<b>NER updates</b>: ${nerUpd}<br>`+
-     `<b>Intent net updates</b>: ${intentUpd}<br>`+
-     `<b>Scorer updates</b>: ${scUpd} (response-embedding + bilinear W)<br>`+
-     `<b>Diagnostics</b>: errors ${DIAG.errors}, route ${escapeHTML(DIAG.lastRoute)}, conf ${typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A"}<br>`+
+     `<b>Attention</b>: Scaled dot-product, ${escapeHTML(memCount)}/${escapeHTML(MEM_CAP)} slots<br>`+
+     `<b>Messages processed</b>: ${escapeHTML(tickCount)}<br>`+
+     `<b>Mood net updates</b>: ${escapeHTML(mnUpd)}<br>`+
+     `<b>Compound mood updates</b>: ${escapeHTML(cmnUpd)} (last: ${escapeHTML(state.lastCompoundMood||'none')})<br>`+
+     `<b>NER updates</b>: ${escapeHTML(nerUpd)}<br>`+
+     `<b>Intent net updates</b>: ${escapeHTML(intentUpd)}<br>`+
+     `<b>Scorer updates</b>: ${escapeHTML(scUpd)} (response-embedding + bilinear W)<br>`+
+     `<b>Diagnostics</b>: errors ${escapeHTML(DIAG.errors)}, route ${escapeHTML(DIAG.lastRoute)}, conf ${escapeHTML(typeof _aiCtx !== "undefined" && _aiCtx ? _aiCtx.confidence.toFixed(3) : "N/A")}<br>`+
     `<b>Trace tail</b>: ${escapeHTML(summarizeTrace())}`;
 }
 

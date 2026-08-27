@@ -3687,9 +3687,9 @@ function fillSentenceSlot(bankDef, context) {
       return context.conceptTriple.entity;
     }
     if (state.memories && state.memories.length > 0) {
-      const allWords = [];
-      for (let i = 0; i < state.memories.length; i++) {
-        const m = state.memories[i];
+      let attempts = 0;
+      while (attempts < 10) {
+        const m = pick(state.memories);
         let extracted = m._extractedWords;
         if (!extracted) {
           extracted = [];
@@ -3707,12 +3707,10 @@ function fillSentenceSlot(bankDef, context) {
             writable: true
           });
         }
-        for (let k = 0; k < extracted.length; k++) {
-          allWords.push(extracted[k]);
+        if (extracted.length > 0) {
+          return pick(extracted);
         }
-      }
-      if (allWords.length > 0) {
-        return pick(allWords);
+        attempts++;
       }
     }
     return 'your thoughts';

@@ -1,6 +1,6 @@
 {
   "source": "kira_memory.db",
-  "updated_at": 1785278849572,
+  "updated_at": 1787804823035,
   "memories": [
     {
       "id": 1,
@@ -184,6 +184,22 @@
       "text": "Enjoys dark roast coffee",
       "affection": 0,
       "timestamp": 1785278849258,
+      "tags": ""
+    },
+    {
+      "id": 24,
+      "category": "preference",
+      "text": "Loves playing electric guitar",
+      "affection": 0,
+      "timestamp": 1787804822397,
+      "tags": ""
+    },
+    {
+      "id": 25,
+      "category": "preference",
+      "text": "Enjoys dark roast coffee",
+      "affection": 0,
+      "timestamp": 1787804822716,
       "tags": ""
     }
   ],

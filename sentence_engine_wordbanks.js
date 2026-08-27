@@ -505,16 +505,26 @@ const WORD_BANKS = {
 // a different caller's memoized view. Safe: no in-repo consumer mutates
 // WORD_BANKS, and freezing is a no-op on already-frozen objects.
 function _deepFreezeBanks(root) {
-  if (typeof Object.freeze !== 'function' || Object.isFrozen(root)) return;
+  if (typeof Object.freeze !== 'function') return;
   const stack = [root];
+  const visited = new Set();
+
   while (stack.length) {
     const node = stack.pop();
-    if (node === null || typeof node !== 'object' || Object.isFrozen(node)) continue;
-    Object.freeze(node);
+    if (node === null || typeof node !== 'object') continue;
+    if (visited.has(node)) continue;
+    visited.add(node);
+
     const keys = Object.keys(node);
     for (let i = 0; i < keys.length; i++) {
       const v = node[keys[i]];
-      if (v !== null && typeof v === 'object') stack.push(v);
+      if (v !== null && typeof v === 'object') {
+        stack.push(v);
+      }
+    }
+
+    if (!Object.isFrozen(node)) {
+      Object.freeze(node);
     }
   }
 }

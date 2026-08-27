@@ -71,6 +71,14 @@ function runTests() {
     assertStrictEqual(Object.isFrozen(obj), true);
   });
 
+  runCase('Freezes children of an already shallow-frozen parent', () => {
+    const obj = { a: { b: 1 } };
+    Object.freeze(obj); // Shallow freeze parent
+    deepFreezeFn(obj);
+    assertStrictEqual(Object.isFrozen(obj), true);
+    assertStrictEqual(Object.isFrozen(obj.a), true, "Child object was not frozen");
+  });
+
   console.log(`\nTests passed: ${passCount}`);
   console.log(`Tests failed: ${failCount}`);
   if (typeof process !== 'undefined' && failCount > 0) process.exit(1);

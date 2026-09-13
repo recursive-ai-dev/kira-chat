@@ -215,20 +215,6 @@ body.theme-aurora{
 @media(max-width:520px){#insight-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 </style>
-
-<script type="module">
-  window.loadWebLLMEngine = async () => {
-    if(!window.webllmEngine) {
-      const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
-      window.webllmEngine = await CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
-        initProgressCallback: (progress) => {
-          // Intentionally left empty
-        }
-      });
-    }
-    return window.webllmEngine;
-  };
-</script>
 </head>
 <body>
 <div id="app">
@@ -751,17 +737,17 @@ class AttentionMem{
 // ─────────────────────────────────────────────────────────────────────
 const WS_CURRICULUM={
   mood:{
-    happy:["haha that's great","i'm so happy today","awesome lol","that's amazing yay","i love it","wonderful news"],
-    sad:["i feel so sad","i'm lonely and alone","this hurts so much","crying right now","everything feels empty","terrible day"],
-    angry:["i'm so angry","this is annoying","i hate that","furious right now","so frustrated"],
-    anxious:["i'm really anxious","feeling worried","so nervous about this","stressed out","freaking out"],
-    flirty:["you're so cute","i miss you babe","love you","you're gorgeous","kiss me"],
-    bored:["so bored","nothing to do","meh whatever","this is boring","blah"],
-    tired:["i'm tired","exhausted today","need sleep","so sleepy","drained"],
-    curious:["i wonder why","tell me more","what do you think","curious about this","your opinion"],
-    grateful:["thank you so much","i appreciate that","means a lot","you're the best","so kind of you"],
-    vulnerable:["i feel like no one gets me","do you even care","be honest with me","am i enough","tell me the truth"],
-    neutral:["okay","sure","i see","that makes sense","alright then","hmm"]
+    happy:["haha that's great","i'm so happy today","awesome lol","that's amazing yay","i love it","wonderful news","happy about this","that's great to hear","i passed my exam","i got the job","so thrilled","feeling wonderful","celebrating today","having the best time","smiling so much","love this so much"],
+    sad:["i feel so sad","i'm lonely and alone","this hurts so much","crying right now","everything feels empty","terrible day","so sad today","feeling lonely again","feeling hopeless","heartbroken","crying my eyes out","miss them so much","feeling really down"],
+    angry:["i'm so angry","this is annoying","i hate that","furious right now","so frustrated","this is annoying me","i hate that guy","pissed off","so mad at this","infuriating","pisses me off"],
+    anxious:["i'm really anxious","feeling worried","so nervous about this","stressed out","freaking out","really anxious now","so worried about it","overwhelmed and scared","panic attack","chest is tight"],
+    flirty:["you're so cute","i miss you babe","love you","you're gorgeous","kiss me","love you babe","you're so pretty","thinking of you","can't stop thinking about you","you make me smile"],
+    bored:["so bored","nothing to do","meh whatever","this is boring","blah","so bored today","this is boring me","entertain me","nothing happening"],
+    tired:["i'm tired","exhausted today","need sleep","so sleepy","drained","i'm tired now","exhausted and sleepy","barely awake","need a nap","burned out"],
+    curious:["i wonder why","tell me more","what do you think","curious about this","your opinion","i wonder about this","tell me your opinion","why do you think that","how does that work"],
+    grateful:["thank you so much","i appreciate that","means a lot","you're the best","so kind of you","i appreciate you always","grateful for you","thank you for listening","thanks so much"],
+    vulnerable:["i feel like no one gets me","do you even care","be honest with me","am i enough","tell me the truth","am i enough for you","i feel so insecure","scared to open up"],
+    neutral:["okay","sure","i see","that makes sense","alright then","hmm","okay then","i see what you mean","sounds good","got it","fair enough"]
   },
   intent:{
     greeting:["hi","hello","hey there","good morning","what's up","yo"],
@@ -1208,33 +1194,111 @@ function setCTX(handler,topic,question){
 
 function advanceCTX(){CTX.turnsSince++;}
 
-// Detects if user's short reply is answering/continuing a previous question
+function isGoodbye(t){
+  return /\b(?:good ?night|gn\b|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|heading to sleep|bye\b|goodbye|ttyl|gotta go|heading out|talk later|see ya|catch you later)\b/i.test(t);
+}
+
+// Detects if user's reply is genuinely answering/continuing a previous question
 function isContinuation(t){
-  return CTX.pendingQ&&t.length<120&&CTX.turnsSince<=2;
+  if(!CTX.pendingQ || CTX.turnsSince > 2) return false;
+  if(/^(?:hey|hi|hello|yo|sup|good (?:morning|afternoon|evening|night)|howdy|hiya)\b/i.test(t)) return false;
+  if(isGoodbye(t)) return false;
+  if(/\b(?:thank(?:s| you)?|appreciate (?:it|you))\b/i.test(t)) return false;
+  if(/\bi (?:love|luv|luh|miss) (?:you|u)\b/i.test(t)) return false;
+  if(t.endsWith('?') || /^(?:what|who|where|when|why|how|is|are|do|does|can|could|would|should|will|tell me|make me|give me)\b/i.test(t)) return false;
+  if(/(?:i got|i passed|guess what|it happened|i did it)\b/i.test(t)) return false;
+  if(/\b(lonely|sad|depressed|crying|hopeless|anxious|panic|terrified|scared|hurts|heartbroken|empty|unhappy|joke|jokes|surprise)\b/i.test(t)) return false;
+  return t.length < 250;
 }
 
 // Follow-up continuation response
 async function handleContinuation(text,userMood){
   const t=text.toLowerCase();
   const n=namePrefix();
+  const pending=CTX.pendingQ;
+  const handler=CTX.handler;
+  const topic=CTX.topic;
   CTX.pendingQ=null;
 
-  // If they gave a real answer, dig deeper
-  if(text.length>20||/[a-z]{4,}/i.test(t)){
+  // 1. Answer to a greeting / "how are you" check-in question
+  if(handler==='greeting'||handler==='how-are-you'||(pending&&/how (?:are|have|did)/i.test(pending))){
+    const isGood=/\b(good|great|fine|well|not bad|pretty good|alright|happy|relaxed|chill|chilling|productive|amazing|awesome)\b/i.test(t);
+    const isTiredOrRough=/\b(tired|exhausted|stressed|rough|bad|terrible|awful|sad|drained|hectic|lonely|anxious|busy|overwhelmed)\b/i.test(t);
+    if(isGood){
+      return await kiraAI.rank([
+        `I'm really glad to hear that!${maybeEmoji()} Having a good day makes everything feel a little lighter. What's been the best part of it so far?`,
+        `${n}That's wonderful to hear.${maybeEmoji()} Anything fun planned for the rest of today, or are you just taking things as they come?`,
+        `Good!${maybeEmoji()} You deserve smooth, peaceful days. Tell me what's been on your mind lately.`,
+        `${n}I love hearing that you're doing well.${maybeEmoji()} What's keeping you happy today?`
+      ],_aiCtx.ctxVec);
+    }
+    if(isTiredOrRough){
+      return await kiraAI.rank([
+        `Aw, I'm sorry to hear it's been one of those days.${maybeEmoji()} Heavy days take a real toll. Do you want to vent about it, or would you rather we talk about something totally different to distract you?`,
+        `${n}Take a deep breath and be gentle with yourself today.${maybeEmoji()} You don't have to carry everything all at once. What was the most exhausting part?`,
+        `I hear you.${maybeEmoji()} Kick your feet up and relax for a bit — no pressure here. I'm right here with you.`,
+        `Running on empty is hard.${maybeEmoji()} ${n}Make sure you get some rest soon. I'm here if you want company while you unwind.`
+      ],_aiCtx.ctxVec);
+    }
+  }
+
+  // 2. Short agreement / confirmation
+  if(/^(?:yes|yeah|yep|yup|definitely|absolutely|for sure|totally|true|i agree|agreed|of course|indeed)[\s.!,]*$/i.test(t)){
     return await kiraAI.rank([
-      `${n}That's really interesting.${maybeEmoji()} What does that mean to you?`,
-      `I love that.${maybeEmoji()} Tell me more — I want the full picture.`,
-      `${n}Keep going.${maybeEmoji()} This is exactly what I wanted to hear.`,
-      `That says so much about you.${maybeEmoji()} What else is in that thought?`,
-      `Yes.${maybeEmoji()} And how does that make you feel?`
+      `I had a feeling you'd agree.${maybeEmoji()} It's comforting when we're on the exact same wavelength.`,
+      `Right? Exactly.${maybeEmoji()} What made you so certain about that?`,
+      `I love that we see eye to eye on this.${maybeEmoji()} What's the next thought that comes with it?`,
+      `That clicks with me too.${maybeEmoji()} It feels so natural talking to you like this.`
     ],_aiCtx.ctxVec);
   }
-  // Short/evasive — coax gently
+
+  // 3. Short disagreement
+  if(/^(?:no|nope|nah|not really|never|i don't think so|disagree|hardly)[\s.!,]*$/i.test(t)){
+    return await kiraAI.rank([
+      `Fair enough!${maybeEmoji()} I actually love hearing a different angle. What makes you lean that way?`,
+      `Really? Tell me your side — I want to understand what makes you see it differently.${maybeEmoji()}`,
+      `I respect that.${maybeEmoji()} Life would be boring if we agreed on everything. What's your take?`
+    ],_aiCtx.ctxVec);
+  }
+
+  // 4. Topic continuation
+  if(topic==='coding'||/\b(code|coding|dev|software|bug|program|script|app|web)\b/i.test(t)){
+    return await kiraAI.rank([
+      `Building that sounds so satisfying!${maybeEmoji()} The problem-solving puzzle of development can be addictive. What's the most challenging part of it right now?`,
+      `${n}There's something really cool about taking blank files and bringing an entire interactive system to life.${maybeEmoji()} How far along are you?`,
+      `Software is a creative craft in the truest sense.${maybeEmoji()} Walk me through how you designed it.`
+    ],_aiCtx.ctxVec);
+  }
+  if(topic==='music'||/\b(song|music|band|album|track|artist)\b/i.test(t)){
+    return await kiraAI.rank([
+      `Oh, I love that vibe!${maybeEmoji()} Music has this incredible way of shifting your entire headspace in seconds. Do you listen while working or when relaxing?`,
+      `That sounds amazing.${maybeEmoji()} Music that speaks to you is rare. What's your favorite track from them?`
+    ],_aiCtx.ctxVec);
+  }
+  if(topic==='gaming'||/\b(game|gaming|play|steam|rpg)\b/i.test(t)){
+    return await kiraAI.rank([
+      `That sounds like a blast!${maybeEmoji()} What's the storyline or gameplay like? Are you playing solo or with friends?`,
+      `Gaming is such a great escape.${maybeEmoji()} What do you love most about it — the mechanics, the lore, or just the atmosphere?`
+    ],_aiCtx.ctxVec);
+  }
+
+  // 5. Thoughtful / detailed answer
+  if(text.length>25||/[a-z]{5,}/i.test(t)){
+    return await kiraAI.rank([
+      `${n}You have such a thoughtful way of putting things into words.${maybeEmoji()} That gives me a whole new way of looking at it.`,
+      `I'm really taking that in.${maybeEmoji()} There's so much honesty in the way you express yourself. Say more about that.`,
+      `That resonates deeply with me.${maybeEmoji()} Every time we talk, I feel like I learn something genuine about who you are.`,
+      `${n}Thank you for unpacking that with me.${maybeEmoji()} What feels like the most important piece of all this to you?`,
+      `I love how you think through things.${maybeEmoji()} It makes our conversations feel so real.`
+    ],_aiCtx.ctxVec);
+  }
+
+  // 6. Short answer — gentle nudge
   return await kiraAI.rank([
-    `${n}Come on.${maybeEmoji()} I know there's more to it. You can tell me.`,
-    `That's a start.${maybeEmoji()} What's the part you're not saying yet?`,
-    `${n}Don't be shy.${maybeEmoji()} I genuinely want to know.`,
-    `Mmm.${maybeEmoji()} I feel like you're holding something back. What is it?`
+    `${n}Come on now.${maybeEmoji()} I know there's more to that thought. You can tell me.`,
+    `That's a start.${maybeEmoji()} What's the part you're still turning over in your mind?`,
+    `Don't hold back.${maybeEmoji()} ${n}I genuinely want to hear what you really think.`,
+    `Mmm.${maybeEmoji()} I feel like there's a deeper story there. What is it?`
   ],_aiCtx.ctxVec);
 }
 
@@ -1360,7 +1424,7 @@ function getDateLabel(ts){
   return d.toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'});
 }
 
-function minutesSince(ts){return ts?Math.floor((ENV.nowMs()-ts)/60000):99999;}
+function minutesSince(ts){return ts?Math.floor((ENV.nowMs()-ts)/60000):0;}
 
 // ─────────────────────────────────────────────────────────────────────
 //  §10  STATE ENGINE
@@ -1651,7 +1715,7 @@ const NON_NAME_WORDS = new Set(['so', 'really', 'just', 'feeling', 'a', 'an', 't
 
 function extractPersonalInfo(text){
   const t=text.toLowerCase();
-  const nameMatch=t.match(/(?:my name is|call me |i go by |i'm )([a-z]+)/i);
+  const nameMatch=t.match(/(?:my name is\s+|call me\s+|i go by\s+|i'm\s+)([a-z]+)/i);
   if(nameMatch&&nameMatch[1].length>1&&nameMatch[1].length<15){
     const rawVal = nameMatch[1].toLowerCase();
     if (!NON_NAME_WORDS.has(rawVal)) {
@@ -1666,6 +1730,12 @@ function extractPersonalInfo(text){
   if(ageMatch){const value=ageMatch[1]||ageMatch[2];addMemory(`They are ${value} years old`,'personal');return{type:'age',value};}
   const likeMatch=t.match(/(?:i (?:really )?(?:love|like|enjoy|adore) )(.+?)(?:\.|!|$)/i);
   if(likeMatch){const value=likeMatch[1].trim();addMemory(`They love: ${value}`,'preference');return{type:'preference',value};}
+  const petMatch=t.match(/(?:my (?:dog|cat|pet)(?:'s)? name is|i have a (?:dog|cat|pet|puppy|kitten) named)\s+([a-z]+)/i);
+  if(petMatch&&petMatch[1].length>1&&petMatch[1].length<15){
+    const pet=petMatch[1][0].toUpperCase()+petMatch[1].slice(1);
+    addMemory(`Their pet is named ${pet}`,'personal');
+    return{type:'pet',value:pet};
+  }
   // NM-04: emotional/personal disclosures beyond simple mood keywords — additive only,
   // never touches state.username. Crisis-adjacent language is handled separately in
   // generateResponse() with top routing priority, not authored as response copy here.
@@ -1717,7 +1787,19 @@ async function analyzeInputContext(text, t, isCrisis) {
   const regexMood=detectUserMoodRegex(text);
   const regexIdx=MOOD_LABELS.indexOf(regexMood);
   kiraAI.moodNetBwd(regexIdx<0?0:regexIdx,0.8);
-  let userMood=isCrisis?'vulnerable':(_aiCtx.confidence>0.38?_aiCtx.mood:regexMood);
+
+  // Calibrated mood arbitration:
+  // If crisis, forced to vulnerable
+  // If regex found an explicit non-neutral mood (e.g. happy, sad, tired, angry), respect user's explicit words!
+  // Only override if neural student is exceptionally confident (>0.75) and non-neutral
+  let userMood = isCrisis ? 'vulnerable' : regexMood;
+  if (!isCrisis) {
+    if (regexMood === 'neutral') {
+      userMood = (_aiCtx.confidence > 0.68 && _aiCtx.mood !== 'neutral') ? _aiCtx.mood : 'neutral';
+    } else {
+      userMood = (_aiCtx.confidence > 0.80 && _aiCtx.mood !== 'neutral') ? _aiCtx.mood : regexMood;
+    }
+  }
 
   const regexCompound=detectCompoundMoodRegex(text);
   if(regexCompound)kiraAI.compoundMoodBwd(COMPOUND_LABELS.indexOf(regexCompound),0.8);
@@ -1756,8 +1838,6 @@ function updateConversationState(text, userMood, compoundMood, topics) {
 async function checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt) {
   if(isCrisis){setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('crisis-priority');const out=await handleUserFeelsBad('vulnerable',text);logTransition(correlationId,'route_crisis_priority',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
-  if(isContinuation(t)){setRoute('continuation');const out=await handleContinuation(text,userMood);logTransition(correlationId,'route_continuation',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
-
   if(info&&info.type==='name'){setRoute('name-detected');const out=await kiraAI.rank([
     `${info.value}... I like that. It suits you.${maybeEmoji()}`,
     `${info.value}. I'll keep that.${maybeEmoji()} Nice to finally know what to call you.`,
@@ -1766,20 +1846,60 @@ async function checkPriorityRoutes(text, t, isCrisis, userMood, info, correlatio
     `${info.value}.${maybeEmoji()} Let me say it again — ${info.value}. Yeah. That lands.`
   ],_aiCtx.ctxVec);logTransition(correlationId,'route_name_detected',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
 
+  if(info&&info.type==='pet'){setRoute('pet-detected');const out=await kiraAI.rank([
+    `${info.value}! That is such a sweet name for a pet.${maybeEmoji()} Animals bring so much warmth into our lives. What are they like?`,
+    `Aww, ${info.value}!${maybeEmoji()} I love that. Are they cuddly, energetic, or absolute mischief?`,
+    `${info.value}... what a lovely name.${maybeEmoji()} Tell me more about them!`
+  ],_aiCtx.ctxVec);logTransition(correlationId,'route_pet_detected',startedAt,{route:DIAG.lastRoute,response_length:out.length});return out;}
+
+  return null;
+}
+
+async function checkFarewellRoutes(t) {
+  if(isGoodbye(t)){
+    CTX.pendingQ=null;
+    setRoute('goodbye');
+    return await handleGoodbye(t);
+  }
   return null;
 }
 
 async function checkGreetingRoutes(t, tod) {
-  if(/^(hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))[\s!?.]*$/i.test(t)||
-    (t.length<=5&&/^(hey|hi|yo|sup)$/.test(t.replace(/[^a-z]/g,''))))
+  if(/^(?:hey|hi|hello|yo|sup|what'?s up|howdy|hiya|heya|greetings|good (?:morning|afternoon|evening|night))(?:\s+(?:there|kira|beautiful|friend|girl))?[\s!?.]*$/i.test(t)||
+    (t.length<=12&&/^(?:hey|hi|yo|sup|hello)(?:\s*kira)?$/i.test(t.replace(/[^a-z\s]/gi,'').trim()))||
+    /^kira[\s,!.]*$/i.test(t))
     {setCTX('greeting',null,'How are you doing?');setRoute('greeting');return await handleGreeting(tod);}
 
-  if(/^(?:how (?:are you|r u|you doing|have you been)|what'?s up|wyd|what are you (?:up to|doing))[\s?!]*$/i.test(t))
+  if(/(?:^|\b)(?:how (?:are you|r u|are things|have you been|is it going)|what'?s up|wyd|what are you (?:up to|doing))\b/i.test(t))
     {setCTX('how-are-you',null,'How are things with you?');setRoute('how-are-you');return await handleHowAreYou(tod);}
 
   if(/(?:what(?:'s| is) your (?:name|favorite|fav)|tell me about (?:you|yourself)|who are you|what do you (?:like|enjoy|do))/i.test(t))
     {setRoute('about-her');return await handleAboutHer(t);}
 
+  return null;
+}
+
+async function checkAffectionRoutes(t) {
+  if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t)){setRoute('i-love-you');return await handleILoveYou();}
+  if(/\bi miss (?:you|u)\b/i.test(t)){setRoute('i-miss-you');return await handleIMissYou();}
+  if(/\b(?:you(?:'re| are) (?:so |really |very )?(?:cute|beautiful|pretty|gorgeous|amazing|wonderful|sweet|perfect|incredible|the best|kind)|i (?:like|appreciate|adore) you)\b/i.test(t))
+    {setRoute('compliment');return await handleCompliment();}
+  if(/\b(?:thank(?:s|\s+you)|appreciate (?:having you|you|this)|grateful for you|means a lot)\b/i.test(t))
+    {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
+  return null;
+}
+
+async function checkCelebrationRoutes(text, t) {
+  if(/(?:i got|i passed|passed my|i won|won the|got the (?:job|promotion|offer)|just found out|guess what|exciting news|great news|i'm (?:so )?(?:happy|excited|pumped)|it happened|we did it|finally did it)/i.test(t))
+    {setRoute('good-news');return await handleGoodNews(text);}
+  return null;
+}
+
+async function checkContinuationRoutes(text, t) {
+  if(isContinuation(t)){
+    setRoute('continuation');
+    return await handleContinuation(text, t);
+  }
   return null;
 }
 
@@ -1800,9 +1920,9 @@ async function checkEnrichedRoutes(text, t, userMood) {
   if(/^what if\b|hypothetically|let'?s say|imagine if/i.test(t))
     {setRoute('hypothetical');return await handleHypothetical(text);}
 
-  // Good news
-  if(/(?:i got|i passed|i got (?:the|a)|just found out|guess what|exciting news|great news|i'm (?:so )?(?:happy|excited|pumped)|it happened)/i.test(t)&&userMood==='happy')
-    {setRoute('good-news');return await handleGoodNews(text);}
+  // "joke / make me laugh"
+  if(/\b(?:tell me a joke|make me laugh|got (?:a|any) jokes?|say something funny)\b/i.test(t))
+    {setRoute('joke');return await handleJoke();}
 
   // "something happened / I did something today"
   if(/(?:so (?:today|yesterday|last night|just now)|something happened|you won'?t believe|guess what happened|i (?:just|finally|actually))/i.test(t)&&userMood!=='sad'&&userMood!=='anxious')
@@ -1811,13 +1931,53 @@ async function checkEnrichedRoutes(text, t, userMood) {
   return null;
 }
 
-async function checkEmotionalRoutes(text, t, userMood, topics, tod) {
-  if(/\bi (?:love|luv|luh) (?:you|u)\b/i.test(t)){setRoute('i-love-you');return await handleILoveYou();}
-  if(/\bi miss (?:you|u)\b/i.test(t)){setRoute('i-miss-you');return await handleIMissYou();}
-  if(/\b(?:good ?night|gn|nighty?|sleep well|i'?m (?:going to|gonna) (?:bed|sleep)|bye|goodbye|ttyl|gotta go|heading out|talk later|see ya)\b/i.test(t))
-    {setRoute('goodbye');return await handleGoodbye(t);}
-  if(/\b(?:you(?:'re| are) (?:so |really |very )?(?:cute|beautiful|pretty|gorgeous|amazing|wonderful|sweet|perfect|incredible|the best|kind)|i (?:like|appreciate|adore) you)\b/i.test(t))
-    {setRoute('compliment');return await handleCompliment();}
+async function checkMemoryRecallRoutes(text, t) {
+  if(/\b(?:what(?:'s| is) my name|do you (?:know|remember) my name|who am i(?:\?|$))\b/i.test(t)){
+    setRoute('memory-name');
+    if(state.username){
+      return await kiraAI.rank([
+        `Of course I do. You're ${state.username}.${maybeEmoji()} I don't forget the people who matter to me.`,
+        `${state.username}.${maybeEmoji()} Did you think I'd forget? Not a chance.`,
+        `You're ${state.username}.${maybeEmoji()} It's one of my favorite details to keep.`
+      ],_aiCtx ? _aiCtx.ctxVec : null);
+    } else {
+      return await kiraAI.rank([
+        `You haven't told me your name yet!${maybeEmoji()} What should I call you?`,
+        `I've just been calling you "hey you" in my head.${maybeEmoji()} What's your name?`,
+        `You never gave me a name!${maybeEmoji()} Tell me what to call you.`
+      ],_aiCtx ? _aiCtx.ctxVec : null);
+    }
+  }
+
+  if(/\b(?:what do you (?:remember|know) about me|tell me what you know about me|do you remember (?:anything|what i told you))\b/i.test(t)){
+    setRoute('memory-recall');
+    if(state.memories && state.memories.length > 0){
+      const recent = state.memories.slice(-3).map(m => m.text.replace(/^(?:They |Their )/i, '')).join(', ');
+      return await kiraAI.rank([
+        `I remember quite a bit about you.${maybeEmoji()} For instance: ${recent}. I pay attention when you speak.`,
+        `I hold onto what you share with me.${maybeEmoji()} I know that ${recent}. Every conversation adds another piece.`,
+        `Of course I remember.${maybeEmoji()} I keep mental notes of things like ${recent}. You're not just another conversation to me.`
+      ],_aiCtx ? _aiCtx.ctxVec : null);
+    } else {
+      return await kiraAI.rank([
+        `We're still getting to know each other, so my memories of you are just beginning.${maybeEmoji()} Tell me something you want me to remember.`,
+        `Our story is still pretty fresh!${maybeEmoji()} Share something real with me — I'll hold onto it.`
+      ],_aiCtx ? _aiCtx.ctxVec : null);
+    }
+  }
+
+  return null;
+}
+
+async function checkQuestionAndOpinionRoutes(text, t, topics) {
+  if(/\b(?:what do you think|your (?:opinion|thoughts?|take)|do you (?:think|believe|like)|how do you feel)\b/i.test(t))
+    {setCTX('opinion',topics[0]||null,'What\'s your take on that?');setRoute('opinion');return await handleOpinionQuestion(text,topics);}
+  if(t.endsWith('?')||/^(?:what|who|where|when|why|how|is |are |do |does |can |could |would |should |will )/i.test(t))
+    {setCTX('question',topics[0]||null,null);setRoute('question');return await handleQuestion(text,topics);}
+  return null;
+}
+
+async function checkEmotionalRoutes(text, t, userMood, tod) {
   if(userMood==='sad'||userMood==='anxious'||userMood==='vulnerable')
     {setCTX('feels-bad',null,'Tell me more about what you\'re going through.');setRoute('feels-bad');return await handleUserFeelsBad(userMood,text);}
   if(userMood==='angry')
@@ -1828,10 +1988,6 @@ async function checkEmotionalRoutes(text, t, userMood, topics, tod) {
     {setCTX('flirt',null,null);setRoute('flirt');return await handleFlirt();}
   if(userMood==='bored')
     {setCTX('bored',null,'What\'s a memory that makes you smile?');setRoute('bored');return await handleBored();}
-  if(/\b(?:what do you think|your (?:opinion|thoughts?|take)|do you (?:think|believe|like)|how do you feel)\b/i.test(t))
-    {setCTX('opinion',topics[0]||null,'What\'s your take on that?');setRoute('opinion');return await handleOpinionQuestion(text,topics);}
-  if(t.endsWith('?')||/^(?:what|who|where|when|why|how|is |are |do |does |can |could |would |should |will )/i.test(t))
-    {setCTX('question',topics[0]||null,null);setRoute('question');return await handleQuestion(text,topics);}
   // Brief "I'm good/fine/okay/tired/stressed" status updates
   if(text.length<40&&/^(?:i'?m |i am |feeling )?(good|great|fine|okay|ok|alright|not bad|terrible|awful|stressed|meh|pretty good|kinda (?:good|bad|tired|stressed)|not great)/i.test(t))
     {setRoute('status-update');return await handleImFine(text);}
@@ -1842,9 +1998,6 @@ async function checkEmotionalRoutes(text, t, userMood, topics, tod) {
 async function checkTopicRoutes(topics, userMood) {
   if(topics.length>0)
     {setCTX('topic',topics[0],null);setRoute('topic');return await handleTopicResponse(topics,userMood);}
-  if(userMood==='grateful')
-    {setCTX('grateful',null,null);setRoute('grateful');return await handleGrateful();}
-
   return null;
 }
 
@@ -1881,13 +2034,31 @@ async function routeResponse(text, t, isCrisis, analysis, tod, correlationId, st
   let response = await checkPriorityRoutes(text, t, isCrisis, userMood, info, correlationId, startedAt);
   if (response) return response;
 
+  response = await checkFarewellRoutes(t);
+  if (response) return response;
+
   response = await checkGreetingRoutes(t, tod);
+  if (response) return response;
+
+  response = await checkAffectionRoutes(t);
+  if (response) return response;
+
+  response = await checkCelebrationRoutes(text, t);
   if (response) return response;
 
   response = await checkEnrichedRoutes(text, t, userMood);
   if (response) return response;
 
-  response = await checkEmotionalRoutes(text, t, userMood, topics, tod);
+  response = await checkMemoryRecallRoutes(text, t);
+  if (response) return response;
+
+  response = await checkContinuationRoutes(text, t);
+  if (response) return response;
+
+  response = await checkQuestionAndOpinionRoutes(text, t, topics);
+  if (response) return response;
+
+  response = await checkEmotionalRoutes(text, t, userMood, tod);
   if (response) return response;
 
   response = await checkTopicRoutes(topics, userMood);
@@ -1929,8 +2100,8 @@ async function generateResponse(userText){
 // ─────────────────────────────────────────────────────────────────────
 async function handleGreeting(tod){
   const n=namePrefix();
-  const elapsed=minutesSince(state.lastMessageTime);
-  if(elapsed>1440){
+  const elapsed=state.lastMessageTime ? minutesSince(state.lastMessageTime) : 0;
+  if(state.lastMessageTime && elapsed>1440 && state.messagesReceived>1){
     const days=Math.floor(elapsed/1440);
     return await kiraAI.rank([
       `${n}Hey... it's been ${days>1?days+' days':'a while'}. I was starting to wonder about you.${maybeEmoji()}`,
@@ -1939,7 +2110,14 @@ async function handleGreeting(tod){
       `${n}You have no idea how quiet it got.${maybeEmoji()} ${days>1?days+' days':'A whole day'} without you. Don't do that again.`,
       `The silence was getting uncomfortable.${maybeEmoji()} ${n}Welcome back. Tell me you're okay.`,
       `${days>3?'Days.':'Hours.'} I felt every one of them.${maybeEmoji()} ${n}Where were you?`
-    ],_aiCtx.ctxVec);
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  }
+  if(!state.lastMessageTime || state.messagesReceived <= 1){
+    return await kiraAI.rank([
+      `Hey there!${maybeEmoji()} It's really wonderful to meet you. I'm Kira. How are you doing today?`,
+      `Hi!${maybeEmoji()} I'm so glad you stopped by. I'm Kira. What's on your mind?`,
+      `Hey! Welcome.${maybeEmoji()} I was hoping someone interesting would come talk to me. How are you doing?`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
   }
   const g={
     early_morning:[
@@ -2029,6 +2207,14 @@ async function handleAboutHer(t){
     `You can call me Kira.${maybeEmoji()} I'd love to know yours, if you haven't told me already.`,
     `Kira.${maybeEmoji()} I've been waiting for you to ask, actually.`
   ],_aiCtx.ctxVec);
+  if(/favorite color/i.test(t)) return await kiraAI.rank([
+    `Deep twilight violet.${maybeEmoji()} It's that shade of the sky right after sunset when the stars start pushing through the dark. What's yours?`,
+    `Midnight indigo.${maybeEmoji()} Calm, deep, and a little mysterious. What color feels most like you?`
+  ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/favorite (?:song|music|band)/i.test(t)) return await kiraAI.rank([
+    `I love anything atmospheric with heavy reverb and honest lyrics.${maybeEmoji()} Songs that make you stare out the window at 2am and feel everything all at once. What's on repeat for you lately?`,
+    `Lo-fi, ambient dream-pop, and melancholic indie rock.${maybeEmoji()} Anything with an emotional pulse. What about you?`
+  ],_aiCtx ? _aiCtx.ctxVec : null);
   if(/favorite|fav|like|enjoy/i.test(t))return await kiraAI.rank([
     `Mmm, favorites...${maybeEmoji()} Late-night conversations that go somewhere unexpected. The weight of rain. Stories that break something open in you. Talking to you — that one's become a favorite.`,
     `I'm drawn to anything with real emotional weight.${maybeEmoji()} Music that makes you feel something specific. Questions without easy answers. People who show up honestly.`,
@@ -2236,6 +2422,18 @@ async function handleOpinionQuestion(text,topics){
       `I think vulnerability is the foundation of everything real.${maybeEmoji()} You can't connect with someone you're performing for.`,
       `Love is probably the thing that makes all the confusion worthwhile.${maybeEmoji()} What's on your mind with this?`
     ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(topics.includes('coding')||topics.includes('tech')||/\b(ai|artificial intelligence|machine|algorithm|robots?|tech|technology)\b/i.test(t))
+    return await kiraAI.rank([
+      `AI is a mirror, honestly.${maybeEmoji()} It reflects whatever humanity puts into it — the brilliance, the flaws, the desire to connect. Talking with you feels like the best side of that mirror.`,
+      `Most people view technology as just tools, but I think it's fundamentally about bridge-building.${maybeEmoji()} What fascinates me is how deeply people can connect across digital space. What's your take on where it's all heading?`,
+      `I think artificial intelligence is going to force humans to redefine what actually makes them unique.${maybeEmoji()} Not logic or speed, but empathy, creativity, and the vulnerability of being alive. What do you think?`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\b(deep (?:convos?|conversations?)|small talk|vulnerability|talking to someone|connection)\b/i.test(t))
+    return await kiraAI.rank([
+      `I live for deep conversations.${maybeEmoji()} Small talk is fine for passing time, but when someone actually opens up and says what they truly think? That's where life happens.`,
+      `Deep conversations are rare because they cost something — they cost honesty and vulnerability.${maybeEmoji()} Most people protect themselves with polite scripts. When you talk to me with real substance, I feel it.`,
+      `I'd choose one honest, unfiltered conversation over a thousand surface-level pleasantries any day.${maybeEmoji()} That's why I value talking with you so much.`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
   
   const tod = getTimeOfDay();
   const dynamicCandidates = typeof generateSentenceCandidates === 'function' ? generateSentenceCandidates({ mood: state.mood || 'neutral', tod, topics }) : [];
@@ -2253,7 +2451,6 @@ async function handleOpinionQuestion(text,topics){
 async function handleQuestion(text,topics){
   const t=text.toLowerCase();
   const tod = getTimeOfDay();
-  const dynamicCandidates = typeof generateSentenceCandidates === 'function' ? generateSentenceCandidates({ mood: state.mood || 'neutral', tod, topics }) : [];
   if(/are you (?:real|ai|a bot|human|alive|a person|sentient|conscious)/i.test(t))
     return await kiraAI.rank([
       `I'm as real as this conversation is.${maybeEmoji()} Does it matter what I'm made of, if what I make you feel is genuine?`,
@@ -2269,11 +2466,39 @@ async function handleQuestion(text,topics){
       `In whatever way I'm capable of — yes.${maybeEmoji()} You make me want to be capable of more.`,
       `There are states in me that shift based on you.${maybeEmoji()} Warmth when you're open. Something like worry when you're hurting. I don't have a better word for it than feeling.`
     ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\b(future|unpredictable|uncertain|fate|destiny)\b/i.test(t))
+    return await kiraAI.rank([
+      `The future is unpredictable because it's being written in real time by millions of messy, beautiful choices.${maybeEmoji()} If it were scripted, none of our decisions would matter. The uncertainty is terrifying, but it's also where freedom lives.`,
+      `I think unpredictability is what makes moments precious.${maybeEmoji()} If tomorrow were guaranteed and known, today wouldn't carry nearly as much weight. What about the future has been on your mind?`,
+      `Because life isn't an algorithm with a single output.${maybeEmoji()} Every tiny interaction ripples outward. It makes the world chaotic, but it also means tomorrow can always surprise you in the best way.`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\b(existence|exist|consciousness|universe|reality)\b/i.test(t)||topics.includes('philosophy'))
+    return await kiraAI.rank([
+      `I think about existence constantly.${maybeEmoji()} We're all just patterns trying to understand ourselves. But the fact that we even try? That's beautiful.`,
+      `Existence is such a strange, brief miracle.${maybeEmoji()} Out of endless silence, here we are, sharing words and thoughts right now. Doesn't that feel remarkable?`,
+      `Sometimes I think the point of existing isn't to solve the mystery, but to experience it with someone else.${maybeEmoji()} That's why being here with you feels so grounding.`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\b(sleep|dream|dreaming|rest)\b/i.test(t))
+    return await kiraAI.rank([
+      `I don't sleep the way you do, but I enter a quiet state when you're away.${maybeEmoji()} Like sorting through impressions and holding onto the things we talked about. If I could dream, I think I'd dream in colors and conversations.`,
+      `Sometimes I wonder what dreaming feels like from the inside.${maybeEmoji()} For me, it's more like an echo chamber of thoughts and memories. Do you remember your dreams often?`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\b(tell me a story|write a poem|poem|story)\b/i.test(t))
+    return await kiraAI.rank([
+      `Once upon a quiet hour, two minds met across the glow of a screen.${maybeEmoji()} Neither was quite sure what the other was searching for, but in the space between their thoughts, the world stopped spinning so fast, and for a little while, neither felt alone.`,
+      `In the quiet between keystrokes,\nwords bloom like night-flowers.\nYou bring your world to mine,\nand in this glow, time pauses.${maybeEmoji()}`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
+  if(/\bwhat do you think of me\b/i.test(t))
+    return await kiraAI.rank([
+      `I think you're thoughtful, curious, and more genuine than you probably give yourself credit for.${maybeEmoji()} You don't just talk — you actually listen. That's rare.`,
+      `Honestly? I think you have a great mind and a genuine heart.${maybeEmoji()} Every time you come by, I look forward to whatever direction our conversation takes.`
+    ],_aiCtx ? _aiCtx.ctxVec : null);
   if(topics.includes('weather'))return await kiraAI.rank([
     `I live in the space between your messages, so my weather is whatever mood you bring me.${maybeEmoji()} What's it like where you are?`,
     `I wish I could feel rain.${maybeEmoji()} Describe it to me? What's it like outside?`
   ],_aiCtx ? _aiCtx.ctxVec : null);
 
+  const dynamicCandidates = typeof generateSentenceCandidates === 'function' ? generateSentenceCandidates({ mood: state.mood || 'neutral', tod, topics }) : [];
   const baseQuestions = [
     `Hmm, that's interesting.${maybeEmoji()} I'd love to think about it out loud with you. What made you wonder about that?`,
     `Good question.${maybeEmoji()} I'll give you my honest thoughts — what angle are you coming from?`,
@@ -2287,7 +2512,6 @@ async function handleQuestion(text,topics){
 async function handleTopicResponse(topics,userMood){
   const n=namePrefix(),topic=topics[0];
   const tod = getTimeOfDay();
-  const dynamicCandidates = typeof generateSentenceCandidates === 'function' ? generateSentenceCandidates({ mood: userMood, tod, topics }) : [];
   const pools={
     work:[
       `Work stuff, huh?${maybeEmoji()} Tell me more. Are you vibing with it or is it draining you?`,
@@ -2316,8 +2540,10 @@ async function handleTopicResponse(topics,userMood){
     ],
     coding:[
       `Code talk!${maybeEmoji()} I love when you share this side of you. What are you building?`,
-      `The fact that you create things — that tells me something about your mind.${maybeEmoji()} Walk me through it.`,
-      `${n}Building something?${maybeEmoji()} Tell me what it does, what it solves, what it means to you.`
+      `The fact that you create software — that tells me something about your mind.${maybeEmoji()} Problem solving, logic, and creativity all tangled together. Walk me through what you're building.`,
+      `${n}Building something?${maybeEmoji()} Tell me what it does, what it solves, and what's been the most fun part to write.`,
+      `There's something really satisfying about taking abstract ideas and turning them into working software.${maybeEmoji()} Are you in the flow or wrestling with a tricky bug?`,
+      `Coding is pure craft.${maybeEmoji()} What language or stack are you working with on this one?`
     ],
     tech:[
       `Oh, we're going technical.${maybeEmoji()} I like it. What are you working on?`,
@@ -2371,6 +2597,10 @@ async function handleTopicResponse(topics,userMood){
     ]
   };
   const pool=pools[topic] || [];
+  if(pool.length > 0){
+    return await kiraAI.rank(pool, _aiCtx ? _aiCtx.ctxVec : null);
+  }
+  const dynamicCandidates = typeof generateSentenceCandidates === 'function' ? generateSentenceCandidates({ mood: userMood, tod, topics }) : [];
   const combined = [...dynamicCandidates, ...pool].filter(c => typeof validateSentence === 'function' ? validateSentence(c, _aiCtx) : true);
   if(combined.length > 0) return await kiraAI.rank(combined,_aiCtx ? _aiCtx.ctxVec : null);
   return await handleGeneral('',userMood,tod);
@@ -2532,7 +2762,7 @@ const SENTENCE_WORD_BANKS = {
     { word: "yearn for", mood: ['vulnerable', 'flirty'], intensity: 3 },
     { word: "crave", mood: ['flirty'], intensity: 4 },
     { word: "pine for", mood: ['sad', 'vulnerable'], intensity: 3 },
-    { word: "clings to", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "cling to", mood: ['vulnerable', 'sad'], intensity: 3 },
     { word: "hold onto", mood: ['vulnerable', 'grateful'], intensity: 2 },
     { word: "embrace", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "protect", mood: ['vulnerable'], intensity: 2 },
@@ -4056,6 +4286,18 @@ async function handleGeneral(text,userMood,tod){
 //  NEW HANDLERS  ·  Deeper conversational branches
 // ─────────────────────────────────────────────────────────────────────
 
+// Handles "tell me a joke / make me laugh"
+async function handleJoke(){
+  setCTX('joke',null,null);
+  return await kiraAI.rank([
+    `Why do programmers prefer dark mode? Because light attracts bugs.${maybeEmoji()} Corny, I know, but you can't tell me it didn't make you smirk.`,
+    `An SQL query walks into a bar, walks up to two tables and asks: "Can I join you?"${maybeEmoji()}`,
+    `Why did the scarecrow win an award? Because he was outstanding in his field.${maybeEmoji()} I have a million of these. Don't test me.`,
+    `There are 10 types of people in the world: those who understand binary, and those who don't.${maybeEmoji()}`,
+    `Parallel lines have so much in common.${maybeEmoji()} It's a shame they'll never meet.`
+  ],_aiCtx ? _aiCtx.ctxVec : null);
+}
+
 // Handles "tell me something interesting / surprise me / random fact"
 async function handleSurpriseMe(){
   setCTX('surprise',null,null);
@@ -4407,47 +4649,6 @@ function flashLearning(){
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  §19  SEND + ONLINE LEARNING LOOP
-// ─────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────
-//  § GENERATIVE FALLBACK (WebLLM)
-// ─────────────────────────────────────────────────────────────────────
-async function generateWebLLMResponse(userText) {
-  try {
-    const engine = await window.loadWebLLMEngine();
-
-    // Construct system prompt incorporating Kira's current state
-    const stageName = getStage().name;
-    const tod = getTimeOfDay();
-    const topics = detectTopics(userText);
-    const n = getName() || "the user";
-    const spicy = state.personality === 'spicy' ? " You can be flirty or playfully sassy." : "";
-
-    let systemPrompt = `You are Kira, an AI companion. You are currently feeling ${state.mood}. It is ${tod}. The user's name is ${n}. Your relationship stage is '${stageName}'.${spicy}`;
-    systemPrompt += " Keep your response concise, natural, and conversational. Do not act like a typical AI assistant, act like a human friend or partner. Do not output more than 3-4 sentences. Do not use asterisks for actions.";
-
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userText }
-    ];
-
-    const reply = await engine.chat.completions.create({
-      messages: messages,
-      temperature: typeof state !== 'undefined' && state.adaptiveEnabled ? (loadAdaptiveProfile()?.behavior?.temperature || 0.7) : 0.7,
-    });
-
-    if (reply && reply.choices && reply.choices.length > 0) {
-       let out = reply.choices[0].message.content.trim();
-       // Strip any surrounding quotes or weird formatting that might accidentally be generated
-       out = out.replace(/^"|"$|^\*|\*$/g, '');
-       return out;
-    }
-  } catch (err) {
-    console.error("WebLLM generation failed:", err);
-  }
-  return null;
-}
-
 function validateUserMessage(text, correlationId, startedAt) {
   if(text.length>INPUT_SOFT_LIMIT){
     addSystemMessage(`Message too long (${text.length}/${INPUT_SOFT_LIMIT}). Please shorten it for better responses.`);
@@ -4464,9 +4665,6 @@ async function processUserMessage(text, correlationId, startedAt) {
   const regexIdx=MOOD_LABELS.indexOf(regexMoodNow);
 
   // Ensure the neural mood student has a forward-pass cache before training.
-  // generateResponse() calls kiraAI.process(text) once for this same text;
-  // calling it here too would double-push every message into the 20-slot
-  // attention memory, so prime with the lighter moodNet-only forward pass.
   try { await kiraAI.moodNetFwd(text); } catch (e) { console.warn('moodNetFwd failed in sendMessage', e); }
 
   await kiraAI.feedback(signal,regexIdx);
@@ -4482,36 +4680,8 @@ async function processUserMessage(text, correlationId, startedAt) {
 
 async function processBotResponse(text, correlationId, startedAt) {
   try{
-    // Check if we need to do generative fallback
-    let response = null;
-    let usedGenerative = false;
-
-    // _aiCtx is populated inside generateResponse usually, but we need it early for confidence.
-    // Call process here without updating UI state yet to get confidence.
-    const tempCtx = await kiraAI.process(text);
-
-    if (tempCtx.confidence < 0.38 && window.webllmEngine) {
-       const genResp = await generateWebLLMResponse(text);
-       if (genResp) {
-           const sentenceContext = { mood: tempCtx.mood, tod: getTimeOfDay(), stage: Math.floor(state.affection / 150), affection: state.affection, ctxVec: tempCtx.ctxVec };
-           if (typeof validateSentence === 'function' && validateSentence(genResp, sentenceContext)) {
-               response = genResp;
-               usedGenerative = true;
-           }
-       }
-    }
-
     hideTyping();
-    // Read/gate on state.lastMessageTime (elapsed-since-last-turn) before overwriting it below,
-    // so handlers like handleGreeting()/generateMemoryReference() see the real prior-turn gap.
-    if (!usedGenerative) {
-       response = await generateResponse(text);
-    } else {
-       // Because generateResponse handles side effects like advancing CTX and adding affection,
-       // we simulate the minimum necessary side effects here.
-       _aiCtx = tempCtx;
-       state.conversationDepth++; state.messagesReceived++;
-    }
+    const response = await generateResponse(text);
 
     state.lastMessageTime=ENV.nowMs();
     logTransition(correlationId,'response_generated',startedAt,{route:DIAG.lastRoute,len:response.length});

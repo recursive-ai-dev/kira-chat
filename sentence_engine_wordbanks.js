@@ -150,7 +150,7 @@ const WORD_BANKS = {
     { word: "yearn for", mood: ['vulnerable', 'flirty'], intensity: 3 },
     { word: "crave", mood: ['flirty'], intensity: 4 },
     { word: "pine for", mood: ['sad', 'vulnerable'], intensity: 3 },
-    { word: "clings to", mood: ['vulnerable', 'sad'], intensity: 3 },
+    { word: "cling to", mood: ['vulnerable', 'sad'], intensity: 3 },
     { word: "hold onto", mood: ['vulnerable', 'grateful'], intensity: 2 },
     { word: "embrace", mood: ['happy', 'flirty'], intensity: 2 },
     { word: "protect", mood: ['vulnerable'], intensity: 2 },

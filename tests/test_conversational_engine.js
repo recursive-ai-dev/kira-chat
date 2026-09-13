@@ -76,6 +76,7 @@ setTimeout(async () => {
 
     const testPrompts = [
       "Hello Kira!",
+      "My name is Damien",
       "How are you doing today?",
       "I'm feeling a bit tired after work.",
       "What do you think about artificial intelligence?",
@@ -83,9 +84,14 @@ setTimeout(async () => {
       "Tell me something interesting or surprise me.",
       "Why is the future so unpredictable?",
       "I passed my exam today! I'm so happy!",
+      "My dog's name is Milo",
       "I feel lonely sometimes.",
       "What's your take on deep conversations?",
       "Do you think about existence?",
+      "What is your favorite color?",
+      "Tell me a joke",
+      "What is my name?",
+      "What do you remember about me?",
       "I appreciate having you here.",
       "What are you thinking about right now?",
       "Good night Kira, heading to sleep."

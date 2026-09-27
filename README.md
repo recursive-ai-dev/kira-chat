@@ -1,109 +1,222 @@
-# Kira v3 — Deterministic & Neural Hybrid Companion AI
+# Kira
 
-**Kira v3** is a browser-native single-page companion AI built on a hybrid architecture combining a custom ~6.5K Float32 parameter neural engine with a deterministic 51-template Sentence Engine, algebraic concept unification, an automated grammar polishing pipeline, and an external SQLite database memory system (`kira_memory.db`).
+**Offline dialogue with inspectable memory, deterministic replay, and checked semantics.**
 
-The entire runtime operates **100% client-side with zero network dependencies**.
+Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and authored dialogue plans to carry a conversation.
 
----
+The current release is **4.1.2**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
 
-## 🌟 Key Capabilities
+Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped by what characters know, remember, want, and experience in a world that continues without the player.** The current release is a standalone companion and engine demonstrator; a game integration SDK is future work.
 
-1. **Deterministic Grammar Polish & Naturalness Engine (`polishSentence`)**
-   - **Article Harmony**: Corrects `a` vs `an` before vowel sounds and silent consonants (*an electric moment*, *a unique feeling*, *an hour*).
-   - **Subject-Verb & Order Agreement**: Fixes irregular verb combinations (*you were*, *I am*, *I am so*).
-   - **Dynamic Gerund Conversion**: Automatically converts verb phrases following *keep* into gerunds (*keep thinking*, *keep taking*) while preserving articles and prepositions (*keep the*).
-   - **Contraction & Cadence Smoothing**: Converts rigid phrasing into spoken natural English (*I'm*, *can't*, *it's*, *that's*).
-   - **Punctuation & Formatting**: Deduplicates punctuation marks, fixes spacing around clauses, capitalizes sentence starts, and ensures proper terminal punctuation.
+## Quick start
 
-2. **Algebraic Concept Unification Engine (`extractConceptTriple`)**
-   - Inspired by algebraic concept structures and SLM data pipelines.
-   - Parses user input into semantic triples `(entity, action, emotion)`.
-   - Dynamically binds user-specified entities (e.g. *"building AI tools"*, *"my exam"*) directly into template slot fillers (`{object}`, `{user_mirror}`), enabling Kira to echo exact personal context.
+1. Download [Kira-4.1.html](dist/Kira-4.1.html). Use your repository host’s download/raw-file option to save the actual HTML.
+2. Open the downloaded file in a modern desktop browser.
+3. Start a conversation. No installation is required.
 
-3. **External SQLite Memory System (`kira_memory.db` & `scripts/kira_db.py`)**
-   - Stores memories, user profile facts, and vocabulary in an SQLite database.
-   - Includes a standalone command-line management tool ([scripts/kira_db.py](file:///home/ubunt/Projects/kira-chat/scripts/kira_db.py)) to view, add, edit, or delete memories from the terminal outside of Kira.
-   - Syncs SQLite state directly into Kira's `state.memories[]` and `AttentionMem`.
+The filename remains `Kira-4.1.html`; the application displays version **4.1.2**.
 
-4. **Neural Core & Bilinear Response Scorer**
-   - **HashEmbed**: FNV-1a n-gram hashing into 16-dimensional dense embedding space (Vocab 128 × Edim 16).
-   - **MoodNet**: 3-layer MLP classifying user mood into 11 categories.
-   - **Bilinear Scorer**: Ranks response candidates using $Score = 0.55 \cdot \tanh(ctx^T \cdot W \cdot resp) + 0.45 \cdot \cos(ctx, resp)$.
-   - **AttentionMem**: 20-turn scaled dot-product context memory.
+If you downloaded the complete source archive, open `kira/dist/Kira-4.1.html` after extracting it. Browser-only use does not require Node.js. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
-5. **Adaptive Learning Engine**
-   - Adapts personality traits, emoji probability, response length, and temperature using Exponential Moving Averages (EMA) based on implicit user feedback signals.
+Try this sequence:
 
----
-
-## 🚀 Quickstart
-
-### Running the App
-Simply open `kira_v3.html` in any modern web browser (Firefox, Chrome, Edge, Safari):
-```bash
-# Double-click or open in browser
-open kira_v3.html
+```text
+Hello, my name is Damien
+I like coffee
+I don't like it anymore
+Do I like coffee?
 ```
 
-### Operating the SQLite Database CLI
-Manage Kira's SQLite memory outside of the browser using Python:
-```bash
-# List all stored memories & profile facts
-python3 scripts/kira_db.py list
+Kira records the original preference, supersedes it with the correction, and recalls the current report. Open **Memories** to inspect both records and their source messages. Then open **Engine lab → Verify deterministic replay** to reconstruct the conversation from its recorded inputs.
 
-# Add a memory
-python3 scripts/kira_db.py add "Loves building AI tools" --category preference
+## What Kira can do
 
-# Set user profile facts
-python3 scripts/kira_db.py set-profile username "Alex"
+| Feature | Current behavior |
+| --- | --- |
+| Conversation | Introductions, preferences, feelings, attributed notes, supported questions, and contextual follow-ups |
+| Memory | Source-linked records, explicit negation, past/present qualifiers, corrections, and retirement |
+| Clarification | Meaning choices for ambiguous words; unresolved reports remain uncommitted |
+| Personality | Warm, playful, thoughtful, and direct dialogue policies |
+| Wording | Absolute register targets and checked alternatives within a shared meaning |
+| Semantic queries | Taxonomy, typed part/role relations, lexical relation sets, and supported entailment contexts |
+| Vocabulary explorer | Search forms and inspect concepts, parents, subtypes, wording variants, and checked links |
+| Inspection | Reply interpretation, memory sources, semantic evidence, and policy traces |
+| Replay | Reconstruct state from version-pinned events and compare a canonical digest |
+| Local data | Browser saving, JSON export/import, profile images, and opaque image attachments |
 
-# Edit or delete memories
-python3 scripts/kira_db.py edit 1 "Updated memory text"
-python3 scripts/kira_db.py delete 1
+Kira can store and display images, but she cannot interpret their contents. Familiarity is fictional character state, not evidence of awareness or emotion.
 
-# Export SQLite payload to Kira
-python3 scripts/kira_db.py sync-to-kira
+## A few things to try
+
+| Message | What it exercises |
+| --- | --- |
+| `I am not sad` | Retains negation without inferring happiness |
+| `I used to love coffee` | Keeps a report in the past |
+| `Remember this: Alex said "I like tea"` | Saves an attributed note without treating it as your preference |
+| `I like bass` | Asks which meaning you intend; try `bass guitar` |
+| `I like bass and python` | Resolves both meanings before saving either report |
+| `I like atmospheric black metal` | Recognizes a specific concept and opens a music discussion |
+| `What is a synthesizer?` | Explains its place in the curated taxonomy |
+| `Is python an animal?` | Clarifies the meaning before answering the semantic question |
+| `What is a more formal word for synth?` | Checks a same-meaning register shift |
+| `What do you remember about me?` | Recalls active attributed records |
+| `Tell me a joke` | Selects an authored response deterministically |
+| `Give me a writing prompt` | Selects an authored creative prompt |
+
+The parser supports a bounded English grammar. These examples show its supported behavior; they are not a promise that every paraphrase or arbitrary sentence will be understood.
+
+## Lexicon depth
+
+Version 4.1.2 expands the vocabulary across music, instruments, software, hardware, game genres, literature, feelings, food, nature, science, and everyday objects.
+
+| Metric | 4.1.1 | 4.1.2 |
+| --- | ---: | ---: |
+| Concepts | 83 | 411 |
+| Stored word senses | 90 | 429 |
+| Concept-alias entries | 106 | 814 |
+| Materialized facts | 317 | 2,000 |
+
+The deepest hierarchy spans **seven inclusion edges**. Alias entries include recognized plurals and abbreviations; a form can appear under multiple meanings, so alias counts are not counts of unique words or senses.
+
+Related things remain distinct. Books are separate from reading, songs from music, and games from gaming. Words such as `python`, `bass`, `metal`, `rock`, `rust`, and `orange` have explicit alternative meanings. Style shifts operate only inside a declared meaning: `synth` can become `synthesizer`, while `like` cannot silently become `love`.
+
+See [LEXICON.md](LEXICON.md) for the complete generated inventory, or explore it inside **Engine lab**.
+
+## How it works
+
+Kira follows **Model–View–Presenter** architecture.
+
+| Component | Responsibility | Main files |
+| --- | --- | --- |
+| Semantic Model | Classify the ontology, answer queries, reconstruct candidate sets, and check evidence | `compiler.js`, `engine.js`, `checker.js`, `audit-query.js` |
+| Dialogue Model | Interpret supported language, track conversation context, update memory, and construct reply plans | `parser.js`, `conversation.js`, `dialogue.js`, `dialogue-assets.js` |
+| Presenter | Serialize turns, record timestamps, call the model, and save before publishing new state | `presenter.js`, `worker-entry.js` |
+| View | Render conversation, memory, vocabulary, settings, and evidence | `view.js`, `shell.html`, `style.css` |
+| Persistence adapter | Store a complete event log and validate exports/imports | `persistence.js` |
+
+These files live in `src/`. The pure models do not read the DOM, browser storage, wall clock, network, or random generators.
+
+Each turn consumes the previous state, an explicit recorded event, and versioned assets. Dialogue selection uses stable rules and tie-breaks. Replay reuses the original events and timestamps. Display details such as local time formatting sit outside the canonical model state.
+
+Memories record **what the user reported**, including their source message. A correction supersedes a matching record; retirement excludes it from active recall while retaining its history. Conversational elaborations can remain quoted context without becoming asserted facts.
+
+### What “checked” means
+
+The semantic query engine proposes a result. A separately implemented reference checker reconstructs the expected result and evidence before the application uses it.
+
+| RSE area | Implemented application profile |
+| --- | --- |
+| L1 | Named-concept subsumption, typed existential roles, explicit disjointness, supported transitive role chains, and closure checking |
+| L2 | Integer potentials and bounded potential-difference costs |
+| L3 | Seven-bit relation sets, generated composition/projectivity tables, possible equality under inclusion, and explicit non-vacuity premises |
+| L4 | Two linear coordinates, exact weighted L1 distance, same-fiber candidate checks, relative shifts, and absolute realization |
+| Routing | Capability admission and a strict-subsumption frontier followed by dialogue policy |
+| Evidence | Artifact hashes, grounded proof references, computation certificates, and reply traces |
+
+A successful check establishes a result **relative to the supplied axioms and premises**. It does not establish that those assumptions are true, that the parser understood arbitrary English, or that a user’s report is factual.
+
+The lexicon is **experimental and independently unreviewed**. The checker is handwritten JavaScript, not formally verified or extracted from a proof assistant. This is a bounded implementation profile, not full implementation of every facility in Draft 4.1.
+
+## Development
+
+Use **Node.js 20 or newer**. The build and tests use Node’s built-in modules; no `npm install` is required.
+
+Run these commands from the directory containing `package.json`:
+
+```sh
+# Rebuild the standalone app and run all tests
+npm run verify
+
+# Build or test separately
+npm run build
+npm test
+
+# Regenerate the lexicon inventory after a build
+node tools/lexicon-report.cjs
+
+# Record timing samples on your machine
+node tools/benchmark.cjs
 ```
 
----
+Generated application files:
 
-## 🧪 Testing & Verification
+- `dist/Kira-4.1.html` — complete offline application.
+- `dist/artifact.json` — compiled semantic artifact.
+- `dist/manifest.json` — release metadata and content hashes.
+- `dist/benchmark.json` — host-specific measurements, generated by the benchmark command.
 
-Kira v3 includes 4 automated test suites running front-to-back:
+### Extending Kira
 
-```bash
-# Run all test runners
-export PATH=/home/ubunt/.config/nvm/versions/node/v24.18.0/bin:$PATH
-node tests/production_audit.js           # Sentence Engine & Template Audit (Node)
-python3 tests/production_audit.py        # Sentence Engine & Template Audit (Python)
-node tests/test_conversational_engine.js # 14-Turn JSDOM Multi-Prompt Simulation
-node tests/test_sqlite_memory.js        # SQLite DB Integration & Memory Sync Test
+| Change | Start here |
+| --- | --- |
+| Add vocabulary, aliases, and inclusion relationships | `src/lexicon-seed.js` |
+| Change the base ontology or capability registry | `src/seed.js` |
+| Add dialogue phrasing or topic prompts | `src/dialogue-assets.js` |
+| Extend interpretation or follow-up handling | `src/parser.js`, `src/conversation.js` |
+| Change memory or reply-planning behavior | `src/dialogue.js` |
+| Change interface behavior or presentation | `src/view.js`, `src/shell.html`, `src/style.css` |
+
+Keep concept and sense IDs stable, declare ambiguity explicitly, and retain provenance. New aliases must not collapse related concepts into a single meaning. Add regression cases for both the intended reading and plausible misreadings, then rebuild and verify.
+
+For exploration in the browser developer console, the application exposes a small diagnostic API:
+
+```js
+await KiraApp.query({
+  op: 'subsumes',
+  a: 'c:analog-synthesizer',
+  b: 'c:musical-instrument'
+});
+
+await KiraApp.replay();
 ```
 
----
+This is a diagnostic interface, not a published game integration SDK.
 
-## 📁 Repository Structure
+## Saving, privacy, and compatibility
 
-```
-kira-chat/
-├── kira_v3.html                  # Single-file HTML/CSS/JS application runtime
-├── kira_memory.db                # SQLite database storing memories & user profile
-├── kira_db_export.json           # Export payload synced between SQLite and Kira
-├── sentence_engine_templates.js  # Standalone 51 dynamic sentence templates
-├── sentence_engine_wordbanks.js  # Standalone 18 curated word banks
-├── AI_RULES.md                   # Invariants & technology guidelines
-├── PROGRESS.md                   # Architecture specification & roadmap
-├── ONBOARDING.md                 # Developer onboarding guide for LLM engineers
-├── scripts/
-│   └── kira_db.py                # External SQLite database CLI tool
-└── tests/
-    ├── production_audit.js       # Production audit (Node.js)
-    ├── production_audit.py       # Production audit (Python)
-    ├── test_conversational_engine.js # Conversational Engine & Grammar Test
-    └── test_sqlite_memory.js     # SQLite Memory Sync Test
-```
+The application has no remote inference service, telemetry, or runtime network dependencies. Its content security policy blocks application network connections.
 
----
+Sessions use browser-local storage where available. Local saves and exported JSON are **not encrypted**. Storage availability and file-origin behavior depend on the browser; moving the HTML, using private browsing, or clearing browser data can affect access to a session.
 
-## 📄 License
-Licensed under MIT. See `LICENSE` for details.
+Use **Settings & data → Export session** to keep a portable backup. If the app reports a temporary session, export before closing it.
+
+Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
+
+Version 4.1.2 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. The source package includes readers for [4.1.0](compat/Kira-4.1.0.html) and [4.1.1](compat/Kira-4.1.1.html). Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+
+Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
+
+## Validation and current limits
+
+The 4.1.2 build passed **60 automated tests**, covering semantic closure, forged evidence, numeric and Unicode behavior, ambiguity, negation, correction, memory attribution, worker execution, deterministic replay, corrupt imports, save failures, tab conflicts, and focused view regressions.
+
+The bundle’s scripts and element references receive static checks. Real-browser visual and interaction coverage is still incomplete; the tests do not establish cross-browser conformance or formal verification. Benchmark results are measurements on the machine running the script, not performance guarantees for other devices.
+
+Current practical limits:
+
+- 1,000 recorded events per session, including settings and other state changes.
+- 2,000 characters per message.
+- An encoded-save guard below 4.5 million characters; browser quota may be smaller.
+- Up to 200 legacy messages per import, with bounded image payloads.
+- A bounded grammar and authored reply plans, rather than unrestricted language generation.
+
+State copying, save encoding, and replay grow with session length. The implementation targets a compact personal dialogue and curated ontology. Web Locks are used for turn commits when available; fallback conflict checks do not provide a general atomic transaction across tabs.
+
+L5 discovery, arbitrary ontology imports, unrestricted coordinate systems, neural learning, image understanding, and multi-agent world simulation are outside the current release.
+
+## Direction
+
+Kira is an experimental step toward natural-feeling NPC conversations whose content comes from character and world state. Areas to explore include individual knowledge and mistaken beliefs, character goals, witnessed events and rumors, relationship-aware dialogue, richer sentence realization, and reusable authoring tools.
+
+Those are development directions, not shipped features. The immediate focus is improving conversational continuity while keeping behavior reproducible and inspectable.
+
+## Reporting problems
+
+A useful dialogue bug report includes:
+
+- The application version and browser.
+- The exact message sequence, including relevant settings or clarification choices.
+- What happened and what you expected.
+- Whether **Verify deterministic replay** reports a match.
+
+A short reproducible conversation is especially useful. Review exported sessions before sharing them: they can contain personal messages, notes, and images.

@@ -11,9 +11,24 @@
     const neg=m.polarity==='negative',past=m.temporal==='past';
     return 'You '+(past?(neg?'did not ':'used to '):(neg?'do not ':''))+m.predicate+' '+m.object.label;
   }
+  function preferenceStance(frame){
+    if(frame.kind!=='preference'||frame.temporal!=='present')return null;
+    if(frame.polarity==='positive')return ['like','love','enjoy'].includes(frame.predicate)?'likes':['dislike','hate'].includes(frame.predicate)?'dislikes':null;
+    return frame.predicate==='like'?'dislikes':null;
+  }
+  function conflictingPreferenceFrames(frames){
+    for(let i=0;i<frames.length;i++)for(let j=i+1;j<frames.length;j++){
+      const a=frames[i],b=frames[j],as=preferenceStance(a),bs=preferenceStance(b);
+      if(a.kind==='preference'&&b.kind==='preference'&&a.temporal===b.temporal&&a.object.key===b.object.key&&
+        (a.predicate===b.predicate&&a.polarity!==b.polarity||as&&bs&&as!==bs))return true;
+    }
+    return false;
+  }
   function recordFrame(state,frame,sourceMessage,resolutionMessage){
+    const stance=preferenceStance(frame);
     const current=state.memories.filter(m=>m.status==='active'&&m.kind===frame.kind&&m.temporal===frame.temporal&&
-      (frame.kind==='name'||frame.kind==='mood'||m.predicate===frame.predicate&&m.object.key===frame.object.key));
+      (frame.kind==='name'||frame.kind==='mood'||m.object.key===frame.object.key&&(
+        m.predicate===frame.predicate||stance&&preferenceStance(m)&&preferenceStance(m)!==stance)));
     const duplicate=current.find(m=>m.polarity===frame.polarity&&m.object.key===frame.object.key&&m.predicate===frame.predicate);
     if(duplicate)return {memory:duplicate,created:false};
     const id='memory:'+String(state.nextMemory++).padStart(5,'0'),supersedes=current.map(m=>m.id);
@@ -68,7 +83,8 @@
         const plan={id:'plan:image',act:'acknowledge_image',claims:[],semantics:[],slots:[],policy:{kind:'dialogue_policy',rule:'Image bytes are opaque'},text:'I can keep this image in our chat, but I can’t see or interpret what it shows. Tell me what you’d like me to know about it.'};
         state.messages.push({id:aid,role:'assistant',text:plan.text,time:event.time,turn:state.turn,plan});state.lastPlan=plan;return {state,plan};
       }
-      const parsed=K.parseConversation(event.text,previous,this.engine);
+      let parsed=K.parseConversation(event.text,previous,this.engine);
+      if(conflictingPreferenceFrames(parsed.frames))parsed={...parsed,intent:'c:clarify',speechAct:'clarification',frames:[],supported:false,reasonCode:'conflicting_reports',reason:'Those reports conflict. Please send the current preference on its own so I can remember it correctly.'};
       state.messages.push({id:uid,role:'user',text:parsed.text,time:event.time,turn:state.turn});
       const routing=this.engine.query({op:'route',intent:parsed.intent,artifactHash:this.engine.a.hash});
       K.assert(routing.outcome==='Computed','Dialogue intent was not admitted');
@@ -83,6 +99,7 @@
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
       const ask=(topic,step,question)=>{const q=question||K.nextConversationQuestion(topic,step);state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid};return q;};
+      const askLastQuestion=(topic,step)=>{const match=plan.text.match(/(?:^|[.!?]\s+)([^.!?]*\?)\s*$/u);K.assert(match,'Support reply must end in a question');return ask(topic,step,match[1]);};
       const discourse=(text,questionMessage)=>{plan.policy.discourse={kind:'quoted_conversation',sourceMessage:uid,questionMessage:questionMessage||null,text};state.context.thread=(state.context.thread||[]).concat({sourceMessage:uid,questionMessage:questionMessage||null,text}).slice(-8);};
       state.context.pending=null;
       switch(intent){
@@ -94,7 +111,7 @@
           else if(first.kind==='note')plan.text='I’ve kept that as a note you gave me: “'+first.object.label+'”';
           else if(first.kind==='mood'){
             if(first.polarity==='negative')plan.text='You said you '+(first.temporal==='past'?'weren’t':'aren’t')+' '+first.object.label+'. I won’t assume a different feeling from that. '+ask('general',0,'How would you describe it?');
-            else if(parsed.negativeMood){plan.text=(persona==='direct'?'You said you feel '+first.object.label+'. ':'I hear you—you said you feel '+first.object.label+'. ')+generic('support');ask('support',0,'Would you like to tell me what happened?');}
+            else if(parsed.negativeMood){plan.text=(persona==='direct'?'You said you feel '+first.object.label+'. ':'I hear you—you said you feel '+first.object.label+'. ')+generic('support');askLastQuestion('support',0);}
             else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,'What’s been behind that?');
           }else{
             const changed=first.supersedes.length>0,past=first.temporal==='past';
@@ -108,7 +125,7 @@
           let records=state.memories.filter(m=>m.status==='active');
           if(parsed.nameOnly)records=records.filter(m=>m.kind==='name');
           else if(parsed.preferencesOnly)records=records.filter(m=>m.kind==='preference'&&m.temporal==='present');
-          else if(parsed.object)records=records.filter(m=>m.object.key===parsed.object.key&&m.predicate===parsed.predicate&&m.temporal==='present');
+          else if(parsed.object)records=records.filter(m=>m.kind==='preference'&&m.object.key===parsed.object.key&&m.temporal==='present');
           records=records.slice(-12);claims(records);
           plan.text=records.length?'Here’s what you’ve told me:\n'+records.map(m=>'• '+describeMemory(m)+' — turn '+m.turn+'.').join('\n'):'I don’t have that saved. You can tell me now if you want to.';
           if(records.length===1&&records[0].kind==='preference')state.context.focus={object:K.clone(records[0].object),turn:state.turn,sourceMessage:records[0].sourceMessage};
@@ -162,7 +179,7 @@
         case 'why':{
           const last=previous.lastPlan;plan.text=last?'I read your previous message as “'+last.act+'”. '+(last.claims.length?'The reply referred to '+last.claims.length+' attributed record'+(last.claims.length===1?'':'s')+'. ':'It made no claim from your memory. ')+'The semantic checker verified the handler’s eligibility; the wording was selected by dialogue policy. You can inspect the previous reply for the exact records and checks.':'There isn’t a previous reply to explain yet.';break;
         }
-        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic('support');if(parsed.answer!=='no')ask('support',0,'Would you like to tell me what happened?');break;
+        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic('support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
         case 'affection':plan.text=generic(state.settings.boundary==='flirty'&&state.relationship.points>=4?'flirt':'affection');break;
         case 'greet':{
           const r=this.engine.query({op:'realize',c:'c:greeting-word',target:[state.settings.register,0]});plan.semantics.push(r);plan.slots.push({concept:'c:greeting-word',sense:r.value.chosen,type:'speech-act',context:'extensional'});
@@ -196,4 +213,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.1.2","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"7d98f0db3607abbef9c33903f315f7d20d5400fdc962a7dfeb782d8ad24c0ccb","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.1.3","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"ec50d3b01c3b7be5913765c046c71125628496326d88e0266874385c78d3a8ce","unicode":"15.0.0","profile":"EXPERIMENTAL"};

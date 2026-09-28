@@ -2,6 +2,8 @@
 """Assemble Kira's offline HTML from its authored source files."""
 
 from argparse import ArgumentParser
+from hashlib import sha256
+import json
 from pathlib import Path
 import sys
 
@@ -33,6 +35,12 @@ def read_parts(directory: str, names: tuple[str, ...]) -> str:
 
 def build() -> str:
     model = read_parts("model", MODEL)
+    model_body, marker, metadata = model.partition("Kira.APP_META=")
+    if not marker or model.count(marker) != 1:
+        raise ValueError("Expected one Kira.APP_META declaration in the model")
+    expected_hash = sha256(model_body.encode("utf-8")).hexdigest()
+    if json.loads(metadata.split(";", 1)[0])["modelHash"] != expected_hash:
+        raise ValueError(f"Model changed; update APP_META.modelHash to {expected_hash} and the release version")
     browser = read_parts("browser", BROWSER)
     worker = model + (SOURCE / "worker-entry.js").read_text(encoding="utf-8")
     style = (SOURCE / "style.css").read_text(encoding="utf-8")

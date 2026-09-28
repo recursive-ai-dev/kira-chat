@@ -4,7 +4,7 @@
 
 Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and authored dialogue plans to carry a conversation.
 
-The current release is **4.1.2**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
+The current release is **4.1.3**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
 
 Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped by what characters know, remember, want, and experience in a world that continues without the player.** The current release is a standalone companion and engine demonstrator; a game integration SDK is future work.
 
@@ -14,7 +14,7 @@ Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped 
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The application displays version **4.1.2**.
+The application displays version **4.1.3**.
 
 If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
@@ -119,7 +119,7 @@ The lexicon is **experimental and independently unreviewed**. The checker is han
 
 ## Development
 
-Use **Python 3.9 or newer** to rebuild the standalone file. Browser-only use needs no development tools.
+Use **Python 3.9 or newer** to rebuild the standalone file and **Node.js 20 or newer** to run the conversation tests. Browser-only use needs no development tools.
 
 Run these commands from the repository root:
 
@@ -129,9 +129,12 @@ python3 tools/build.py
 
 # Check that the standalone app matches the modular source
 python3 tools/build.py --check
+
+# Run conversation and replay regressions
+node --test tests/conversation.test.cjs
 ```
 
-`Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The current checkout does not include an automated JavaScript test runner.
+`Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The build also checks that the pinned model hash matches the model source; dialogue changes require a new release version and storage key.
 
 ### Extending Kira
 
@@ -169,13 +172,13 @@ Use **Settings & data → Export session** to keep a portable backup. If the app
 
 Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
 
-Version 4.1.2 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+Version 4.1.3 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
 
 Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
 
 ## Validation and current limits
 
-The source checkout currently has a byte-for-byte build check but no runnable automated JavaScript test suite. Real-browser visual and interaction coverage is incomplete; the build check does not establish cross-browser conformance or formal verification.
+The source checkout includes a byte-for-byte build check and a focused conversation test suite covering corrections, ambiguity, unsupported reports, support follow-ups, attribution, and deterministic replay. Real-browser visual and interaction coverage is incomplete; these checks do not establish cross-browser conformance or formal verification.
 
 Current practical limits:
 

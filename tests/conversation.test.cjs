@@ -1,22 +1,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'Kira.html'), 'utf8');
-const scripts = [...html.matchAll(/<script(?: id="worker-source" type="text\/plain")?>([\s\S]*?)<\/script>/g)].map(match => match[1]);
-assert.equal(scripts.length, 3, 'expected page model, worker model, and browser scripts');
-assert.ok(scripts[1].startsWith(scripts[0]), 'worker must share the page model exactly');
-
-const context = vm.createContext({TextEncoder});
-vm.runInContext(scripts[0], context, {filename: 'Kira.html', timeout: 30_000});
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'browser', 'persistence.js'), 'utf8'), context);
-const K = context.Kira;
-const engine = new K.SemanticEngine(K.ARTIFACT);
-const dialogue = new K.DialogueModel(engine, K.APP_META);
+const {loadModel} = require('./helpers/load-model.cjs');
+const {K, dialogue} = loadModel();
 
 function conversation(steps) {
   let state = K.initialState();

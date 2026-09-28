@@ -1,0 +1,40 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The app is a single committed HTML file generated from src/. These two checks
+# are the whole contract: the generated file must match the modular source, and
+# the model must behave.
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/setup-python@v5
+        with:
+          # The documented floor, so a new toolchain release cannot break the build.
+          python-version: '3.9'
+
+      - name: Kira.html matches the modular source
+        run: python3 tools/build.py --check
+
+      - name: Rebuilding does not change the committed file
+        run: |
+          python3 tools/build.py
+          git diff --exit-code -- Kira.html
+
+      - name: Conversation, canonical, and persistence tests
+        run: npm test

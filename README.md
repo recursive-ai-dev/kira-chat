@@ -67,7 +67,7 @@ The parser supports a bounded English grammar. These examples show its supported
 
 ## Lexicon depth
 
-Version 4.1.2 expands the vocabulary across music, instruments, software, hardware, game genres, literature, feelings, food, nature, science, and everyday objects.
+Version 4.1.3 ships the expanded vocabulary across music, instruments, software, hardware, game genres, literature, feelings, food, nature, science, and everyday objects. The figures below compare 4.1.1 with the expanded 4.1.2 lexicon, which 4.1.3 carries forward unchanged.
 
 | Metric | 4.1.1 | 4.1.2 |
 | --- | ---: | ---: |
@@ -119,7 +119,7 @@ The lexicon is **experimental and independently unreviewed**. The checker is han
 
 ## Development
 
-Use **Python 3.9 or newer** to rebuild the standalone file and **Node.js 20 or newer** to run the conversation tests. Browser-only use needs no development tools.
+Use **Python 3.9 or newer** to rebuild the standalone file and **Node.js 20 or newer** to run the tests. Browser-only use needs no development tools. There are no runtime or test dependencies to install.
 
 Run these commands from the repository root:
 
@@ -130,11 +130,35 @@ python3 tools/build.py
 # Check that the standalone app matches the modular source
 python3 tools/build.py --check
 
-# Run conversation and replay regressions
-node --test tests/conversation.test.cjs
+# Run the conversation, canonical, and persistence tests
+node --test tests/*.test.cjs
 ```
 
+Or, with npm:
+
+```sh
+npm run build     # rebuild Kira.html
+npm run check     # verify Kira.html is not stale
+npm test          # run every test file
+npm run verify    # check + test, the same pair CI runs
+```
+
+Every push and pull request runs `npm run verify` on Node 20 and Node 24 with the documented Python floor.
+
 `Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The build also checks that the pinned model hash matches the model source; dialogue changes require a new release version and storage key.
+
+### Test layout
+
+| File | Covers |
+| --- | --- |
+| `tests/conversation.test.cjs` | Memory correction, ambiguity, attribution, support follow-ups, deterministic replay |
+| `tests/canonical.test.cjs` | SHA-256 vectors, canonical encoding, NFC, merkle roots, potentials, artifact verification and tamper rejection, optimizer against the reference checker |
+| `tests/persistence.test.cjs` | Session envelopes, checksum and version pinning, multi-tab conflicts, event validation |
+| `tests/helpers/load-model.cjs` | Loads the model out of `Kira.html` and runs code inside its realm |
+
+Tests read the model out of the generated `Kira.html` rather than re-concatenating `src/`, so they exercise exactly the bytes a user would open.
+
+One constraint is worth knowing before adding tests: the model runs inside a `vm` context, and `canonical()` only accepts objects whose prototype is that context's `Object.prototype`. A query object built in a test file is therefore rejected as *not canonical JSON data*. Build such objects with the loader's `query()`/`run()` helpers, which marshal them through JSON into the model's realm. In a browser the whole app shares one realm, so this never affects the application.
 
 ### Extending Kira
 
@@ -178,7 +202,7 @@ Older Kira v3 transcripts can be appended as unverified archives. Their learned 
 
 ## Validation and current limits
 
-The source checkout includes a byte-for-byte build check and a focused conversation test suite covering corrections, ambiguity, unsupported reports, support follow-ups, attribution, and deterministic replay. Real-browser visual and interaction coverage is incomplete; these checks do not establish cross-browser conformance or formal verification.
+The source checkout includes a byte-for-byte build check and a focused test suite covering corrections, ambiguity, unsupported reports, support follow-ups, attribution, deterministic replay, canonical hashing and encoding, artifact verification, query auditing, and session persistence. Real-browser visual and interaction coverage is incomplete; these checks do not establish cross-browser conformance or formal verification.
 
 Current practical limits:
 

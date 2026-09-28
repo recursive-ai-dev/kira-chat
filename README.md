@@ -14,7 +14,7 @@ Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped 
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The application displays version **4.1.3**.
+The bundled application version is **4.1.3**.
 
 If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
@@ -130,7 +130,7 @@ python3 tools/build.py
 # Check that the standalone app matches the modular source
 python3 tools/build.py --check
 
-# Run the conversation, canonical, and persistence tests
+# Run the conversation, canonical, persistence, and presenter tests
 node --test tests/*.test.cjs
 ```
 
@@ -143,7 +143,7 @@ npm test          # run every test file
 npm run verify    # check + test, the same pair CI runs
 ```
 
-Every push and pull request runs `npm run verify` on Node 20 and Node 24 with the documented Python floor.
+Every push to `main` and every pull request runs the build checks and tests on Node 20 and Node 24 with the documented Python floor.
 
 `Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The build also checks that the pinned model hash matches the model source; dialogue changes require a new release version and storage key.
 
@@ -154,9 +154,10 @@ Every push and pull request runs `npm run verify` on Node 20 and Node 24 with th
 | `tests/conversation.test.cjs` | Memory correction, ambiguity, attribution, support follow-ups, deterministic replay |
 | `tests/canonical.test.cjs` | SHA-256 vectors, canonical encoding, NFC, merkle roots, potentials, artifact verification and tamper rejection, optimizer against the reference checker |
 | `tests/persistence.test.cjs` | Session envelopes, checksum and version pinning, multi-tab conflicts, event validation |
-| `tests/helpers/load-model.cjs` | Loads the model out of `Kira.html` and runs code inside its realm |
+| `tests/presenter.test.cjs` | Startup and replay ordering, save failures, import/reset locking, corrupt-save recovery, temporary sessions |
+| `tests/helpers/load-model.cjs` | Loads the model and browser adapters out of `Kira.html` and runs code inside its realm |
 
-Tests read the model out of the generated `Kira.html` rather than re-concatenating `src/`, so they exercise exactly the bytes a user would open.
+Tests read the model and browser adapters out of the generated `Kira.html` rather than re-concatenating `src/`, so they exercise exactly the bytes a user would open.
 
 One constraint is worth knowing before adding tests: the model runs inside a `vm` context, and `canonical()` only accepts objects whose prototype is that context's `Object.prototype`. A query object built in a test file is therefore rejected as *not canonical JSON data*. Build such objects with the loader's `query()`/`run()` helpers, which marshal them through JSON into the model's realm. In a browser the whole app shares one realm, so this never affects the application.
 
@@ -212,7 +213,7 @@ Current practical limits:
 - Up to 200 legacy messages per import, with bounded image payloads.
 - A bounded grammar and authored reply plans, rather than unrestricted language generation.
 
-State copying, save encoding, and replay grow with session length. The implementation targets a compact personal dialogue and curated ontology. Web Locks are used for turn commits when available; fallback conflict checks do not provide a general atomic transaction across tabs.
+State copying, save encoding, and replay grow with session length. The implementation targets a compact personal dialogue and curated ontology. Web Locks are used for turn commits, imports, and resets when available; fallback conflict checks do not provide a general atomic transaction across tabs.
 
 L5 discovery, arbitrary ontology imports, unrestricted coordinate systems, neural learning, image understanding, and multi-agent world simulation are outside the current release.
 

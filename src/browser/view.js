@@ -137,7 +137,7 @@
       $('import-button').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',()=>this.run(async()=>{const file=$('import-file').files[0];$('import-file').value='';if(!file)return;K.assert(file.size<5000000,'Import must be under 5 MB');const data=JSON.parse(await file.text());
         if(data.format==='kira-session/4.1'){if(!confirm('Replace this conversation with the imported session? Export the current one first if you want to keep it.'))return;await this.presenter.importSession(data);}
         else{const messages=data.chatHistory||data.messages;K.assert(Array.isArray(messages),'Not a Kira session or supported legacy transcript');if(!confirm('Append up to 200 old messages as an unverified archive? No inferred memories or neural weights will be imported.'))return;await this.presenter.legacy(messages.filter(m=>typeof m.text==='string').slice(-200).map(m=>({role:m.role,text:m.text})));}
-        $('settings-dialog').close();this.status('Imported and verified','ok');}));
+        $('settings-dialog').close();}));
       $('reset-button').addEventListener('click',()=>this.run(async()=>{if(!confirm('Remove this app’s saved conversation, memories, settings, and images? Export a backup first if you want to keep them.'))return;await this.presenter.reset();this.rendered=[];this.renderMessages();$('settings-dialog').close();}));
       $('query-kind').addEventListener('change',()=>this.queryFields());$('run-query').addEventListener('click',()=>this.runQuery());document.querySelectorAll('[data-example]').forEach(b=>b.addEventListener('click',()=>this.example(b.dataset.example)));
       $('lexicon-search').addEventListener('input',()=>{this.lexiconTicket=(this.lexiconTicket||0)+1;clearTimeout(this.lexiconTimer);this.lexiconTimer=setTimeout(()=>this.run(()=>this.searchLexicon()),150);});
@@ -146,7 +146,7 @@
       $('attach-button').addEventListener('click',()=>$('image-file').click());$('avatar-upload').addEventListener('click',()=>$('avatar-file').click());$('avatar-remove').addEventListener('click',()=>{this.avatarDraft=null;$('avatar-upload').textContent='Choose image';});
       $('image-file').addEventListener('change',()=>this.run(async()=>{const file=$('image-file').files[0];$('image-file').value='';if(file)await this.presenter.image(await imageData(file));}));
       $('avatar-file').addEventListener('change',()=>this.run(async()=>{const file=$('avatar-file').files[0];$('avatar-file').value='';if(file){this.avatarDraft=await imageData(file);$('avatar-upload').textContent='Image selected';}}));
-      window.addEventListener('storage',e=>{if(e.key===K.STORE_KEY&&e.newValue!==this.presenter.store.raw){this.presenter.blocked=true;this.error('Another tab changed this conversation. Reload this page before continuing. Your unsent text is still here.');}});
+      window.addEventListener('storage',e=>{if(this.presenter.store.storage&&e.storageArea===this.presenter.store.storage&&(e.key===K.STORE_KEY||e.key===null)&&e.newValue!==this.presenter.store.raw){this.presenter.blocked=true;this.error('Another tab changed this conversation. Reload this page before continuing. Your unsent text is still here.');}});
     }
   }
   async function imageData(file){

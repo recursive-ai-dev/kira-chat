@@ -1959,28 +1959,30 @@ self.onmessage=event=>{
   }
   class Presenter{
     constructor(view,store,bridge){this.view=view;this.store=store;this.bridge=bridge;this.state=K.initialState();this.events=[];this.queue=Promise.resolve();this.blocked=false;this.mode='worker';}
-    async boot(){
+    boot(){return this.enqueue(async()=>{
       this.view.setBusy(true,'Checking the semantic artifact…');
       try{
         this.mode=await this.bridge.start();const envelope=this.store.read();
         if(envelope){K.inspectEnvelope(envelope,K.APP_META);const restored=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(restored)===envelope.stateDigest,'Saved conversation did not replay exactly');this.state=restored;this.events=envelope.events;}
-        this.view.render(this.state);this.view.status(this.store.temporary?'Temporary session · export before closing':'Saved on this device',this.store.temporary?'warning':'ok');
+        this.view.render(this.state);this.savedStatus();
       }catch(e){this.blocked=true;this.view.render(this.state);this.view.error('Could not open the saved conversation. '+e.message+' You can export the saved bytes or reset in Settings.');}
       finally{this.view.setBusy(false);}
-    }
+    });}
     enqueue(action){const p=this.queue.then(action);this.queue=p.catch(()=>{});return p;}
+    withLock(action){return globalThis.navigator?.locks? navigator.locks.request('kira-rse-session',action):action();}
+    savedStatus(){this.view.status(this.store.temporary?'Temporary session · export before closing':'Saved on this device',this.store.temporary?'warning':'ok');}
     transact(eventData){return this.enqueue(async()=>{
-      if(this.blocked)throw Error('Resolve the saved-session error in Settings first.');
       const operation=async()=>{
+        if(this.blocked)throw Error('Resolve the saved-session error in Settings first.');
         const event={...eventData,seq:this.state.revision+1,time:Date.now()};
         this.view.setBusy(true,'Kira is considering your message…');
         try{
           const next=await this.bridge.request('step',{state:this.state,event});
           const events=this.events.concat(event),envelope=K.packSession(events,next.state,K.APP_META);
-          this.store.commit(envelope);this.events=events;this.state=next.state;this.view.render(this.state);this.view.status(this.store.temporary?'Temporary session · export before closing':'Saved on this device',this.store.temporary?'warning':'ok');return next;
+          this.store.commit(envelope);this.events=events;this.state=next.state;this.view.render(this.state);this.savedStatus();return next;
         }finally{this.view.setBusy(false);}
       };
-      return navigator.locks? navigator.locks.request('kira-rse-session',operation):operation();
+      return this.withLock(operation);
     });}
     message(text){return this.transact({type:'message',text});}
     settings(settings){return this.transact({type:'settings',settings});}
@@ -1988,18 +1990,20 @@ self.onmessage=event=>{
     image(data){return this.transact({type:'image',data});}
     query(query){return this.bridge.request('query',{query});}
     lexicon(payload){return this.bridge.request('lexicon',payload);}
-    async replay(){const state=await this.bridge.request('replay',{events:this.events});K.assert(K.hash(state)===K.hash(this.state),'Replay mismatch');return {events:this.events.length,turns:state.turn,digest:K.hash(state),matched:true};}
+    replay(){return this.enqueue(async()=>{const state=await this.bridge.request('replay',{events:this.events});K.assert(K.hash(state)===K.hash(this.state),'Replay mismatch');return {events:this.events.length,turns:state.turn,digest:K.hash(state),matched:true};});}
     export(){return JSON.stringify(K.packSession(this.events,this.state,K.APP_META),null,2);}
-    importSession(envelope){return this.enqueue(async()=>{
-      K.inspectEnvelope(envelope,K.APP_META);const candidate=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(candidate)===envelope.stateDigest,'Imported snapshot does not replay');
-      this.store.commit(K.packSession(envelope.events,candidate,K.APP_META));this.state=candidate;this.events=envelope.events;this.blocked=false;this.view.render(this.state);return candidate;
-    });}
-    reset(){return this.enqueue(async()=>{this.store.clear();this.events=[];this.state=K.initialState();this.blocked=false;this.view.render(this.state);this.view.status('New conversation','ok');});}
+    importSession(envelope){return this.enqueue(()=>this.withLock(async()=>{
+      this.view.setBusy(true,'Checking the imported conversation…');
+      try{
+        K.inspectEnvelope(envelope,K.APP_META);const candidate=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(candidate)===envelope.stateDigest,'Imported snapshot does not replay');
+        this.store.commit(K.packSession(envelope.events,candidate,K.APP_META));this.state=candidate;this.events=envelope.events;this.blocked=false;this.view.render(this.state);this.savedStatus();return candidate;
+      }finally{this.view.setBusy(false);}
+    }));}
+    reset(){return this.enqueue(()=>this.withLock(async()=>{this.store.clear();this.events=[];this.state=K.initialState();this.blocked=false;this.view.render(this.state);this.savedStatus();}));}
     legacy(messages){return this.transact({type:'legacy',messages});}
   }
   Object.assign(K,{ModelBridge,Presenter});
 })(Kira);
-
 'use strict';
 (function(K){
   const $=id=>document.getElementById(id),el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
@@ -2139,7 +2143,7 @@ self.onmessage=event=>{
       $('import-button').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',()=>this.run(async()=>{const file=$('import-file').files[0];$('import-file').value='';if(!file)return;K.assert(file.size<5000000,'Import must be under 5 MB');const data=JSON.parse(await file.text());
         if(data.format==='kira-session/4.1'){if(!confirm('Replace this conversation with the imported session? Export the current one first if you want to keep it.'))return;await this.presenter.importSession(data);}
         else{const messages=data.chatHistory||data.messages;K.assert(Array.isArray(messages),'Not a Kira session or supported legacy transcript');if(!confirm('Append up to 200 old messages as an unverified archive? No inferred memories or neural weights will be imported.'))return;await this.presenter.legacy(messages.filter(m=>typeof m.text==='string').slice(-200).map(m=>({role:m.role,text:m.text})));}
-        $('settings-dialog').close();this.status('Imported and verified','ok');}));
+        $('settings-dialog').close();}));
       $('reset-button').addEventListener('click',()=>this.run(async()=>{if(!confirm('Remove this app’s saved conversation, memories, settings, and images? Export a backup first if you want to keep them.'))return;await this.presenter.reset();this.rendered=[];this.renderMessages();$('settings-dialog').close();}));
       $('query-kind').addEventListener('change',()=>this.queryFields());$('run-query').addEventListener('click',()=>this.runQuery());document.querySelectorAll('[data-example]').forEach(b=>b.addEventListener('click',()=>this.example(b.dataset.example)));
       $('lexicon-search').addEventListener('input',()=>{this.lexiconTicket=(this.lexiconTicket||0)+1;clearTimeout(this.lexiconTimer);this.lexiconTimer=setTimeout(()=>this.run(()=>this.searchLexicon()),150);});
@@ -2148,7 +2152,7 @@ self.onmessage=event=>{
       $('attach-button').addEventListener('click',()=>$('image-file').click());$('avatar-upload').addEventListener('click',()=>$('avatar-file').click());$('avatar-remove').addEventListener('click',()=>{this.avatarDraft=null;$('avatar-upload').textContent='Choose image';});
       $('image-file').addEventListener('change',()=>this.run(async()=>{const file=$('image-file').files[0];$('image-file').value='';if(file)await this.presenter.image(await imageData(file));}));
       $('avatar-file').addEventListener('change',()=>this.run(async()=>{const file=$('avatar-file').files[0];$('avatar-file').value='';if(file){this.avatarDraft=await imageData(file);$('avatar-upload').textContent='Image selected';}}));
-      window.addEventListener('storage',e=>{if(e.key===K.STORE_KEY&&e.newValue!==this.presenter.store.raw){this.presenter.blocked=true;this.error('Another tab changed this conversation. Reload this page before continuing. Your unsent text is still here.');}});
+      window.addEventListener('storage',e=>{if(this.presenter.store.storage&&e.storageArea===this.presenter.store.storage&&(e.key===K.STORE_KEY||e.key===null)&&e.newValue!==this.presenter.store.raw){this.presenter.blocked=true;this.error('Another tab changed this conversation. Reload this page before continuing. Your unsent text is still here.');}});
     }
   }
   async function imageData(file){

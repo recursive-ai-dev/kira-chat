@@ -63,14 +63,14 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if Kira.html differs from the source")
     args = parser.parse_args()
-    html = build()
+    html = build().encode("utf-8")
     if args.check:
-        if not OUTPUT.exists() or OUTPUT.read_text(encoding="utf-8") != html:
+        if not OUTPUT.exists() or OUTPUT.read_bytes() != html:
             print("Kira.html is out of date; run python3 tools/build.py", file=sys.stderr)
             return 1
         print("Kira.html matches the modular source.")
     else:
-        OUTPUT.write_text(html, encoding="utf-8")
+        OUTPUT.write_bytes(html)
         print(f"Built {OUTPUT.name} ({OUTPUT.stat().st_size:,} bytes).")
     return 0
 

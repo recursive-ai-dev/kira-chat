@@ -113,6 +113,7 @@ test('a store without storage degrades to a temporary session', () => {
   assert.equal(out.read, null);
   assert.equal(out.commit, 'ok:"committed"');
   assert.ok(out.exportLength > 0, 'raw export must still work for recovery');
+});
 
 test('the event log is bounded and sequence-checked', () => {
 
@@ -147,6 +148,4 @@ test('settings events only accept known keys and ranges', () => {
   assert.throws(() => K.validateEvent(state, {seq: 1, time: 1, type: 'settings', settings: {register: 9999}}), /register/);
   assert.throws(() => K.validateEvent(state, {seq: 1, time: 1, type: 'settings', settings: {theme: 'neon'}}), /theme/);
   assert.throws(() => K.validateEvent(state, {seq: 1, time: 1, type: 'settings', settings: {boundary: 'explicit'}}), /boundary/);
-});
-
 });

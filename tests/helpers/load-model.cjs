@@ -31,7 +31,11 @@ function loadModel({withPersistence = true} = {}) {
   const context = vm.createContext({TextEncoder, console});
   vm.runInContext(scripts[0], context, {filename: 'Kira.html', timeout: 60_000});
   if (withPersistence) {
-    vm.runInContext(fs.readFileSync(path.join(ROOT, 'src', 'browser', 'persistence.js'), 'utf8'), context);
+    // Load the shipped adapters, stopping before the DOM-dependent view.
+    const viewStart = scripts[2].indexOf("  const $=id=>document.getElementById(id)");
+    assert.ok(viewStart > 0, 'expected the browser view after the adapters');
+    const adapterEnd = scripts[2].lastIndexOf("'use strict';", viewStart);
+    vm.runInContext(scripts[2].slice(0, adapterEnd), context);
   }
 
   // One shared engine inside the context, so repeated queries stay cheap.

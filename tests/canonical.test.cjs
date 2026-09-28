@@ -156,6 +156,7 @@ test('optimizer and reference checker agree across sampled operators', () => {
   assert.equal(report.failures, 0, 'no query may escape the reference check (first: ' + report.firstFailure + ')');
   assert.ok(report.subsumes > 5 && report.relation > 5 && report.realize > 5 && report.route > 5,
     `expected a meaningful sample of each operator, got ${JSON.stringify(report)}`);
+});
 
 test('a wrong answer is rejected rather than returned', () => {
   // The point of auditQuery: a lying optimizer must never reach the UI.
@@ -213,8 +214,6 @@ test('the engine exposes only concepts its artifact declares', () => {
   assert.equal(report.coffee, 'ok:1');
   assert.match(report.longSearch, /threw:.*under 200 characters/);
   assert.match(report.badConcept, /threw:.*Unknown concept/);
-});
-
 });
 
 test('identical queries are byte-for-byte deterministic', () => {

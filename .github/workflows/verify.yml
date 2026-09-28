@@ -36,5 +36,5 @@ jobs:
           python3 tools/build.py
           git diff --exit-code -- Kira.html
 
-      - name: Conversation, canonical, and persistence tests
+      - name: Conversation, canonical, persistence, and presenter tests
         run: npm test

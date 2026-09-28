@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; worker-src blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Kira · A little room for conversation</title>
+<style>{{KIRA_STYLE}}</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.1.2</span></a>
+    <div class="side-caption">A LITTLE CONTINUITY</div>
+    <nav aria-label="Main navigation">
+      <button class="nav-item active" data-screen="conversation" aria-current="page"><span aria-hidden="true">◌</span> Conversation <span class="nav-arrow">↗</span></button>
+      <button class="nav-item" data-screen="memories"><span aria-hidden="true">▱</span> Memories <span id="memory-count" class="count">0</span></button>
+      <button class="nav-item" data-screen="lab"><span aria-hidden="true">⌘</span> Engine lab</button>
+    </nav>
+    <div class="side-profile">
+      <div class="portrait" id="portrait"><div class="orbital" aria-hidden="true"></div><span>K</span></div>
+      <div class="profile-name">Kira <span class="online-dot" aria-hidden="true"></span></div>
+      <p id="persona-summary">Warm, curious, a little soft around the edges.</p>
+      <button class="subtle" id="personality-open">Shape the conversation <span aria-hidden="true">↗</span></button>
+    </div>
+    <div class="side-bottom">
+      <button class="nav-item" id="settings-open"><span aria-hidden="true">⚙</span> Settings &amp; data</button>
+      <div class="offline-line"><span class="online-dot" aria-hidden="true"></span> Offline, on your device</div>
+      <p class="tiny">A fictional companion. No account, model download, or connection needed.</p>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div><div class="eyebrow" id="screen-eyebrow">YOUR OWN PACE</div><h1 id="screen-title">Conversation</h1></div>
+      <div class="topbar-actions"><span class="pill" id="stage-pill">A new conversation</span><button class="icon-button" id="settings-shortcut" aria-label="Open settings">⚙</button><button class="icon-button" id="theme-toggle" aria-label="Switch color theme">◐</button></div>
+    </header>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section id="screen-conversation" class="screen conversation-screen" aria-label="Conversation">
+      <div class="conversation-column">
+        <div id="messages" class="messages" role="log" aria-label="Messages" aria-live="polite" aria-relevant="additions"></div>
+        <div class="composer-wrap">
+          <div id="thinking" class="thinking" role="status" hidden><span class="thinking-dots">● ● ●</span> <span id="thinking-label">Kira is considering your message…</span></div>
+          <div id="quick-prompts" class="quick-prompts"></div>
+          <form id="composer" class="composer">
+            <label class="sr-only" for="message-input">Message Kira</label>
+            <textarea id="message-input" rows="2" maxlength="2000" placeholder="Tell me a little about your world…" autocomplete="off"></textarea>
+            <div class="composer-tools"><button type="button" class="icon-button" id="attach-button" title="Share an image (Kira cannot interpret images)" aria-label="Share an image">＋</button><span class="composer-tip">Enter to send <span aria-hidden="true">·</span> Shift + Enter for a new line</span><span id="input-count" class="tiny">0 / 2000</span><button id="send-button" class="send-button" type="submit" aria-label="Send message">↑</button></div>
+          </form>
+          <div class="composer-footer"><span id="save-status">Opening your conversation…</span><span>Private by design. Export to keep a backup.</span></div>
+        </div>
+      </div>
+      <aside class="continuity">
+        <div class="rail-heading"><span class="eyebrow">IN THIS CONVERSATION</span><span aria-hidden="true">✳</span></div>
+        <div class="rail-card"><div class="eyebrow">A GROWING FAMILIARITY</div><h2 id="relationship-title">A first hello.</h2><div class="progress-track"><div id="familiarity-fill"></div></div><p id="relationship-copy">There’s no rush. Start with something small.</p><span class="tiny">Story state, shaped by distinct turns.</span></div>
+        <div class="rail-section"><div class="row-between"><h3>Little things remembered</h3><span id="rail-count" class="tiny">0</span></div><div id="memory-preview"></div><button class="text-button" data-screen="memories">Open memory notebook <span aria-hidden="true">↗</span></button></div>
+        <div class="rail-note"><span aria-hidden="true">⌁</span><p>Say something differently? Corrections replace the active memory and keep its source.</p></div>
+        <button class="rail-lab" data-screen="lab"><span>Curious how a reply works?</span><b>Look inside the engine ↗</b></button>
+      </aside>
+    </section>
+    <section id="screen-memories" class="screen page-screen" aria-label="Memories" hidden>
+      <div class="page-intro"><div><span class="eyebrow">YOUR WORDS, WITH THEIR SOURCES</span><h2>A notebook, not a guess.</h2><p>These are things you told Kira. A record proves the attribution, not that the statement is true.</p></div><button class="secondary" id="export-memory">Export session ↗</button></div>
+      <div class="filterbar"><label class="search-field"><span aria-hidden="true">⌕</span><input id="memory-search" type="search" placeholder="Find a name, preference, or note" aria-label="Search memories"></label><label class="checkbox-label"><input type="checkbox" id="show-retired"> Include superseded &amp; retired</label></div>
+      <div id="memory-list" class="memory-grid"></div>
+      <p class="tiny page-footnote">Retiring stops Kira from using a memory. Its record and source remain in history. Reset the conversation to remove this app’s saved session.</p>
+    </section>
+    <section id="screen-lab" class="screen page-screen" aria-label="Engine lab" hidden>
+      <div class="page-intro"><div><span class="eyebrow">ROTATIONAL SEMANTIC ENGINE · DRAFT 4.1</span><h2>Meaning first. Wording second.</h2><p>Try a checked query, examine its proof, or replay every conversation event.</p></div><span class="pill experimental">Experimental lexicon</span></div>
+      <div class="engine-strip"><div><span>01</span><b>Denotation</b><small>CR0–CR8 closure</small></div><div><span>02</span><b>Potential</b><small>Exact integer weights</small></div><div><span>03</span><b>Inference</b><small>Set-valued relations</small></div><div><span>04</span><b>Realization</b><small>Same-fiber candidates</small></div></div>
+      <div class="panel lexicon-panel"><div class="panel-heading"><h3>Explore Kira’s vocabulary</h3><span class="tiny" id="lexicon-total"></span></div><p class="tiny">Search a word or subject. Open a meaning to see its parents, subtypes, wording variants, and checked links.</p><label class="search-field"><span aria-hidden="true">⌕</span><input id="lexicon-search" type="search" maxlength="200" placeholder="Try synth, python, music, or coffee" aria-label="Search lexicon"></label><div class="lexicon-browser"><div id="lexicon-results" class="lexicon-results"></div><div id="lexicon-detail" class="lexicon-detail"><p class="tiny">Choose a concept to explore its place in the hierarchy.</p></div></div></div>
+      <div class="lab-grid"><div class="panel query-panel"><div class="panel-heading"><h3>Ask the artifact</h3><span class="tiny">L1 / L3 / L4</span></div>
+        <label class="field-label" for="query-kind">Operation</label><select id="query-kind"><option value="subsumes">L1 · Is a kind of</option><option value="existential">L1 · Part / role relation</option><option value="relation">L3 · Lexical relation mask</option><option value="entails">L3 · Entailment in a context</option><option value="shift">L4 · Relative style shift</option><option value="realize">L4 · Absolute realization</option></select>
+        <div id="query-fields"></div><button class="primary full" id="run-query">Run checked query <span aria-hidden="true">↗</span></button>
+        <div class="example-label tiny">TRY AN EXAMPLE</div><div class="lab-examples"><button data-example="dog">Dog → animal</button><button data-example="siblings">Dog / cat</button><button data-example="no">No animal → no dog</button><button data-example="gap">A lexical gap</button></div>
+      </div><div class="panel result-panel"><div class="panel-heading"><h3>Checked result</h3><button class="text-button" id="export-proof" hidden>Export proof ↓</button></div><div id="query-result"><div class="empty-result"><span aria-hidden="true">⌘</span><h3>A result you can inspect.</h3><p>Choose an example or run your own query. Unknown and Inconclusive are honest answers.</p></div></div></div></div>
+      <div class="lab-grid lower-lab"><div class="panel"><div class="panel-heading"><h3>Conversation replay</h3><span class="tiny" id="event-count">0 events</span></div><p>Rebuild the full conversation from its recorded inputs and pinned assets, then compare the canonical state digest.</p><button class="secondary" id="replay-button">Verify deterministic replay ↻</button><div id="replay-result" class="replay-result" role="status"></div></div><div class="panel"><div class="panel-heading"><h3>What is actually checked?</h3><span class="status-dot" aria-hidden="true"></span></div><p>L1 proof grounding and closure, generated L3 tables, candidate universes, integer bounds, provenance, and every semantic query.</p><p class="tiny">The checker is an independent JavaScript implementation, not formally verified or extracted from Lean. The seed assumptions and synonym fibers are unreviewed. Raw-English interpretation and dialogue policy have separate traces. L5 discovery and multi-agent allocation are outside this app’s scope.</p><div id="artifact-stats" class="artifact-stats"></div></div></div>
+    </section>
+  </main>
+</div>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2>Settings &amp; data</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
+  <form id="settings-form"><div class="settings-body"><label class="field-label" for="persona-select">Kira’s personality</label><select id="persona-select"><option value="warm">Warm</option><option value="playful">Playful</option><option value="thoughtful">Thoughtful</option><option value="direct">Direct</option></select><p id="persona-description" class="tiny"></p>
+    <label class="field-label" for="register-range">Wording register <output id="register-output">Neutral</output></label><input id="register-range" type="range" min="-2000" max="2000" step="500"><div class="range-labels"><span>Casual</span><span>Formal</span></div><p class="tiny">Selects approved variants inside the same meaning. It never turns “like” into “love”.</p>
+    <label class="field-label" for="boundary-select">Conversation boundary</label><select id="boundary-select"><option value="platonic">Platonic company</option><option value="flirty">Light fictional flirting</option></select>
+    <div class="settings-avatar-row"><div><b>Profile image</b><p class="tiny">Optional. Stored only with this session.</p></div><button class="secondary small" type="button" id="avatar-upload">Choose image</button><button class="text-button" type="button" id="avatar-remove">Remove</button></div>
+    <button class="primary full" type="submit">Save preferences</button>
+  </div></form>
+  <div class="settings-data"><h3>Your conversation belongs to you.</h3><p class="tiny">Browser data can be cleared. Export a session to keep a portable backup. Images are stored as opaque attachments; Kira has no image recognition.</p><div class="button-row"><button class="secondary" id="export-button">Export session ↓</button><button class="secondary" id="import-button">Import session ↑</button></div><button class="text-button" id="export-raw">Export saved bytes for recovery</button><p class="tiny">Old Kira v3 JSON can be imported as a transcript archive. Old inferred memories and learned weights are not treated as verified facts.</p><button class="danger" id="reset-button">Reset conversation</button></div>
+</dialog>
+<dialog id="inspect-dialog" class="inspect-dialog"><div class="dialog-heading"><div><span class="eyebrow">A REPLY, OPENED UP</span><h2>Sources &amp; reasoning</h2></div><button class="icon-button" data-close="inspect-dialog" aria-label="Close reply details">×</button></div><div id="inspect-content" class="inspect-content"></div></dialog>
+<dialog id="image-dialog" class="image-dialog"><button class="icon-button" data-close="image-dialog" aria-label="Close image">×</button><img id="zoom-image" alt="Shared image"></dialog>
+<input type="file" id="import-file" accept=".json,application/json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp" hidden><input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp" hidden>
+<noscript>Kira needs JavaScript enabled. This file works offline.</noscript>
+<script>{{KIRA_MODEL}}</script>
+<script id="worker-source" type="text/plain">{{KIRA_WORKER}}</script>
+<script>{{KIRA_BROWSER}}</script>
+</body>
+</html>

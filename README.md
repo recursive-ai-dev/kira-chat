@@ -10,13 +10,13 @@ Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped 
 
 ## Quick start
 
-1. Download [Kira-4.1.html](dist/Kira-4.1.html). Use your repository host’s download/raw-file option to save the actual HTML.
+1. Download [Kira.html](Kira.html). Use your repository host’s download/raw-file option to save the actual HTML.
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The filename remains `Kira-4.1.html`; the application displays version **4.1.2**.
+The application displays version **4.1.2**.
 
-If you downloaded the complete source archive, open `kira/dist/Kira-4.1.html` after extracting it. Browser-only use does not require Node.js. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
+If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
 Try this sequence:
 
@@ -80,7 +80,7 @@ The deepest hierarchy spans **seven inclusion edges**. Alias entries include rec
 
 Related things remain distinct. Books are separate from reading, songs from music, and games from gaming. Words such as `python`, `bass`, `metal`, `rock`, `rust`, and `orange` have explicit alternative meanings. Style shifts operate only inside a declared meaning: `synth` can become `synthesizer`, while `like` cannot silently become `love`.
 
-See [LEXICON.md](LEXICON.md) for the complete generated inventory, or explore it inside **Engine lab**.
+Explore the vocabulary inside **Engine lab**.
 
 ## How it works
 
@@ -88,13 +88,13 @@ Kira follows **Model–View–Presenter** architecture.
 
 | Component | Responsibility | Main files |
 | --- | --- | --- |
-| Semantic Model | Classify the ontology, answer queries, reconstruct candidate sets, and check evidence | `compiler.js`, `engine.js`, `checker.js`, `audit-query.js` |
-| Dialogue Model | Interpret supported language, track conversation context, update memory, and construct reply plans | `parser.js`, `conversation.js`, `dialogue.js`, `dialogue-assets.js` |
-| Presenter | Serialize turns, record timestamps, call the model, and save before publishing new state | `presenter.js`, `worker-entry.js` |
-| View | Render conversation, memory, vocabulary, settings, and evidence | `view.js`, `shell.html`, `style.css` |
-| Persistence adapter | Store a complete event log and validate exports/imports | `persistence.js` |
+| Semantic Model | Answer queries and check evidence against the bundled artifact | `src/model/artifact-checker.js`, `query-checker.js`, `engine.js` |
+| Dialogue Model | Interpret supported language, track conversation context, update memory, and construct reply plans | `src/model/parser.js`, `conversation.js`, `dialogue.js`, `dialogue-assets.js` |
+| Presenter | Serialize turns, record timestamps, call the model, and save before publishing new state | `src/browser/presenter.js`, `src/worker-entry.js` |
+| View | Render conversation, memory, vocabulary, settings, and evidence | `src/browser/view.js`, `src/shell.html`, `src/style.css` |
+| Persistence adapter | Store a complete event log and validate exports/imports | `src/browser/persistence.js` |
 
-These files live in `src/`. The pure models do not read the DOM, browser storage, wall clock, network, or random generators.
+The shared model is bundled once for the page and once for the worker by `tools/build.py`. The pure models do not read the DOM, browser storage, wall clock, network, or random generators. `src/model/artifact-data.js` and `unicode-data.js` contain frozen compiled data; this checkout does not include the source compiler or lexicon seed used to create them.
 
 Each turn consumes the previous state, an explicit recorded event, and versioned assets. Dialogue selection uses stable rules and tie-breaks. Replay reuses the original events and timestamps. Display details such as local time formatting sit outside the canonical model state.
 
@@ -119,44 +119,31 @@ The lexicon is **experimental and independently unreviewed**. The checker is han
 
 ## Development
 
-Use **Node.js 20 or newer**. The build and tests use Node’s built-in modules; no `npm install` is required.
+Use **Python 3.9 or newer** to rebuild the standalone file. Browser-only use needs no development tools.
 
-Run these commands from the directory containing `package.json`:
+Run these commands from the repository root:
 
 ```sh
-# Rebuild the standalone app and run all tests
-npm run verify
+# Rebuild the standalone app
+python3 tools/build.py
 
-# Build or test separately
-npm run build
-npm test
-
-# Regenerate the lexicon inventory after a build
-node tools/lexicon-report.cjs
-
-# Record timing samples on your machine
-node tools/benchmark.cjs
+# Check that the standalone app matches the modular source
+python3 tools/build.py --check
 ```
 
-Generated application files:
-
-- `dist/Kira-4.1.html` — complete offline application.
-- `dist/artifact.json` — compiled semantic artifact.
-- `dist/manifest.json` — release metadata and content hashes.
-- `dist/benchmark.json` — host-specific measurements, generated by the benchmark command.
+`Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The current checkout does not include an automated JavaScript test runner.
 
 ### Extending Kira
 
 | Change | Start here |
 | --- | --- |
-| Add vocabulary, aliases, and inclusion relationships | `src/lexicon-seed.js` |
-| Change the base ontology or capability registry | `src/seed.js` |
-| Add dialogue phrasing or topic prompts | `src/dialogue-assets.js` |
-| Extend interpretation or follow-up handling | `src/parser.js`, `src/conversation.js` |
-| Change memory or reply-planning behavior | `src/dialogue.js` |
-| Change interface behavior or presentation | `src/view.js`, `src/shell.html`, `src/style.css` |
+| Add dialogue phrasing or topic prompts | `src/model/dialogue-assets.js` |
+| Extend interpretation or follow-up handling | `src/model/parser.js`, `src/model/conversation.js` |
+| Change memory or reply-planning behavior | `src/model/dialogue.js` |
+| Change query behavior or checking | `src/model/engine.js`, `src/model/query-checker.js` |
+| Change interface behavior or presentation | `src/browser/view.js`, `src/shell.html`, `src/style.css` |
 
-Keep concept and sense IDs stable, declare ambiguity explicitly, and retain provenance. New aliases must not collapse related concepts into a single meaning. Add regression cases for both the intended reading and plausible misreadings, then rebuild and verify.
+The compiled semantic artifact is version pinned. Changing vocabulary or ontology data requires regenerating the artifact and its hashes with the original compiler, which is not included here. For dialogue changes, add regression cases for the intended reading and plausible misreadings, then rebuild and check the standalone file. Existing session exports remain tied to their original model hash.
 
 For exploration in the browser developer console, the application exposes a small diagnostic API:
 
@@ -182,15 +169,13 @@ Use **Settings & data → Export session** to keep a portable backup. If the app
 
 Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
 
-Version 4.1.2 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. The source package includes readers for [4.1.0](compat/Kira-4.1.0.html) and [4.1.1](compat/Kira-4.1.1.html). Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+Version 4.1.2 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
 
 Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
 
 ## Validation and current limits
 
-The 4.1.2 build passed **60 automated tests**, covering semantic closure, forged evidence, numeric and Unicode behavior, ambiguity, negation, correction, memory attribution, worker execution, deterministic replay, corrupt imports, save failures, tab conflicts, and focused view regressions.
-
-The bundle’s scripts and element references receive static checks. Real-browser visual and interaction coverage is still incomplete; the tests do not establish cross-browser conformance or formal verification. Benchmark results are measurements on the machine running the script, not performance guarantees for other devices.
+The source checkout currently has a byte-for-byte build check but no runnable automated JavaScript test suite. Real-browser visual and interaction coverage is incomplete; the build check does not establish cross-browser conformance or formal verification.
 
 Current practical limits:
 

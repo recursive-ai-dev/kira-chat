@@ -79,8 +79,9 @@
       K.assert(typeof text==='string'&&text.length<=200,'Search must be under 200 characters');
       if(id){const c=this.concepts.get(id);K.assert(c,'Unknown concept');return {entry:K.clone(c),parents:this.parents.get(id).map(parent=>({id:parent,label:this.concepts.get(parent).label,evidence:this.query({op:'subsumes',a:id,b:parent})})),children:this.a.axioms.filter(ax=>ax.kind==='sub'&&ax.b===id&&ax.a!==id).map(ax=>({id:ax.a,label:this.concepts.get(ax.a).label})),senses:this.fibers.get(id).map(K.clone),topic:this.topicFor(id)};}
       const needle=this.lookupKey(text),exact=new Set(this.lookup(text));
-      const results=this.a.concepts.filter(c=>!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle));
-      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(a.id,b.id));
+      // Dialogue-act concepts are routing internals, not vocabulary; they stay reachable by id.
+      const results=this.a.concepts.filter(c=>!this.sub(c.id,'c:intent')&&(!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle)));
+      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(K.fold(a.label),K.fold(b.label))||K.cmp(a.id,b.id));
       return {total:results.length,entries:results.slice(0,40).map(c=>({id:c.id,label:c.label,aliases:c.aliases,topic:this.topicFor(c.id)}))};
     }
     senseFor(cid){return this.a.senses.find(s=>s.cid===cid&&s.lin[0]===0&&s.lin[1]===0)?.id||this.a.senses.find(s=>s.cid===cid).id;}

@@ -24,7 +24,7 @@
       const active=state.memories.filter(m=>m.status==='active');$('memory-count').textContent=active.length;$('rail-count').textContent=active.length;$('stage-pill').textContent=K.relationshipStage(state.relationship.points);
       $('relationship-title').textContent=state.relationship.points>=32?'A familiar presence.':state.relationship.points>=12?'A rhythm of our own.':state.relationship.points>=4?'Little things add up.':'A first hello.';
       $('relationship-copy').textContent=state.turn?state.turn+' turn'+(state.turn===1?'':'s')+' together. The small details give this conversation its shape.':'There’s no rush. Start with something small.';
-      $('familiarity-fill').style.width=Math.max(4,state.relationship.points)+'%';
+      $('familiarity-fill').style.width=Math.max(4,Math.min(100,Math.round(state.relationship.points/32*100)))+'%';
       clear($('memory-preview'));if(!active.length)$('memory-preview').append(el('p','tiny','A name, a preference, a detail worth keeping. Nothing assumed.'));else for(const m of active.slice(-3)){const n=el('div','preview-note',K.describeMemory(m));n.append(el('span','','You told Kira · turn '+m.turn));$('memory-preview').append(n);}
       this.renderMessages();this.renderMemories();this.quickPrompts();$('event-count').textContent=state.revision+' events';
       $('artifact-stats').textContent=K.ARTIFACT.concepts.length+' concepts · '+K.ARTIFACT.senses.length+' senses · '+K.ARTIFACT.classification.nodes.length+' checked facts\nSHA-256 '+K.ARTIFACT.hash;
@@ -66,8 +66,8 @@
       if(!records.length){const empty=el('div','empty-memory');empty.append(el('h3','','Nothing on this page yet.'),el('p','','Try “My name is Alex” or “I like coffee” to give Kira a place to start.'));box.append(empty);return;}
       for(const m of records){const card=el('article','memory-card '+(m.status==='active'?'':'retired')),type=el('div','memory-type',m.kind);type.append(el('span','',m.status));card.append(type,el('h3','',K.describeMemory(m)),el('p','',m.attribution.replace(/_/g,' ')+' · '+m.temporal));
         const source=this.state.messages.find(x=>x.id===m.sourceMessage);if(source)card.append(el('p','memory-source','“'+source.text+'”'));
-        if(m.supersedes.length)card.append(el('p','tiny','Supersedes '+m.supersedes.join(', ')));
-        if(m.object.concept)card.append(el('p','tiny',m.object.concept));
+        if(m.supersedes.length)card.append(el('p','tiny','Replaces '+(m.supersedes.length===1?'an earlier record':m.supersedes.length+' earlier records')));
+        const meaning=m.object.concept&&K.ARTIFACT.concepts.find(c=>c.id===m.object.concept);if(meaning)card.append(el('p','tiny','Meaning · '+meaning.label));
         const footer=el('footer');footer.append(button('Source · turn '+m.turn,'source-link',()=>this.source(m.sourceMessage)));if(m.status==='active')footer.append(button('Retire','text-button',()=>this.run(()=>this.presenter.retire(m.id))));card.append(footer);box.append(card);
       }
     }
@@ -85,7 +85,7 @@
       box.append(button('Export this reply and its semantic artifact ↓','secondary',()=>download('kira-reply-proof.json',JSON.stringify({artifact:K.ARTIFACT,plan},null,2))));$('inspect-dialog').showModal();
     }
     openSettings(){const s=this.state.settings;$('persona-select').value=s.persona;$('register-range').value=s.register;$('boundary-select').value=s.boundary;this.avatarDraft=s.avatar;this.settingsLabels();$('settings-dialog').showModal();}
-    settingsLabels(){$('persona-description').textContent=K.DIALOGUE.personas[$('persona-select').value].description;const n=Number($('register-range').value);$('register-output').textContent=n<0?'Casual '+n:n>0?'Formal +'+n:'Neutral';}
+    settingsLabels(){$('persona-description').textContent=K.DIALOGUE.personas[$('persona-select').value].description;const n=Number($('register-range').value);$('register-output').textContent=n<=-1500?'Very casual':n<0?'Casual':n>=1500?'Very formal':n>0?'Formal':'Neutral';}
     queryFields(){
       const kind=$('query-kind').value,box=$('query-fields');clear(box);
       const selectField=(id,title,values,selected)=>{const label=el('label','field-label',title);label.htmlFor=id;const select=el('select');select.id=id;for(const v of values){const o=el('option','',v.label);o.value=v.id;select.append(o);}if(selected)select.value=selected;box.append(label,select);return select;};

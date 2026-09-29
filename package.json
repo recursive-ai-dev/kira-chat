@@ -1,6 +1,6 @@
 {
   "name": "kira-chat",
-  "version": "4.1.3",
+  "version": "4.2.0",
   "private": true,
   "description": "Kira - offline dialogue with inspectable memory, deterministic replay, and checked semantics. Runs in a single HTML file with no account, API key, or LLM.",
   "license": "Apache-2.0",

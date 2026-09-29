@@ -11,12 +11,13 @@
 body.dawn{color-scheme:light;--bg:#f7f5ef;--sidebar:#eeefe7;--panel:#fffef9;--raised:#ebece4;--text:#263a33;--muted:#5c6e64;--subtle:#647a6d;--line:#d9dfd3;--accent:#975b3b;--accent-ink:#fff9f0;--green:#44745c;--bubble:#eaf0e7;--user:#dce8db;--shadow:0 22px 100px #30473533}.dawn .portrait{background:radial-gradient(ellipse at 25% 40%,#efcba799,transparent 60%),#b8c6ad}.dawn .portrait>span{color:#3b5745}.dawn .settings-data{background:#00000003}.dawn .composer{border-color:#9cab9d}
 @keyframes arrive{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}@keyframes pulse{50%{opacity:.3}}@media(min-width:1500px){.messages{padding-top:50px}.welcome{margin-top:65px}.continuity{padding:32px}.conversation-screen{grid-template-columns:minmax(0,1fr) 310px}}@media(max-width:1180px){#app{grid-template-columns:210px minmax(0,1fr)}.sidebar{padding:25px 14px}.continuity{display:none}.conversation-screen{grid-template-columns:1fr}.messages,.composer-wrap{padding-left:50px;padding-right:50px}.lab-grid{grid-template-columns:300px minmax(0,1fr)}.lower-lab{grid-template-columns:1fr 1fr}.page-screen{padding:32px 25px}}@media(max-width:800px){#app{grid-template-columns:170px minmax(0,1fr)}.sidebar{padding:24px 10px}.brand{font-size:34px;gap:6px}.brand-mark{font-size:26px}.version{font-size:8px}.nav-item{font-size:11px;padding:10px;gap:8px}.side-caption{font-size:8px;letter-spacing:1px}.side-profile{margin-top:28px}.portrait{width:91px;height:108px}.portrait>span{font-size:55px}.side-profile p{font-size:11px}.subtle{font-size:10px}.topbar{padding:16px 25px}.messages,.composer-wrap{padding-left:27px;padding-right:27px}.composer-footer>span:last-child{display:none}.lab-grid,.lower-lab{grid-template-columns:1fr}.empty-result{margin:20px auto}.engine-strip{grid-template-columns:repeat(2,1fr)}.engine-strip>div{border-bottom:1px solid var(--line)}.page-intro{display:block}.page-intro h2{font-size:30px}.page-intro>.pill{display:inline-block}.filterbar{display:block}.filterbar>.checkbox-label{margin-top:15px}.topbar .pill{font-size:9px}.composer-tip{display:none}.composer-tools #input-count{margin-left:auto}.side-bottom .tiny{font-size:10px}.welcome{margin-top:20px}.welcome-foot{gap:10px;font-size:9px}}@media(max-width:600px){#app{display:flex;flex-direction:column;height:100dvh}.sidebar{flex-direction:row;padding:12px 16px;align-items:center;border-right:0;border-bottom:1px solid var(--line);overflow:visible;gap:16px;flex-shrink:0}.brand{padding:0;font-size:31px;gap:6px}.brand-mark{font-size:25px}.version,.side-caption,.side-profile,.side-bottom{display:none}.sidebar nav{display:flex;flex:1;gap:3px;justify-content:flex-end}.nav-item{margin:0;padding:8px 9px;font-size:10px;width:auto;gap:5px}.nav-item>span:first-child{display:none}.nav-arrow,.count{display:none}.topbar{height:74px;padding:14px 20px}.topbar h1{font-size:18px}.topbar-actions{gap:9px}.topbar .pill{font-size:8px;padding:5px 7px}main{flex:1;height:auto;min-height:0}.topbar .eyebrow{font-size:8px}.messages{padding:18px 20px 10px}.composer-wrap{padding:8px 16px 12px}.welcome{margin:12px auto}.welcome h2{font-size:36px}.welcome p{font-size:12px}.welcome-symbol{font-size:26px;margin-bottom:9px}.welcome .eyebrow{font-size:8px;margin-bottom:12px}.welcome-foot{margin-top:17px;padding-top:14px}.bubble{padding:13px 15px;font-size:12px}.message{margin-bottom:20px}.quick-prompts{gap:5px;margin-bottom:9px}.quick-prompts button{font-size:10px;padding:5px 9px}.composer{padding:12px 12px 8px}.composer textarea{font-size:13px}.composer-footer{font-size:8px;padding-top:8px}.page-screen{padding:26px 20px}.page-intro{margin-bottom:20px}.page-intro h2{font-size:31px}.page-intro p{font-size:12px}.panel{padding:18px}.engine-strip>div{padding:14px}.engine-strip b{font-size:11px}.engine-strip small{font-size:9px}.dialog-heading{padding:22px}.settings-body,.settings-data,.inspect-content{padding-left:22px;padding-right:22px}.settings-avatar-row{flex-wrap:wrap}.settings-avatar-row>div{flex-basis:100%}.notice{padding:10px 20px;font-size:11px}.settings-dialog{max-height:93dvh}.button-row .secondary{font-size:11px}.memory-grid{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .lexicon-panel{margin-bottom:24px}.lexicon-browser{display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr);gap:24px;margin-top:18px}.lexicon-results{max-height:340px;overflow:auto;display:flex;flex-direction:column;align-items:stretch;gap:6px}.lexicon-results button{text-align:left;padding:9px 12px}.lexicon-detail{min-width:0;overflow-wrap:anywhere}.lexicon-detail .button-row{flex-wrap:wrap}.lexicon-detail h3{margin-top:0}.lexicon-detail details{margin-top:12px}.lexicon-detail pre{max-height:240px;overflow:auto;font-size:11px;white-space:pre-wrap}@media(max-width:700px){.lexicon-browser{grid-template-columns:1fr}.lexicon-results{max-height:180px}}
+.message.assistant .message-tools{opacity:.6;transition:opacity .2s}.message.assistant:hover .message-tools,.message.assistant:focus-within .message-tools,.message.assistant:last-child .message-tools{opacity:1}@media(hover:none){.message.assistant .message-tools{opacity:1}}
 </style>
 </head>
 <body>
 <div id="app">
   <aside class="sidebar">
-    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.1.3</span></a>
+    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.2.0</span></a>
     <div class="side-caption">A LITTLE CONTINUITY</div>
     <nav aria-label="Main navigation">
       <button class="nav-item active" data-screen="conversation" aria-current="page"><span aria-hidden="true">◌</span> Conversation <span class="nav-arrow">↗</span></button>
@@ -538,8 +539,9 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       K.assert(typeof text==='string'&&text.length<=200,'Search must be under 200 characters');
       if(id){const c=this.concepts.get(id);K.assert(c,'Unknown concept');return {entry:K.clone(c),parents:this.parents.get(id).map(parent=>({id:parent,label:this.concepts.get(parent).label,evidence:this.query({op:'subsumes',a:id,b:parent})})),children:this.a.axioms.filter(ax=>ax.kind==='sub'&&ax.b===id&&ax.a!==id).map(ax=>({id:ax.a,label:this.concepts.get(ax.a).label})),senses:this.fibers.get(id).map(K.clone),topic:this.topicFor(id)};}
       const needle=this.lookupKey(text),exact=new Set(this.lookup(text));
-      const results=this.a.concepts.filter(c=>!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle));
-      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(a.id,b.id));
+      // Dialogue-act concepts are routing internals, not vocabulary; they stay reachable by id.
+      const results=this.a.concepts.filter(c=>!this.sub(c.id,'c:intent')&&(!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle)));
+      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(K.fold(a.label),K.fold(b.label))||K.cmp(a.id,b.id));
       return {total:results.length,entries:results.slice(0,40).map(c=>({id:c.id,label:c.label,aliases:c.aliases,topic:this.topicFor(c.id)}))};
     }
     senseFor(cid){return this.a.senses.find(s=>s.cid===cid&&s.lin[0]===0&&s.lin[1]===0)?.id||this.a.senses.find(s=>s.cid===cid).id;}
@@ -550,13 +552,18 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
 'use strict';
 // Bounded English grammar. This is an auditable interpretation, not a proof of NLU.
 (function(K){
-  const negativeMoods=new Set(['sad','unhappy','tired','lonely','anxious','angry','overwhelmed','frustrated','worried','disappointed','restless']);
-  const moods=['happy','glad','sad','unhappy','tired','lonely','anxious','angry','excited','calm','okay','ok','fine','overwhelmed'];
+  const negativeMoods=new Set(['sad','unhappy','tired','lonely','anxious','angry','overwhelmed','frustrated','worried','disappointed','restless','stressed','depressed','scared','upset','exhausted','nervous','down']);
+  const moods=['happy','glad','sad','unhappy','tired','lonely','anxious','angry','excited','calm','okay','ok','fine','overwhelmed','good','great','alright','well','stressed','depressed','scared','upset','exhausted','nervous','down','bored','relaxed','content'];
+  // Trailing emphasis that does not change what is reported.
+  const trailing=/\s+(?:a lot|so much|very much|a ton|too|as well|anymore|now|these days|lately)$/i;
+  // Hard news gets a gentle reply instead of a generic follow-up question.
+  const loss=/\b(?:died|passed away|passed on|put (?:him|her|them|it) down|was put down|funeral|lost my (?:job|mom|mum|mother|dad|father|brother|sister|friend|partner|wife|husband|dog|cat|grandma|grandpa|grandmother|grandfather)|broke up|dumped me|got fired|was fired|laid off|getting divorced|got divorced)\b/;
   function parseInput(input,state,engine){
     const text=K.nfc(input).trim(),lower=K.fold(text),core=lower.replace(/[.!?]+$/,'').trim();
-    const result=(intent,extra={})=>({version:'parser/4.1.0',text,intent:'c:'+intent,speechAct:'statement',frames:[],quoted:[],supported:true,reason:null,...extra});
+    const result=(intent,extra={})=>({version:'parser/4.2.0',text,intent:'c:'+intent,speechAct:'statement',frames:[],quoted:[],supported:true,reason:null,...extra});
     const clarify=reason=>result('clarify',{supported:false,reason});
     const span=v=>{const start=lower.indexOf(K.fold(v));return {start:Math.max(0,start),end:Math.max(0,start)+v.length};};
+    const original=v=>{const i=lower.lastIndexOf(v);return i<0?v:text.slice(i,i+v.length);};
     const object=v=>{const label=v.trim(),candidates=engine.lookup(label);return {label,candidates,concept:candidates.length===1?candidates[0]:null,key:candidates.length===1?candidates[0]:'literal:'+K.hash(K.fold(label))};};
     if(!text||text.length>2000)return clarify('A message must contain 1–2000 characters.');
     if(/\bnot\s+not\b|\b(?:don't|do not)\s+not\b/.test(lower))return clarify('The repeated negation has more than one plausible reading. Please say the intended feeling or preference directly.');
@@ -582,48 +589,66 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       const chosen=p.choices.find((c,i)=>core===String(i+1)||core===K.fold(c.label)||c.aliases.some(x=>core===K.fold(x)));
       if(chosen){const frames=K.clone(p.frames||[p.frame]);for(const frame of frames)if(frame.object.key===p.frame.object.key){frame.object.concept=chosen.id;frame.object.key=chosen.id;frame.object.candidates=[chosen.id];}const unresolved=frames.find(f=>f.object.candidates.length>1);if(unresolved)return result('clarify',{supported:false,ambiguity:unresolved,candidateFrames:frames,sourceMessage:p.sourceMessage,reason:'There is one more ambiguous word.'});const frame=frames[0];return result(frames.every(f=>f.kind===frame.kind)?frame.kind:'note',{frames,object:frame.object,resolvedPending:true,sourceMessage:p.sourceMessage,speechAct:'clarification'});}
     }
+    if(/^(?:(?:what|who) (?:can|do) you (?:do|help with)|how does this work|how do (?:i|you) use (?:this|you)|help|help me|can you help(?: me)?|what should (?:i|we) (?:say|talk about)|what else|what now|i don't know what to say|idk|any ideas)$/.test(core))return result('about',{speechAct:'question',aboutKind:'capabilities'});
+    if(/^(?:are you (?:real|human|a (?:bot|robot|person|human|machine)|an ai|ai|alive|conscious|sentient)|do you have (?:feelings|emotions|a body)|are you an? (?:llm|chatbot)|what are you really)$/.test(core))return result('about',{speechAct:'question',aboutKind:'honest'});
+    if((m=core.match(/^(?:do you (?:like|love|enjoy)|what do you think (?:of|about)|how do you feel about) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'taste',object:object(original(m[1]))});
+    if((m=core.match(/^(?:what(?:'s| is) your fav(?:ou?rite)?|do you have a fav(?:ou?rite)?) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'favorite',object:object(original(m[1]))});
+    if(/^(?:another(?: one)?|one more|again|more)$/.test(core)&&['joke','prompt'].includes(state.lastPlan?.act))return result(state.lastPlan.act);
+    if(/^(?:lol|lmao|haha+|hehe+|ha(?: ha)+|that's funny|that was funny|good one|nice one)$/.test(core))return result('social',{socialKind:'laugh'});
+    if(/^(?:cool|nice|neat|great|awesome|interesting|i see|got it|fair enough|true|hmm+|mm+|oh|ah|wow|right|alright|sounds good|makes sense|not much|nothing much|nothing)$/.test(core))return result('social',{socialKind:'ack'});
+    if(loss.test(core))return result('support',{loss:true});
     const fixed=[
       ['greet',/^(?:hi|hello|hey|yo|hey kira|hi kira|good morning|good afternoon|good evening)$/],
       ['farewell',/^(?:bye|goodbye|good night|goodnight|see you|see ya|talk later)$/],
-      ['how',/^(?:how are you|how are you doing|how have you been|what's up|what are you thinking about)$/],
-      ['about',/^(?:who are you|what are you|tell me about (?:you|yourself)|what do you like|what's your name)$/],
-      ['thanks',/^(?:thanks|thank you|thank you kira|thanks for listening|i appreciate you)$/],
+      ['how',/^(?:how are you|how are you doing|how are you today|how's it going|how have you been|what's up|sup|what are you thinking about|what are you up to)$/],
+      ['about',/^(?:who are you|what are you|tell me about (?:you|yourself)|what do you like|what's your name|what is your name|what should i call you|introduce yourself)$/],
+      ['thanks',/^(?:thanks|thank you|thank you kira|thanks kira|thank you so much|thanks a lot|thx|ty|thanks for listening|i appreciate (?:you|it|that))$/],
       ['affection',/^(?:i love you|i like you|i miss you|you're (?:beautiful|amazing|lovely)|you are (?:beautiful|amazing|lovely))$/],
-      ['joke',/^(?:tell me a joke|make me laugh|another joke)$/],
+      ['joke',/^(?:tell me a joke|tell me another joke|make me laugh|another joke|(?:do you )?know any jokes|say something funny)$/],
       ['prompt',/^(?:give me a writing prompt|writing prompt|tell me a story idea|another prompt)$/],
       ['why',/^(?:why|why did you say that|explain (?:that|your reply))$/],
       ['recall',/^(?:what do you remember(?: about me)?|what do you know about me|what have i told you|what do i like|what's my name|what is my name)$/],
-      ['support',/^(?:i need (?:advice|support|someone to talk to)|can we talk|i had a (?:bad|rough|hard) day|i'm having a hard time)$/]
+      ['support',/^(?:i need (?:advice|support|someone to talk to|to talk)|can we talk|i had a (?:bad|rough|hard|terrible|long) day|(?:i'm|i am) having a (?:hard|rough|bad) (?:time|day|week)|(?:today|this week) (?:was|has been) (?:rough|hard|bad|terrible))$/]
     ];
     for(const [intent,pattern]of fixed)if(pattern.test(core))return result(intent,{speechAct:['how','about','recall','why'].includes(intent)?'question':'statement',nameOnly:/my name/.test(core),preferencesOnly:core==='what do i like'});
     if((m=core.match(/^do i (like|love|enjoy|hate|dislike) (.+)$/)))return result('recall',{speechAct:'question',predicate:m[1],object:object(m[2])});
     if((m=core.match(/^(?:forget|stop remembering) (.+)$/)))return result('forget',{speechAct:'request',object:object(m[1])});
     function semanticDraft(draft){
-      for(const slot of ['a','b'])if(draft[slot]){if(!draft[slot].length)return clarify('I don’t have that term in the lexicon yet. You can search the vocabulary in Engine lab.');if(draft[slot].length>1)return result('clarify',{supported:false,semanticAmbiguity:{slot,draft,candidates:draft[slot]},reason:'Which meaning do you intend?'});}
+      for(const slot of ['a','b'])if(draft[slot]){if(!draft[slot].length)return clarify((draft.labels?.[slot]?'“'+draft.labels[slot]+'” isn’t in my vocabulary yet':'That term isn’t in my vocabulary yet')+', so I can’t answer reliably. You can browse the words I do know in Engine lab.');if(draft[slot].length>1)return result('clarify',{supported:false,semanticAmbiguity:{slot,draft,candidates:draft[slot]},reason:'Which meaning do you intend?'});}
       return result('semantic',{speechAct:'question',...(draft.op==='describe'?{definition:draft.a[0]}:{query:{op:'subsumes',a:draft.a[0],b:draft.b[0]}})});
     }
-    if((m=core.match(/^is (.+?) (?:a kind of |a type of |an? )(.+)$/))||(m=core.match(/^are (.+?) (.+)$/)))return semanticDraft({op:'subsumes',a:engine.lookup(m[1]),b:engine.lookup(m[2])});
+    if((m=core.match(/^is (.+?) (?:a kind of |a type of |an? )(.+)$/))||(m=core.match(/^are (?!you\b)(.+?) (?:a kind of |a type of )?(.+)$/)))return semanticDraft({op:'subsumes',a:engine.lookup(m[1]),b:engine.lookup(m[2]),labels:{a:m[1],b:m[2]}});
     if((m=core.match(/^(?:what is |what's )?(?:a )?more (formal|casual) (?:word|term) for (.+)$/))){
       const cs=engine.lookup(m[2]);if(cs.length!==1)return clarify('Which meaning do you want to restyle? Try “a more formal word for bike”.');
       const s=engine.a.senses.find(s=>s.cid===cs[0]&&K.fold(s.lemma)===m[2])||engine.a.senses.find(s=>s.id===engine.senseFor(cs[0]));
       return result('semantic',{speechAct:'question',query:{op:'shift',s:s.id,delta:[m[1]==='formal'?2000:-2000,0]}});
     }
-    if((m=core.match(/^(?:what is|what's|define)\s+(.+)$/)))return semanticDraft({op:'describe',a:engine.lookup(m[1])});
+    if((m=core.match(/^(?:what is|what's|what are|define)\s+(?:an? )?(.+)$/)))return semanticDraft({op:'describe',a:engine.lookup(m[1]),labels:{a:m[1]}});
     if((m=core.match(/^(?:tell me about|let's talk about|talk about) (.+)$/)))return result('topic',{object:object(m[1]),speechAct:'request'});
-    if(core==='yes'||core==='no'||core==='sure'||core==='okay'){
-      if(state.context.pending?.kind==='support')return result('support',{answer:core==='no'?'no':'yes'});
-      return clarify('I don’t have a specific yes-or-no question pending. What would you like to continue with?');
+    if(/^(?:yes|yeah|yep|yes please|sure|ok|okay|no|nope|no thanks|not really)$/.test(core)){
+      const no=/^(?:no|nope|no thanks|not really)$/.test(core),p=state.context.pending;
+      if(p?.kind==='offer')return no?result('social',{socialKind:'decline'}):result(p.act);
+      if(p?.kind==='support')return result('support',{answer:no?'no':'yes'});
+      // A pending question or choice takes the answer; see parseConversation.
+      if(['detail','confirmName','sense','topicSense','semanticSense'].includes(p?.kind))return {...clarify('I don’t have a reliable reading of that yet.'),reasonCode:'unparsed'};
+      return result('social',{socialKind:no?'decline':'ack'});
     }
     // Multiple supported reports commit together; any unparsed clause rejects the batch.
     const clauses=text.replace(/^(?:actually|correction)[:,]?\s*/i,'').split(/(?:[.;]\s+|,?\s+but\s+|\s+and\s+(?=I\b))/i);
     const frames=[];
     for(let clause of clauses){
       clause=clause.replace(/[.!?]+$/,'').trim();const c=K.fold(clause);let f=null;
+      const favorite=c.match(/^my (?:absolute )?fav(?:ou?rite)? [\p{L} ]{1,40}? (?:is|are) (.+)$/u)||c.match(/^(.+?) (?:is|are) my (?:absolute )?fav(?:ou?rite)?(?: [\p{L} ]{1,40})?$/u);
+      if(favorite&&!/^(?:it|that|this|them)$/.test(favorite[1])&&favorite[1].length<=100&&!/[.;!?]/.test(favorite[1])){
+        const piece=clause.slice(c.lastIndexOf(favorite[1]),c.lastIndexOf(favorite[1])+favorite[1].length).trim();
+        frames.push({kind:'preference',subject:'user',predicate:'love',object:object(piece),polarity:'positive',temporal:'present',correction:false,span:span(piece),attribution:'user_reported',reference:null});
+        continue;
+      }
       if((m=clause.match(/^(?:my name(?: is|'s)|call me)\s+(.+)$/i))){
         const name=m[1].trim();if(!K.isConversationName(name))return {...clarify('What name would you like me to use?'),askName:true};
         f={kind:'name',subject:'user',predicate:'name',object:object(name),polarity:'positive',temporal:'present',span:span(name),attribution:'user_reported'};
-      }else if((m=c.match(/^i\s+(?:(used to)\s+)?(?:(don't|do not|didn't|did not)\s+)?(like|love|enjoy|hate|dislike)\s+(.+)$/))){
-        let label=clause.slice(c.indexOf(m[4])).replace(/\s+(?:anymore|now)$/i,'').trim(),resolved=null;
+      }else if((m=c.match(/^i\s+(?:(?:really|truly|absolutely|totally|genuinely|honestly|just|also|still|kind of|kinda|sort of)\s+)?(?:(used to)\s+)?(?:(don't|do not|didn't|did not)\s+)?(?:(?:really|even|actually)\s+)?(like|love|enjoy|hate|dislike)\s+(.+)$/))){
+        let label=clause.slice(c.lastIndexOf(m[4])),resolved=null;while(trailing.test(label))label=label.replace(trailing,'');label=label.trim();
         if(/^(?:it|that|this|them)$/i.test(label)){
           if(!state.context.focus||state.turn-state.context.focus.turn>3)return clarify('What does “'+label+'” refer to? Please name it so I change the right preference.');
           resolved=K.clone(state.context.focus.object);label=resolved.label;
@@ -632,7 +657,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
         const pieces=resolved?[label]:label.split(/\s+and\s+/i);if(pieces.length>4)return clarify('Please give me up to four preferences at a time.');
         for(const piece of pieces){const obj=resolved||object(piece);frames.push({kind:'preference',subject:'user',predicate:m[3],object:obj,polarity:m[2]?'negative':'positive',temporal:m[1]||m[2]?.startsWith('did')?'past':'present',correction:/^(?:actually|correction)\b/i.test(text)||/anymore$/i.test(clause),span:resolved?span(clause):span(piece),attribution:'user_reported',reference:resolved?{resolvedFrom:state.context.focus.sourceMessage}:null});}
         continue;
-      }else if((m=c.match(/^i(?:'m| am| feel| was| felt)\s+(not\s+)?(?:feeling\s+)?(.+)$/))&&(moods.includes(m[2])||(engine.lookup(m[2]).length===1&&engine.sub(engine.lookup(m[2])[0],'c:feeling')))){
+      }else if((m=c.replace(/,?\s+(?:thanks|thank you|thx)(?: for asking)?$/,'').replace(/\s+(?:today|right now|now|lately|tonight)$/,'').match(/^i(?:'m| am| feel| was| felt)\s+(not\s+)?(?:(?:feeling|doing)\s+)?(?:(?:really|so|very|pretty|quite|a bit|a little|kind of|kinda)\s+)?(.+)$/))&&(moods.includes(m[2])||(engine.lookup(m[2]).length===1&&engine.sub(engine.lookup(m[2])[0],'c:feeling')))){
         f={kind:'mood',subject:'user',predicate:'feels',object:object(m[2]),polarity:m[1]?'negative':'positive',temporal:/^i (?:was|felt)/.test(c)?'past':'present',span:span(m[2]),attribution:'user_reported'};
       }
       if(!f)return {...clarify('I don’t have a reliable reading of that yet.'),reasonCode:'unparsed'};
@@ -667,7 +692,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   function parseConversation(input,state,engine){
     const raw=K.nfc(input).trim(),text=raw.replace(/[’‘]/g,"'"),pending=state.context.pending;
     const base=(s=text)=>K.parseInput(s,state,engine);
-    const finish=r=>({...r,text:raw,version:'conversation-parser/4.1.2'});
+    const finish=r=>({...r,text:raw,version:'conversation-parser/4.2.0'});
     if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base());
     const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0},reason:null});
     // Do not turn a quoted or explicitly conditional statement into a report.
@@ -727,23 +752,27 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     art:['What kind of art draws you in?','Is it the subject, the materials, or the way it makes you feel?','Are you making something yourself?'],
     hiking:['Is there a place you like to return to?','What do you notice there that you miss elsewhere?','Do you go for the movement or the quiet?'],
     feelings:['Would you like to describe what brought that on?','What feels most important to say about it?','Would you like to stay with this, or take a break from the subject?'],
-    general:['What would you like me to know about that?','Which part matters most to you?','Would you like to stay with that, or change the subject?']
+    support:['What’s been the hardest part?','How are you holding up right now?','Has anything helped, even a little?','Would you like to keep talking about it, or take a breather with something lighter?'],
+    general:['How do you feel about that?','What’s that like for you?','Would you like to stay with that, or talk about something else?']
   };
   function nextQuestion(topic,step){const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';}
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion});
+  // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
+  const acknowledgements={gentle:['Thank you for telling me.','I’m listening.','That makes sense.'],direct:['Understood.','Okay.','Got it.'],default:['I’m with you.','Mm, okay.','Thanks for sharing that.','That’s good to know.']};
+  const acknowledge=(topic,persona,turn)=>{const a=['support','feelings','repair'].includes(topic)?acknowledgements.gentle:persona==='direct'?acknowledgements.direct:acknowledgements.default;return a[turn%a.length];};
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
 })(Kira);
 
 'use strict';
 (function(K){
-  K.DIALOGUE={version:'dialogue/4.1.0',personas:{
+  K.DIALOGUE={version:'dialogue/4.2.0',personas:{
     warm:{name:'Warm',description:'Gentle, open, a little soft around the edges.',target:[-1000,0]},
     playful:{name:'Playful',description:'Light teasing, curious questions, small surprises.',target:[-2000,0]},
     thoughtful:{name:'Thoughtful',description:'Reflective, unhurried, drawn to the details.',target:[2000,0]},
     direct:{name:'Direct',description:'Clear words, honest limits, fewer detours.',target:[0,0]}
   },responses:{
     greet:[{id:'greet:open',text:'{greeting}. It’s good to have some company. What’s on your mind?'},{id:'greet:small',text:'{greeting}. Start anywhere—a small thing is enough.'},{id:'greet:return',text:'{greeting}. What are we making room for today?'}],
-    how:[{id:'how:rain',text:'In my little fictional corner of things: a window, a notebook, and rain that hasn’t quite started. What’s your corner like?'},{id:'how:music',text:'If this were a scene, I’d have a quiet record on and nowhere urgent to be. How are you doing?'},{id:'how:honest',text:'Ready for a conversation. I don’t have a day outside this app, but we can give this one a little atmosphere.'}],
-    about:[{id:'about:clear',text:'I’m Kira, a fictional companion built from explicit rules, a small lexicon, and the things you choose to tell me. My character likes late-night music, unfinished notebooks, and thoughtful company. I can remember a preference; I’ll ask when I can’t reliably read a sentence.'}],
+    how:[{id:'how:rain',text:'In my little fictional corner of things: a window, a notebook, and rain that hasn’t quite started. What’s your corner like?'},{id:'how:music',text:'If this were a scene, I’d have a quiet record on and nowhere urgent to be. How are you doing?'},{id:'how:honest',text:'Ready for a conversation. I don’t have a day outside this app, but we can give this one a little atmosphere. How are you doing?'}],
+    about:[{id:'about:clear',text:'I’m Kira—a fictional companion made of explicit rules, a small vocabulary, and whatever you choose to tell me. In character, I like late-night music, unfinished notebooks, and unhurried company. I’ll remember what you share, and I’ll ask when I’m not sure what you mean. How are you doing?'}],
     farewell:[{id:'bye:gentle',text:'Take care of yourself. We can pick this up whenever you feel like it.'},{id:'bye:soft',text:'See you around. There’s no schedule to keep with me.'}],
     stay:[{id:'stay:listen',text:'We can keep talking. What would you like to stay with for a bit?'},{id:'stay:quiet',text:'Okay. No goodbye just yet. Want a distraction, or a little space to talk?'}],
     thanks:[{id:'thanks:welcome',text:'You’re welcome. I’m glad this conversation has something for you.'},{id:'thanks:easy',text:'You’re welcome. We can take things at your pace.'}],
@@ -752,6 +781,12 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     joke:[{id:'joke:cache',text:'I named my houseplant Cache. Every time I forget to water it, I call it a memory leak.'},{id:'joke:moon',text:'The moon opened a café. Great atmosphere, terrible working hours.'},{id:'joke:bug',text:'A bug walked into my code. I offered it a feature flag and hoped nobody would notice.'},{id:'joke:book',text:'I tried to write a very short book about procrastination. So far, the title is doing all the work.'}],
     prompt:[{id:'prompt:station',text:'A railway station keeps announcing trains that stopped running thirty years ago. Tonight, someone gets off one. Write the conversation at the ticket window.'},{id:'prompt:town',text:'A town’s streetlights turn on one by one, following someone who isn’t there. Tell it through the person paid to replace the bulbs.'},{id:'prompt:letter',text:'Two strangers receive the same unfinished letter. Neither knows the writer. Their first disagreement is about whether to finish it.'},{id:'prompt:world',text:'An empire falls while a village argues over a broken bridge. Keep the empire offstage. Let the bridge matter.'}],
     support:[{id:'support:space',text:'We can slow down for a moment. Would you like to say what happened?'},{id:'support:small',text:'You don’t have to put the whole thing into words at once. Is there one part you want to start with?'}],
+    loss:[{id:'loss:sorry',text:'I’m so sorry. That’s a lot to carry. Would you like to tell me about it, or would you rather have some quiet company for a bit?'},{id:'loss:gentle',text:'Oh, I’m sorry. That sounds really painful. Do you want to talk about it?'}],
+    social:[{id:'social:open',text:'Mm-hm. What’s on your mind?'},{id:'social:next',text:'Okay. Where would you like to go from here?'},{id:'social:day',text:'Sure. Anything from your day you’d like to tell me about?'}],
+    decline:[{id:'decline:fine',text:'That’s fine. What would you rather talk about?'},{id:'decline:easy',text:'No problem. Is there something else on your mind?'}],
+    laugh:[{id:'laugh:win',text:'I’ll count that as a win. Want another one?'},{id:'laugh:glad',text:'Glad that landed. Shall I try another?'}],
+    capabilities:[{id:'capabilities:list',text:'A few things I do well:\n• Remember what you tell me — “My name is Sam”, “I like jazz”, “I don’t like mornings”.\n• Notice how you’re feeling — “I’m tired”, “I’m happy”.\n• Answer questions about words I know — “What is a synthesizer?”, “Is a dog an animal?”\n• Tell a joke or give you a writing prompt.\nWhat would you like to start with?'}],
+    honest:[{id:'honest:clear',text:'I’m a fictional character running on explicit rules inside this page. There’s no AI model, no internet connection, and no hidden mind behind me. I only know what you tell me here, and you can inspect every reply. What would you like to talk about?'}],
     crisis:[{id:'support:urgent',text:'I’m sorry things feel this hard. Are you safe right now? If you might act on hurting yourself, contact emergency services or someone who can stay with you now. I can keep talking, but I can’t provide emergency help.'}]
   },topics:{
     'c:music':['What kind of music has been staying with you lately?','A song can make a room feel like a different place. Is there one you keep returning to?'],
@@ -783,6 +818,8 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
 // Pure Model: no DOM, storage, clock, randomness, network, or timers.
 (function(K){
   const MAX_EVENTS=1000,MAX_IMAGE=450000;
+  const upbeat=new Set(['happy','glad','excited','calm','good','great','well','relaxed','content','okay','ok','fine','alright']),mild=new Set(['okay','ok','fine','alright','good','well']);
+  const actLabels={name:'you telling me your name',preference:'a preference you shared',mood:'you telling me how you feel',note:'a note to keep',recall:'a question about what you’ve told me',forget:'a request to forget something',clarify:'something I couldn’t read confidently',semantic:'a question about what a word means',topic:'part of our ongoing conversation',greet:'a greeting',farewell:'a goodbye',how:'a check-in',about:'a question about me',thanks:'a thank-you',joke:'a request for a joke',prompt:'a request for a writing prompt',support:'a sign that things are hard right now',social:'a quick reaction',affection:'something kind',boundary:'a boundary for our conversation',stay:'a request to keep talking',why:'a question about my last reply'};
   const stage=points=>points>=32?'Familiar company':points>=12?'Finding a rhythm':points>=4?'Getting acquainted':'A new conversation';
   function initialState(){return {schema:'kira-state/4.1',revision:0,turn:0,nextMemory:1,settings:{persona:'warm',register:-1000,theme:'night',boundary:'platonic',avatar:null},messages:[],memories:[],context:{focus:null,pending:null},usage:{},relationship:{points:0,seen:[]},lastPlan:null};}
   function describeMemory(m){
@@ -892,12 +929,18 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
           else if(first.kind==='note')plan.text='I’ve kept that as a note you gave me: “'+first.object.label+'”';
           else if(first.kind==='mood'){
             if(first.polarity==='negative')plan.text='You said you '+(first.temporal==='past'?'weren’t':'aren’t')+' '+first.object.label+'. I won’t assume a different feeling from that. '+ask('general',0,'How would you describe it?');
+            else if(parsed.negativeMood&&['tired','exhausted'].includes(first.object.label)&&first.temporal==='present')plan.text=(persona==='direct'?'Noted—you’re '+first.object.label+'. ':'That sounds draining. ')+ask('support',1,'Has it been a long day, or more of a slow build-up?');
             else if(parsed.negativeMood){plan.text=(persona==='direct'?'You said you feel '+first.object.label+'. ':'I hear you—you said you feel '+first.object.label+'. ')+generic('support');askLastQuestion('support',0);}
-            else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,'What’s been behind that?');
+            else if(first.temporal==='present'&&upbeat.has(first.object.label))plan.text=mild.has(first.object.label)?'Glad to hear it. '+ask('general',0,'What’s been going on with you lately?'):'Good to hear you’re feeling '+first.object.label+'. '+ask('general',0,'What’s been behind that?');
+            else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,first.object.label==='bored'?'Want a joke, a writing prompt, or something to talk about?':'What’s been behind that?');
           }else{
             const changed=first.supersedes.length>0,past=first.temporal==='past';
             plan.text=(changed?'I’ve updated that. ':records[0].created?'I’ll remember that. ':'I have that saved already. ')+describeMemory(first)+'.';
-            if(!past&&first.polarity==='positive'&&records[0].created){const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general',averse=['hate','dislike'].includes(first.predicate);plan.text+=' '+ask(topic,0,averse?'What puts you off '+first.object.label+'?':K.DIALOGUE.topics['c:'+topic]?.[0]||'What draws you to '+first.object.label+'?');}
+            if(!past&&first.polarity==='positive'&&records[0].created){
+              const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general',label=first.object.label,averse=['hate','dislike'].includes(first.predicate);
+              const pool=averse?['What puts you off '+label+'?','What is it about '+label+' that doesn’t work for you?']:(K.DIALOGUE.topics['c:'+topic]||['What draws you to '+label+'?','What do you like most about '+label+'?']).concat(topic==='general'?[]:K.conversationQuestions[topic]||[]);
+              const key='followup:'+(averse?'averse':topic),count=state.usage[key]||0;state.usage[key]=count+1;plan.text+=' '+ask(topic,0,pool[count%pool.length]);
+            }
             if(past)plan.text+=' I won’t assume that is still your preference now.';
           }
           break;
@@ -906,21 +949,27 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
           let records=state.memories.filter(m=>m.status==='active');
           if(parsed.nameOnly)records=records.filter(m=>m.kind==='name');
           else if(parsed.preferencesOnly)records=records.filter(m=>m.kind==='preference'&&m.temporal==='present');
-          else if(parsed.object)records=records.filter(m=>m.kind==='preference'&&m.object.key===parsed.object.key&&m.temporal==='present');
+          else if(parsed.object)records=records.filter(m=>m.kind==='preference'&&(m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key))&&m.temporal==='present');
           records=records.slice(-12);claims(records);
-          plan.text=records.length?'Here’s what you’ve told me:\n'+records.map(m=>'• '+describeMemory(m)+' — turn '+m.turn+'.').join('\n'):'I don’t have that saved. You can tell me now if you want to.';
+          if(!records.length){
+            if(parsed.nameOnly){plan.text='You haven’t told me your name yet. What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}
+            else plan.text=parsed.object?'You haven’t told me how you feel about '+parsed.object.label+' yet.':'You haven’t told me anything to remember yet. You could start with your name, or something you like.';
+          }
+          else if(parsed.nameOnly)plan.text='You’re '+records[records.length-1].object.label+'.';
+          else if(parsed.object&&records.length===1)plan.text=describeMemory(records[0])+'—that’s what you told me.';
+          else plan.text='Here’s what you’ve told me:\n'+records.map(m=>'• '+describeMemory(m)+'.').join('\n');
           if(records.length===1&&records[0].kind==='preference')state.context.focus={object:K.clone(records[0].object),turn:state.turn,sourceMessage:records[0].sourceMessage};
           break;
         }
         case 'forget':{
-          const records=state.memories.filter(m=>m.status==='active'&&(m.object.key===parsed.object.key||K.fold(m.object.label)===K.fold(parsed.object.label)));
+          const records=state.memories.filter(m=>m.status==='active'&&(m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key)||K.fold(m.object.label)===K.fold(parsed.object.label)));
           const ids=records.map(m=>m.id);state.memories=state.memories.map(m=>ids.includes(m.id)?{...m,status:'retired',retiredAt:event.seq}:m);
           if(records.length)state.context.focus=null;
           plan.text=records.length?'I’ll stop using '+(records.length===1?'that memory':'those memories')+'. The original messages and retired records remain in the history; “Reset conversation” removes this app’s saved session.':'I don’t have an active memory matching that.';
           plan.policy.retired=ids;break;
         }
         case 'clarify':{
-          if(parsed.ambiguity){const f=parsed.ambiguity,choices=meaningChoices(f.object.candidates);state.context.pending={kind:'sense',frame:f,frames:parsed.candidateFrames,sourceMessage:parsed.sourceMessage||uid,choices};plan.text='When you say “'+f.object.label+'”, which meaning do you have in mind?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n')+'\nI haven’t saved this message’s reports yet.';}
+          if(parsed.ambiguity){const f=parsed.ambiguity,choices=meaningChoices(f.object.candidates);state.context.pending={kind:'sense',frame:f,frames:parsed.candidateFrames,sourceMessage:parsed.sourceMessage||uid,choices};plan.text='When you say “'+f.object.label+'”, which meaning do you have in mind?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n')+'\nI’ll save it once I know which one you mean.';}
           else if(parsed.semanticAmbiguity){const {slot,draft,candidates}=parsed.semanticAmbiguity,choices=meaningChoices(candidates);state.context.pending={kind:'semanticSense',slot,draft,choices};plan.text='Which meaning should I use for that question?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n');}
           else if(parsed.nameCandidate){plan.text='Should I call you '+parsed.nameCandidate+'?';state.context.pending={kind:'confirmName',name:parsed.nameCandidate,span:parsed.nameSpan,sourceMessage:uid,questionMessage:aid};}
           else if(parsed.askName){plan.text=parsed.reason;state.context.pending={kind:'name',questionMessage:aid};}
@@ -930,7 +979,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else{plan.text=misses===1?'I lost the thread there. '+ask('general',0,'What would you like me to know about that?'):'I’m still missing the meaning, and repeating the same answer won’t help. We can keep it as a note with “Remember this: …”, or start with one thing you want to talk about.';}
+            else plan.text=misses===1?'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.':'I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
           break;
         }
@@ -947,7 +996,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             discourse(answer,f?.questionMessage);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic};
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,'What would you rather talk about?');}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,topic==='support'?'What happened?':'Which part would you like to start with?');}
-            else{const openings=persona==='direct'?['You said: “','On “','To follow up on “']:['Let’s stay with “','Picking up on “','You mentioned “'];plan.text=openings[(state.turn-1)%openings.length]+answer.slice(0,240)+(answer.length>240?'…':'')+'”—'+ask(topic,step);}
+            else plan.text=K.acknowledge(topic,persona,state.turn)+' '+ask(topic,step);
             break;
           }
           const o=parsed.object,topic=this.engine.topicFor(o.concept),lines=K.DIALOGUE.topics['c:'+topic];
@@ -958,21 +1007,39 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
         }
         case 'boundary':state.settings.boundary=parsed.value;plan.text=parsed.value==='platonic'?'Of course. I’ll keep the conversation platonic.':'A little fictional flirting is fine. You can say “stop flirting” whenever you want.';break;
         case 'why':{
-          const last=previous.lastPlan;plan.text=last?'I read your previous message as “'+last.act+'”. '+(last.claims.length?'The reply referred to '+last.claims.length+' attributed record'+(last.claims.length===1?'':'s')+'. ':'It made no claim from your memory. ')+'The semantic checker verified the handler’s eligibility; the wording was selected by dialogue policy. You can inspect the previous reply for the exact records and checks.':'There isn’t a previous reply to explain yet.';break;
+          const last=previous.lastPlan,read=actLabels[last?.act]||'part of our conversation';plan.text=last?'I took your last message as '+read+'. '+(last.claims.length?'My reply drew on '+(last.claims.length===1?'one thing':last.claims.length+' things')+' you’ve told me. ':'My reply didn’t rely on anything you’ve told me before. ')+'The wording comes from my dialogue rules—open “Sources & reasoning” under any reply to see every record and check.':'There isn’t a previous reply to explain yet.';break;
         }
-        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic('support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
+        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic(parsed.loss?'loss':'support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
+        case 'about':{
+          const kind=parsed.aboutKind,o=parsed.object;
+          if(kind==='capabilities'||kind==='honest'){plan.text=generic(kind);askLastQuestion('general',0);}
+          else if(kind==='taste'||kind==='favorite'){
+            const topic=o.candidates.length===1?this.engine.topicFor(o.concept):null;
+            if(/^(?:me|us|talking to me|this)$/.test(K.fold(o.label)))plan.text='I enjoy your company here, in the way a fictional character can. What made you ask?';
+            else if(topic==='music')plan.text='In character, I’m drawn to late-night music—something quiet with a bit of texture. '+(kind==='favorite'?'What’s yours?':'What do you listen to?');
+            else plan.text=kind==='favorite'?'I’m a fictional character, so I don’t have a true favorite '+o.label+'. What’s yours?':'I’m a fictional character, so I don’t have real tastes of my own—but I’d like to hear yours. How do you feel about '+o.label+'?';
+            askLastQuestion(topic||'general',0);
+          }else plan.text=generic('about');
+          break;
+        }
+        case 'social':{
+          const kind=parsed.socialKind;
+          if(kind==='laugh'&&['joke','prompt'].includes(previous.lastPlan?.act)){plan.text=generic('laugh');state.context.pending={kind:'offer',act:previous.lastPlan.act};}
+          else{plan.text=kind==='laugh'?'Ha—glad something made you smile. What’s on your mind?':generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}
+          break;
+        }
         case 'affection':plan.text=generic(state.settings.boundary==='flirty'&&state.relationship.points>=4?'flirt':'affection');break;
         case 'greet':{
           const r=this.engine.query({op:'realize',c:'c:greeting-word',target:[state.settings.register,0]});plan.semantics.push(r);plan.slots.push({concept:'c:greeting-word',sense:r.value.chosen,type:'speech-act',context:'extensional'});
           const word=this.engine.a.senses.find(s=>s.id===r.value.chosen).lemma,name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
           if(name){claims([name]);plan.text=word[0].toUpperCase()+word.slice(1)+', '+name.object.label+'. '+ask('general',0,'What’s on your mind?');}
-          else{plan.text=generic('greet').replace('{greeting}',word[0].toUpperCase()+word.slice(1))+' What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}break;
+          else{plan.text=generic('greet').replace('{greeting}',word[0].toUpperCase()+word.slice(1)).replace(/\s+[^.!?]*\?$/,'')+' What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}break;
         }
         default:plan.text=generic(K.DIALOGUE.responses[intent]?intent:'about');
       }
       if(parsed.elaboration){discourse(parsed.elaboration);plan.text=plan.text.replace(/\s+[^.!?]*\?$/,'')+' You gave this reason: “'+parsed.elaboration+'”. '+ask(K.conversationTopic(parsed.text,this.engine)||'general',1);}
       for(const act of parsed.afterActs||[]){const r=this.engine.query({op:'route',intent:act.intent});K.assert(r.outcome==='Computed','Secondary act was not admitted');plan.semantics.push(r);const kind=act.intent.slice(2);plan.text+='\n\n'+generic(kind);plan.policy.secondaryActs=(plan.policy.secondaryActs||[]).concat(kind);state.context.pending=null;}
-      if(['how','about'].includes(intent)||(parsed.afterActs||[]).some(a=>a.intent==='c:how'))ask('general',0,'How are you doing?');
+      if(intent==='how'||intent==='about'&&!parsed.aboutKind||(parsed.afterActs||[]).some(a=>a.intent==='c:how'))ask('general',0,'How are you doing?');
       if(parsed.supported)state.context.misses=0;
       if(parsed.supported&&intent!=='crisis'){
         const fingerprint=K.hash(K.fold(parsed.text));if(!state.relationship.seen.includes(fingerprint)){state.relationship.seen.push(fingerprint);state.relationship.points=Math.min(100,state.relationship.points+1);}
@@ -994,7 +1061,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.1.3","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"ec50d3b01c3b7be5913765c046c71125628496326d88e0266874385c78d3a8ce","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"83205638cdf19f1828a96cfc19d316a013f53d354a0a65b78c12d45ce6a3c79a","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -1439,8 +1506,9 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       K.assert(typeof text==='string'&&text.length<=200,'Search must be under 200 characters');
       if(id){const c=this.concepts.get(id);K.assert(c,'Unknown concept');return {entry:K.clone(c),parents:this.parents.get(id).map(parent=>({id:parent,label:this.concepts.get(parent).label,evidence:this.query({op:'subsumes',a:id,b:parent})})),children:this.a.axioms.filter(ax=>ax.kind==='sub'&&ax.b===id&&ax.a!==id).map(ax=>({id:ax.a,label:this.concepts.get(ax.a).label})),senses:this.fibers.get(id).map(K.clone),topic:this.topicFor(id)};}
       const needle=this.lookupKey(text),exact=new Set(this.lookup(text));
-      const results=this.a.concepts.filter(c=>!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle));
-      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(a.id,b.id));
+      // Dialogue-act concepts are routing internals, not vocabulary; they stay reachable by id.
+      const results=this.a.concepts.filter(c=>!this.sub(c.id,'c:intent')&&(!needle||c.aliases.some(s=>this.lookupKey(s).includes(needle))||c.id.includes(needle)));
+      results.sort((a,b)=>Number(exact.has(b.id))-Number(exact.has(a.id))||K.cmp(K.fold(a.label),K.fold(b.label))||K.cmp(a.id,b.id));
       return {total:results.length,entries:results.slice(0,40).map(c=>({id:c.id,label:c.label,aliases:c.aliases,topic:this.topicFor(c.id)}))};
     }
     senseFor(cid){return this.a.senses.find(s=>s.cid===cid&&s.lin[0]===0&&s.lin[1]===0)?.id||this.a.senses.find(s=>s.cid===cid).id;}
@@ -1451,13 +1519,18 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
 'use strict';
 // Bounded English grammar. This is an auditable interpretation, not a proof of NLU.
 (function(K){
-  const negativeMoods=new Set(['sad','unhappy','tired','lonely','anxious','angry','overwhelmed','frustrated','worried','disappointed','restless']);
-  const moods=['happy','glad','sad','unhappy','tired','lonely','anxious','angry','excited','calm','okay','ok','fine','overwhelmed'];
+  const negativeMoods=new Set(['sad','unhappy','tired','lonely','anxious','angry','overwhelmed','frustrated','worried','disappointed','restless','stressed','depressed','scared','upset','exhausted','nervous','down']);
+  const moods=['happy','glad','sad','unhappy','tired','lonely','anxious','angry','excited','calm','okay','ok','fine','overwhelmed','good','great','alright','well','stressed','depressed','scared','upset','exhausted','nervous','down','bored','relaxed','content'];
+  // Trailing emphasis that does not change what is reported.
+  const trailing=/\s+(?:a lot|so much|very much|a ton|too|as well|anymore|now|these days|lately)$/i;
+  // Hard news gets a gentle reply instead of a generic follow-up question.
+  const loss=/\b(?:died|passed away|passed on|put (?:him|her|them|it) down|was put down|funeral|lost my (?:job|mom|mum|mother|dad|father|brother|sister|friend|partner|wife|husband|dog|cat|grandma|grandpa|grandmother|grandfather)|broke up|dumped me|got fired|was fired|laid off|getting divorced|got divorced)\b/;
   function parseInput(input,state,engine){
     const text=K.nfc(input).trim(),lower=K.fold(text),core=lower.replace(/[.!?]+$/,'').trim();
-    const result=(intent,extra={})=>({version:'parser/4.1.0',text,intent:'c:'+intent,speechAct:'statement',frames:[],quoted:[],supported:true,reason:null,...extra});
+    const result=(intent,extra={})=>({version:'parser/4.2.0',text,intent:'c:'+intent,speechAct:'statement',frames:[],quoted:[],supported:true,reason:null,...extra});
     const clarify=reason=>result('clarify',{supported:false,reason});
     const span=v=>{const start=lower.indexOf(K.fold(v));return {start:Math.max(0,start),end:Math.max(0,start)+v.length};};
+    const original=v=>{const i=lower.lastIndexOf(v);return i<0?v:text.slice(i,i+v.length);};
     const object=v=>{const label=v.trim(),candidates=engine.lookup(label);return {label,candidates,concept:candidates.length===1?candidates[0]:null,key:candidates.length===1?candidates[0]:'literal:'+K.hash(K.fold(label))};};
     if(!text||text.length>2000)return clarify('A message must contain 1–2000 characters.');
     if(/\bnot\s+not\b|\b(?:don't|do not)\s+not\b/.test(lower))return clarify('The repeated negation has more than one plausible reading. Please say the intended feeling or preference directly.');
@@ -1483,48 +1556,66 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       const chosen=p.choices.find((c,i)=>core===String(i+1)||core===K.fold(c.label)||c.aliases.some(x=>core===K.fold(x)));
       if(chosen){const frames=K.clone(p.frames||[p.frame]);for(const frame of frames)if(frame.object.key===p.frame.object.key){frame.object.concept=chosen.id;frame.object.key=chosen.id;frame.object.candidates=[chosen.id];}const unresolved=frames.find(f=>f.object.candidates.length>1);if(unresolved)return result('clarify',{supported:false,ambiguity:unresolved,candidateFrames:frames,sourceMessage:p.sourceMessage,reason:'There is one more ambiguous word.'});const frame=frames[0];return result(frames.every(f=>f.kind===frame.kind)?frame.kind:'note',{frames,object:frame.object,resolvedPending:true,sourceMessage:p.sourceMessage,speechAct:'clarification'});}
     }
+    if(/^(?:(?:what|who) (?:can|do) you (?:do|help with)|how does this work|how do (?:i|you) use (?:this|you)|help|help me|can you help(?: me)?|what should (?:i|we) (?:say|talk about)|what else|what now|i don't know what to say|idk|any ideas)$/.test(core))return result('about',{speechAct:'question',aboutKind:'capabilities'});
+    if(/^(?:are you (?:real|human|a (?:bot|robot|person|human|machine)|an ai|ai|alive|conscious|sentient)|do you have (?:feelings|emotions|a body)|are you an? (?:llm|chatbot)|what are you really)$/.test(core))return result('about',{speechAct:'question',aboutKind:'honest'});
+    if((m=core.match(/^(?:do you (?:like|love|enjoy)|what do you think (?:of|about)|how do you feel about) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'taste',object:object(original(m[1]))});
+    if((m=core.match(/^(?:what(?:'s| is) your fav(?:ou?rite)?|do you have a fav(?:ou?rite)?) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'favorite',object:object(original(m[1]))});
+    if(/^(?:another(?: one)?|one more|again|more)$/.test(core)&&['joke','prompt'].includes(state.lastPlan?.act))return result(state.lastPlan.act);
+    if(/^(?:lol|lmao|haha+|hehe+|ha(?: ha)+|that's funny|that was funny|good one|nice one)$/.test(core))return result('social',{socialKind:'laugh'});
+    if(/^(?:cool|nice|neat|great|awesome|interesting|i see|got it|fair enough|true|hmm+|mm+|oh|ah|wow|right|alright|sounds good|makes sense|not much|nothing much|nothing)$/.test(core))return result('social',{socialKind:'ack'});
+    if(loss.test(core))return result('support',{loss:true});
     const fixed=[
       ['greet',/^(?:hi|hello|hey|yo|hey kira|hi kira|good morning|good afternoon|good evening)$/],
       ['farewell',/^(?:bye|goodbye|good night|goodnight|see you|see ya|talk later)$/],
-      ['how',/^(?:how are you|how are you doing|how have you been|what's up|what are you thinking about)$/],
-      ['about',/^(?:who are you|what are you|tell me about (?:you|yourself)|what do you like|what's your name)$/],
-      ['thanks',/^(?:thanks|thank you|thank you kira|thanks for listening|i appreciate you)$/],
+      ['how',/^(?:how are you|how are you doing|how are you today|how's it going|how have you been|what's up|sup|what are you thinking about|what are you up to)$/],
+      ['about',/^(?:who are you|what are you|tell me about (?:you|yourself)|what do you like|what's your name|what is your name|what should i call you|introduce yourself)$/],
+      ['thanks',/^(?:thanks|thank you|thank you kira|thanks kira|thank you so much|thanks a lot|thx|ty|thanks for listening|i appreciate (?:you|it|that))$/],
       ['affection',/^(?:i love you|i like you|i miss you|you're (?:beautiful|amazing|lovely)|you are (?:beautiful|amazing|lovely))$/],
-      ['joke',/^(?:tell me a joke|make me laugh|another joke)$/],
+      ['joke',/^(?:tell me a joke|tell me another joke|make me laugh|another joke|(?:do you )?know any jokes|say something funny)$/],
       ['prompt',/^(?:give me a writing prompt|writing prompt|tell me a story idea|another prompt)$/],
       ['why',/^(?:why|why did you say that|explain (?:that|your reply))$/],
       ['recall',/^(?:what do you remember(?: about me)?|what do you know about me|what have i told you|what do i like|what's my name|what is my name)$/],
-      ['support',/^(?:i need (?:advice|support|someone to talk to)|can we talk|i had a (?:bad|rough|hard) day|i'm having a hard time)$/]
+      ['support',/^(?:i need (?:advice|support|someone to talk to|to talk)|can we talk|i had a (?:bad|rough|hard|terrible|long) day|(?:i'm|i am) having a (?:hard|rough|bad) (?:time|day|week)|(?:today|this week) (?:was|has been) (?:rough|hard|bad|terrible))$/]
     ];
     for(const [intent,pattern]of fixed)if(pattern.test(core))return result(intent,{speechAct:['how','about','recall','why'].includes(intent)?'question':'statement',nameOnly:/my name/.test(core),preferencesOnly:core==='what do i like'});
     if((m=core.match(/^do i (like|love|enjoy|hate|dislike) (.+)$/)))return result('recall',{speechAct:'question',predicate:m[1],object:object(m[2])});
     if((m=core.match(/^(?:forget|stop remembering) (.+)$/)))return result('forget',{speechAct:'request',object:object(m[1])});
     function semanticDraft(draft){
-      for(const slot of ['a','b'])if(draft[slot]){if(!draft[slot].length)return clarify('I don’t have that term in the lexicon yet. You can search the vocabulary in Engine lab.');if(draft[slot].length>1)return result('clarify',{supported:false,semanticAmbiguity:{slot,draft,candidates:draft[slot]},reason:'Which meaning do you intend?'});}
+      for(const slot of ['a','b'])if(draft[slot]){if(!draft[slot].length)return clarify((draft.labels?.[slot]?'“'+draft.labels[slot]+'” isn’t in my vocabulary yet':'That term isn’t in my vocabulary yet')+', so I can’t answer reliably. You can browse the words I do know in Engine lab.');if(draft[slot].length>1)return result('clarify',{supported:false,semanticAmbiguity:{slot,draft,candidates:draft[slot]},reason:'Which meaning do you intend?'});}
       return result('semantic',{speechAct:'question',...(draft.op==='describe'?{definition:draft.a[0]}:{query:{op:'subsumes',a:draft.a[0],b:draft.b[0]}})});
     }
-    if((m=core.match(/^is (.+?) (?:a kind of |a type of |an? )(.+)$/))||(m=core.match(/^are (.+?) (.+)$/)))return semanticDraft({op:'subsumes',a:engine.lookup(m[1]),b:engine.lookup(m[2])});
+    if((m=core.match(/^is (.+?) (?:a kind of |a type of |an? )(.+)$/))||(m=core.match(/^are (?!you\b)(.+?) (?:a kind of |a type of )?(.+)$/)))return semanticDraft({op:'subsumes',a:engine.lookup(m[1]),b:engine.lookup(m[2]),labels:{a:m[1],b:m[2]}});
     if((m=core.match(/^(?:what is |what's )?(?:a )?more (formal|casual) (?:word|term) for (.+)$/))){
       const cs=engine.lookup(m[2]);if(cs.length!==1)return clarify('Which meaning do you want to restyle? Try “a more formal word for bike”.');
       const s=engine.a.senses.find(s=>s.cid===cs[0]&&K.fold(s.lemma)===m[2])||engine.a.senses.find(s=>s.id===engine.senseFor(cs[0]));
       return result('semantic',{speechAct:'question',query:{op:'shift',s:s.id,delta:[m[1]==='formal'?2000:-2000,0]}});
     }
-    if((m=core.match(/^(?:what is|what's|define)\s+(.+)$/)))return semanticDraft({op:'describe',a:engine.lookup(m[1])});
+    if((m=core.match(/^(?:what is|what's|what are|define)\s+(?:an? )?(.+)$/)))return semanticDraft({op:'describe',a:engine.lookup(m[1]),labels:{a:m[1]}});
     if((m=core.match(/^(?:tell me about|let's talk about|talk about) (.+)$/)))return result('topic',{object:object(m[1]),speechAct:'request'});
-    if(core==='yes'||core==='no'||core==='sure'||core==='okay'){
-      if(state.context.pending?.kind==='support')return result('support',{answer:core==='no'?'no':'yes'});
-      return clarify('I don’t have a specific yes-or-no question pending. What would you like to continue with?');
+    if(/^(?:yes|yeah|yep|yes please|sure|ok|okay|no|nope|no thanks|not really)$/.test(core)){
+      const no=/^(?:no|nope|no thanks|not really)$/.test(core),p=state.context.pending;
+      if(p?.kind==='offer')return no?result('social',{socialKind:'decline'}):result(p.act);
+      if(p?.kind==='support')return result('support',{answer:no?'no':'yes'});
+      // A pending question or choice takes the answer; see parseConversation.
+      if(['detail','confirmName','sense','topicSense','semanticSense'].includes(p?.kind))return {...clarify('I don’t have a reliable reading of that yet.'),reasonCode:'unparsed'};
+      return result('social',{socialKind:no?'decline':'ack'});
     }
     // Multiple supported reports commit together; any unparsed clause rejects the batch.
     const clauses=text.replace(/^(?:actually|correction)[:,]?\s*/i,'').split(/(?:[.;]\s+|,?\s+but\s+|\s+and\s+(?=I\b))/i);
     const frames=[];
     for(let clause of clauses){
       clause=clause.replace(/[.!?]+$/,'').trim();const c=K.fold(clause);let f=null;
+      const favorite=c.match(/^my (?:absolute )?fav(?:ou?rite)? [\p{L} ]{1,40}? (?:is|are) (.+)$/u)||c.match(/^(.+?) (?:is|are) my (?:absolute )?fav(?:ou?rite)?(?: [\p{L} ]{1,40})?$/u);
+      if(favorite&&!/^(?:it|that|this|them)$/.test(favorite[1])&&favorite[1].length<=100&&!/[.;!?]/.test(favorite[1])){
+        const piece=clause.slice(c.lastIndexOf(favorite[1]),c.lastIndexOf(favorite[1])+favorite[1].length).trim();
+        frames.push({kind:'preference',subject:'user',predicate:'love',object:object(piece),polarity:'positive',temporal:'present',correction:false,span:span(piece),attribution:'user_reported',reference:null});
+        continue;
+      }
       if((m=clause.match(/^(?:my name(?: is|'s)|call me)\s+(.+)$/i))){
         const name=m[1].trim();if(!K.isConversationName(name))return {...clarify('What name would you like me to use?'),askName:true};
         f={kind:'name',subject:'user',predicate:'name',object:object(name),polarity:'positive',temporal:'present',span:span(name),attribution:'user_reported'};
-      }else if((m=c.match(/^i\s+(?:(used to)\s+)?(?:(don't|do not|didn't|did not)\s+)?(like|love|enjoy|hate|dislike)\s+(.+)$/))){
-        let label=clause.slice(c.indexOf(m[4])).replace(/\s+(?:anymore|now)$/i,'').trim(),resolved=null;
+      }else if((m=c.match(/^i\s+(?:(?:really|truly|absolutely|totally|genuinely|honestly|just|also|still|kind of|kinda|sort of)\s+)?(?:(used to)\s+)?(?:(don't|do not|didn't|did not)\s+)?(?:(?:really|even|actually)\s+)?(like|love|enjoy|hate|dislike)\s+(.+)$/))){
+        let label=clause.slice(c.lastIndexOf(m[4])),resolved=null;while(trailing.test(label))label=label.replace(trailing,'');label=label.trim();
         if(/^(?:it|that|this|them)$/i.test(label)){
           if(!state.context.focus||state.turn-state.context.focus.turn>3)return clarify('What does “'+label+'” refer to? Please name it so I change the right preference.');
           resolved=K.clone(state.context.focus.object);label=resolved.label;
@@ -1533,7 +1624,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
         const pieces=resolved?[label]:label.split(/\s+and\s+/i);if(pieces.length>4)return clarify('Please give me up to four preferences at a time.');
         for(const piece of pieces){const obj=resolved||object(piece);frames.push({kind:'preference',subject:'user',predicate:m[3],object:obj,polarity:m[2]?'negative':'positive',temporal:m[1]||m[2]?.startsWith('did')?'past':'present',correction:/^(?:actually|correction)\b/i.test(text)||/anymore$/i.test(clause),span:resolved?span(clause):span(piece),attribution:'user_reported',reference:resolved?{resolvedFrom:state.context.focus.sourceMessage}:null});}
         continue;
-      }else if((m=c.match(/^i(?:'m| am| feel| was| felt)\s+(not\s+)?(?:feeling\s+)?(.+)$/))&&(moods.includes(m[2])||(engine.lookup(m[2]).length===1&&engine.sub(engine.lookup(m[2])[0],'c:feeling')))){
+      }else if((m=c.replace(/,?\s+(?:thanks|thank you|thx)(?: for asking)?$/,'').replace(/\s+(?:today|right now|now|lately|tonight)$/,'').match(/^i(?:'m| am| feel| was| felt)\s+(not\s+)?(?:(?:feeling|doing)\s+)?(?:(?:really|so|very|pretty|quite|a bit|a little|kind of|kinda)\s+)?(.+)$/))&&(moods.includes(m[2])||(engine.lookup(m[2]).length===1&&engine.sub(engine.lookup(m[2])[0],'c:feeling')))){
         f={kind:'mood',subject:'user',predicate:'feels',object:object(m[2]),polarity:m[1]?'negative':'positive',temporal:/^i (?:was|felt)/.test(c)?'past':'present',span:span(m[2]),attribution:'user_reported'};
       }
       if(!f)return {...clarify('I don’t have a reliable reading of that yet.'),reasonCode:'unparsed'};
@@ -1568,7 +1659,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   function parseConversation(input,state,engine){
     const raw=K.nfc(input).trim(),text=raw.replace(/[’‘]/g,"'"),pending=state.context.pending;
     const base=(s=text)=>K.parseInput(s,state,engine);
-    const finish=r=>({...r,text:raw,version:'conversation-parser/4.1.2'});
+    const finish=r=>({...r,text:raw,version:'conversation-parser/4.2.0'});
     if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base());
     const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0},reason:null});
     // Do not turn a quoted or explicitly conditional statement into a report.
@@ -1628,23 +1719,27 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     art:['What kind of art draws you in?','Is it the subject, the materials, or the way it makes you feel?','Are you making something yourself?'],
     hiking:['Is there a place you like to return to?','What do you notice there that you miss elsewhere?','Do you go for the movement or the quiet?'],
     feelings:['Would you like to describe what brought that on?','What feels most important to say about it?','Would you like to stay with this, or take a break from the subject?'],
-    general:['What would you like me to know about that?','Which part matters most to you?','Would you like to stay with that, or change the subject?']
+    support:['What’s been the hardest part?','How are you holding up right now?','Has anything helped, even a little?','Would you like to keep talking about it, or take a breather with something lighter?'],
+    general:['How do you feel about that?','What’s that like for you?','Would you like to stay with that, or talk about something else?']
   };
   function nextQuestion(topic,step){const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';}
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion});
+  // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
+  const acknowledgements={gentle:['Thank you for telling me.','I’m listening.','That makes sense.'],direct:['Understood.','Okay.','Got it.'],default:['I’m with you.','Mm, okay.','Thanks for sharing that.','That’s good to know.']};
+  const acknowledge=(topic,persona,turn)=>{const a=['support','feelings','repair'].includes(topic)?acknowledgements.gentle:persona==='direct'?acknowledgements.direct:acknowledgements.default;return a[turn%a.length];};
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
 })(Kira);
 
 'use strict';
 (function(K){
-  K.DIALOGUE={version:'dialogue/4.1.0',personas:{
+  K.DIALOGUE={version:'dialogue/4.2.0',personas:{
     warm:{name:'Warm',description:'Gentle, open, a little soft around the edges.',target:[-1000,0]},
     playful:{name:'Playful',description:'Light teasing, curious questions, small surprises.',target:[-2000,0]},
     thoughtful:{name:'Thoughtful',description:'Reflective, unhurried, drawn to the details.',target:[2000,0]},
     direct:{name:'Direct',description:'Clear words, honest limits, fewer detours.',target:[0,0]}
   },responses:{
     greet:[{id:'greet:open',text:'{greeting}. It’s good to have some company. What’s on your mind?'},{id:'greet:small',text:'{greeting}. Start anywhere—a small thing is enough.'},{id:'greet:return',text:'{greeting}. What are we making room for today?'}],
-    how:[{id:'how:rain',text:'In my little fictional corner of things: a window, a notebook, and rain that hasn’t quite started. What’s your corner like?'},{id:'how:music',text:'If this were a scene, I’d have a quiet record on and nowhere urgent to be. How are you doing?'},{id:'how:honest',text:'Ready for a conversation. I don’t have a day outside this app, but we can give this one a little atmosphere.'}],
-    about:[{id:'about:clear',text:'I’m Kira, a fictional companion built from explicit rules, a small lexicon, and the things you choose to tell me. My character likes late-night music, unfinished notebooks, and thoughtful company. I can remember a preference; I’ll ask when I can’t reliably read a sentence.'}],
+    how:[{id:'how:rain',text:'In my little fictional corner of things: a window, a notebook, and rain that hasn’t quite started. What’s your corner like?'},{id:'how:music',text:'If this were a scene, I’d have a quiet record on and nowhere urgent to be. How are you doing?'},{id:'how:honest',text:'Ready for a conversation. I don’t have a day outside this app, but we can give this one a little atmosphere. How are you doing?'}],
+    about:[{id:'about:clear',text:'I’m Kira—a fictional companion made of explicit rules, a small vocabulary, and whatever you choose to tell me. In character, I like late-night music, unfinished notebooks, and unhurried company. I’ll remember what you share, and I’ll ask when I’m not sure what you mean. How are you doing?'}],
     farewell:[{id:'bye:gentle',text:'Take care of yourself. We can pick this up whenever you feel like it.'},{id:'bye:soft',text:'See you around. There’s no schedule to keep with me.'}],
     stay:[{id:'stay:listen',text:'We can keep talking. What would you like to stay with for a bit?'},{id:'stay:quiet',text:'Okay. No goodbye just yet. Want a distraction, or a little space to talk?'}],
     thanks:[{id:'thanks:welcome',text:'You’re welcome. I’m glad this conversation has something for you.'},{id:'thanks:easy',text:'You’re welcome. We can take things at your pace.'}],
@@ -1653,6 +1748,12 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     joke:[{id:'joke:cache',text:'I named my houseplant Cache. Every time I forget to water it, I call it a memory leak.'},{id:'joke:moon',text:'The moon opened a café. Great atmosphere, terrible working hours.'},{id:'joke:bug',text:'A bug walked into my code. I offered it a feature flag and hoped nobody would notice.'},{id:'joke:book',text:'I tried to write a very short book about procrastination. So far, the title is doing all the work.'}],
     prompt:[{id:'prompt:station',text:'A railway station keeps announcing trains that stopped running thirty years ago. Tonight, someone gets off one. Write the conversation at the ticket window.'},{id:'prompt:town',text:'A town’s streetlights turn on one by one, following someone who isn’t there. Tell it through the person paid to replace the bulbs.'},{id:'prompt:letter',text:'Two strangers receive the same unfinished letter. Neither knows the writer. Their first disagreement is about whether to finish it.'},{id:'prompt:world',text:'An empire falls while a village argues over a broken bridge. Keep the empire offstage. Let the bridge matter.'}],
     support:[{id:'support:space',text:'We can slow down for a moment. Would you like to say what happened?'},{id:'support:small',text:'You don’t have to put the whole thing into words at once. Is there one part you want to start with?'}],
+    loss:[{id:'loss:sorry',text:'I’m so sorry. That’s a lot to carry. Would you like to tell me about it, or would you rather have some quiet company for a bit?'},{id:'loss:gentle',text:'Oh, I’m sorry. That sounds really painful. Do you want to talk about it?'}],
+    social:[{id:'social:open',text:'Mm-hm. What’s on your mind?'},{id:'social:next',text:'Okay. Where would you like to go from here?'},{id:'social:day',text:'Sure. Anything from your day you’d like to tell me about?'}],
+    decline:[{id:'decline:fine',text:'That’s fine. What would you rather talk about?'},{id:'decline:easy',text:'No problem. Is there something else on your mind?'}],
+    laugh:[{id:'laugh:win',text:'I’ll count that as a win. Want another one?'},{id:'laugh:glad',text:'Glad that landed. Shall I try another?'}],
+    capabilities:[{id:'capabilities:list',text:'A few things I do well:\n• Remember what you tell me — “My name is Sam”, “I like jazz”, “I don’t like mornings”.\n• Notice how you’re feeling — “I’m tired”, “I’m happy”.\n• Answer questions about words I know — “What is a synthesizer?”, “Is a dog an animal?”\n• Tell a joke or give you a writing prompt.\nWhat would you like to start with?'}],
+    honest:[{id:'honest:clear',text:'I’m a fictional character running on explicit rules inside this page. There’s no AI model, no internet connection, and no hidden mind behind me. I only know what you tell me here, and you can inspect every reply. What would you like to talk about?'}],
     crisis:[{id:'support:urgent',text:'I’m sorry things feel this hard. Are you safe right now? If you might act on hurting yourself, contact emergency services or someone who can stay with you now. I can keep talking, but I can’t provide emergency help.'}]
   },topics:{
     'c:music':['What kind of music has been staying with you lately?','A song can make a room feel like a different place. Is there one you keep returning to?'],
@@ -1684,6 +1785,8 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
 // Pure Model: no DOM, storage, clock, randomness, network, or timers.
 (function(K){
   const MAX_EVENTS=1000,MAX_IMAGE=450000;
+  const upbeat=new Set(['happy','glad','excited','calm','good','great','well','relaxed','content','okay','ok','fine','alright']),mild=new Set(['okay','ok','fine','alright','good','well']);
+  const actLabels={name:'you telling me your name',preference:'a preference you shared',mood:'you telling me how you feel',note:'a note to keep',recall:'a question about what you’ve told me',forget:'a request to forget something',clarify:'something I couldn’t read confidently',semantic:'a question about what a word means',topic:'part of our ongoing conversation',greet:'a greeting',farewell:'a goodbye',how:'a check-in',about:'a question about me',thanks:'a thank-you',joke:'a request for a joke',prompt:'a request for a writing prompt',support:'a sign that things are hard right now',social:'a quick reaction',affection:'something kind',boundary:'a boundary for our conversation',stay:'a request to keep talking',why:'a question about my last reply'};
   const stage=points=>points>=32?'Familiar company':points>=12?'Finding a rhythm':points>=4?'Getting acquainted':'A new conversation';
   function initialState(){return {schema:'kira-state/4.1',revision:0,turn:0,nextMemory:1,settings:{persona:'warm',register:-1000,theme:'night',boundary:'platonic',avatar:null},messages:[],memories:[],context:{focus:null,pending:null},usage:{},relationship:{points:0,seen:[]},lastPlan:null};}
   function describeMemory(m){
@@ -1793,12 +1896,18 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
           else if(first.kind==='note')plan.text='I’ve kept that as a note you gave me: “'+first.object.label+'”';
           else if(first.kind==='mood'){
             if(first.polarity==='negative')plan.text='You said you '+(first.temporal==='past'?'weren’t':'aren’t')+' '+first.object.label+'. I won’t assume a different feeling from that. '+ask('general',0,'How would you describe it?');
+            else if(parsed.negativeMood&&['tired','exhausted'].includes(first.object.label)&&first.temporal==='present')plan.text=(persona==='direct'?'Noted—you’re '+first.object.label+'. ':'That sounds draining. ')+ask('support',1,'Has it been a long day, or more of a slow build-up?');
             else if(parsed.negativeMood){plan.text=(persona==='direct'?'You said you feel '+first.object.label+'. ':'I hear you—you said you feel '+first.object.label+'. ')+generic('support');askLastQuestion('support',0);}
-            else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,'What’s been behind that?');
+            else if(first.temporal==='present'&&upbeat.has(first.object.label))plan.text=mild.has(first.object.label)?'Glad to hear it. '+ask('general',0,'What’s been going on with you lately?'):'Good to hear you’re feeling '+first.object.label+'. '+ask('general',0,'What’s been behind that?');
+            else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,first.object.label==='bored'?'Want a joke, a writing prompt, or something to talk about?':'What’s been behind that?');
           }else{
             const changed=first.supersedes.length>0,past=first.temporal==='past';
             plan.text=(changed?'I’ve updated that. ':records[0].created?'I’ll remember that. ':'I have that saved already. ')+describeMemory(first)+'.';
-            if(!past&&first.polarity==='positive'&&records[0].created){const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general',averse=['hate','dislike'].includes(first.predicate);plan.text+=' '+ask(topic,0,averse?'What puts you off '+first.object.label+'?':K.DIALOGUE.topics['c:'+topic]?.[0]||'What draws you to '+first.object.label+'?');}
+            if(!past&&first.polarity==='positive'&&records[0].created){
+              const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general',label=first.object.label,averse=['hate','dislike'].includes(first.predicate);
+              const pool=averse?['What puts you off '+label+'?','What is it about '+label+' that doesn’t work for you?']:(K.DIALOGUE.topics['c:'+topic]||['What draws you to '+label+'?','What do you like most about '+label+'?']).concat(topic==='general'?[]:K.conversationQuestions[topic]||[]);
+              const key='followup:'+(averse?'averse':topic),count=state.usage[key]||0;state.usage[key]=count+1;plan.text+=' '+ask(topic,0,pool[count%pool.length]);
+            }
             if(past)plan.text+=' I won’t assume that is still your preference now.';
           }
           break;
@@ -1807,21 +1916,27 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
           let records=state.memories.filter(m=>m.status==='active');
           if(parsed.nameOnly)records=records.filter(m=>m.kind==='name');
           else if(parsed.preferencesOnly)records=records.filter(m=>m.kind==='preference'&&m.temporal==='present');
-          else if(parsed.object)records=records.filter(m=>m.kind==='preference'&&m.object.key===parsed.object.key&&m.temporal==='present');
+          else if(parsed.object)records=records.filter(m=>m.kind==='preference'&&(m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key))&&m.temporal==='present');
           records=records.slice(-12);claims(records);
-          plan.text=records.length?'Here’s what you’ve told me:\n'+records.map(m=>'• '+describeMemory(m)+' — turn '+m.turn+'.').join('\n'):'I don’t have that saved. You can tell me now if you want to.';
+          if(!records.length){
+            if(parsed.nameOnly){plan.text='You haven’t told me your name yet. What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}
+            else plan.text=parsed.object?'You haven’t told me how you feel about '+parsed.object.label+' yet.':'You haven’t told me anything to remember yet. You could start with your name, or something you like.';
+          }
+          else if(parsed.nameOnly)plan.text='You’re '+records[records.length-1].object.label+'.';
+          else if(parsed.object&&records.length===1)plan.text=describeMemory(records[0])+'—that’s what you told me.';
+          else plan.text='Here’s what you’ve told me:\n'+records.map(m=>'• '+describeMemory(m)+'.').join('\n');
           if(records.length===1&&records[0].kind==='preference')state.context.focus={object:K.clone(records[0].object),turn:state.turn,sourceMessage:records[0].sourceMessage};
           break;
         }
         case 'forget':{
-          const records=state.memories.filter(m=>m.status==='active'&&(m.object.key===parsed.object.key||K.fold(m.object.label)===K.fold(parsed.object.label)));
+          const records=state.memories.filter(m=>m.status==='active'&&(m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key)||K.fold(m.object.label)===K.fold(parsed.object.label)));
           const ids=records.map(m=>m.id);state.memories=state.memories.map(m=>ids.includes(m.id)?{...m,status:'retired',retiredAt:event.seq}:m);
           if(records.length)state.context.focus=null;
           plan.text=records.length?'I’ll stop using '+(records.length===1?'that memory':'those memories')+'. The original messages and retired records remain in the history; “Reset conversation” removes this app’s saved session.':'I don’t have an active memory matching that.';
           plan.policy.retired=ids;break;
         }
         case 'clarify':{
-          if(parsed.ambiguity){const f=parsed.ambiguity,choices=meaningChoices(f.object.candidates);state.context.pending={kind:'sense',frame:f,frames:parsed.candidateFrames,sourceMessage:parsed.sourceMessage||uid,choices};plan.text='When you say “'+f.object.label+'”, which meaning do you have in mind?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n')+'\nI haven’t saved this message’s reports yet.';}
+          if(parsed.ambiguity){const f=parsed.ambiguity,choices=meaningChoices(f.object.candidates);state.context.pending={kind:'sense',frame:f,frames:parsed.candidateFrames,sourceMessage:parsed.sourceMessage||uid,choices};plan.text='When you say “'+f.object.label+'”, which meaning do you have in mind?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n')+'\nI’ll save it once I know which one you mean.';}
           else if(parsed.semanticAmbiguity){const {slot,draft,candidates}=parsed.semanticAmbiguity,choices=meaningChoices(candidates);state.context.pending={kind:'semanticSense',slot,draft,choices};plan.text='Which meaning should I use for that question?\n'+choices.map((c,i)=>(i+1)+'. '+c.label).join('\n');}
           else if(parsed.nameCandidate){plan.text='Should I call you '+parsed.nameCandidate+'?';state.context.pending={kind:'confirmName',name:parsed.nameCandidate,span:parsed.nameSpan,sourceMessage:uid,questionMessage:aid};}
           else if(parsed.askName){plan.text=parsed.reason;state.context.pending={kind:'name',questionMessage:aid};}
@@ -1831,7 +1946,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else{plan.text=misses===1?'I lost the thread there. '+ask('general',0,'What would you like me to know about that?'):'I’m still missing the meaning, and repeating the same answer won’t help. We can keep it as a note with “Remember this: …”, or start with one thing you want to talk about.';}
+            else plan.text=misses===1?'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.':'I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
           break;
         }
@@ -1848,7 +1963,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             discourse(answer,f?.questionMessage);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic};
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,'What would you rather talk about?');}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,topic==='support'?'What happened?':'Which part would you like to start with?');}
-            else{const openings=persona==='direct'?['You said: “','On “','To follow up on “']:['Let’s stay with “','Picking up on “','You mentioned “'];plan.text=openings[(state.turn-1)%openings.length]+answer.slice(0,240)+(answer.length>240?'…':'')+'”—'+ask(topic,step);}
+            else plan.text=K.acknowledge(topic,persona,state.turn)+' '+ask(topic,step);
             break;
           }
           const o=parsed.object,topic=this.engine.topicFor(o.concept),lines=K.DIALOGUE.topics['c:'+topic];
@@ -1859,21 +1974,39 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
         }
         case 'boundary':state.settings.boundary=parsed.value;plan.text=parsed.value==='platonic'?'Of course. I’ll keep the conversation platonic.':'A little fictional flirting is fine. You can say “stop flirting” whenever you want.';break;
         case 'why':{
-          const last=previous.lastPlan;plan.text=last?'I read your previous message as “'+last.act+'”. '+(last.claims.length?'The reply referred to '+last.claims.length+' attributed record'+(last.claims.length===1?'':'s')+'. ':'It made no claim from your memory. ')+'The semantic checker verified the handler’s eligibility; the wording was selected by dialogue policy. You can inspect the previous reply for the exact records and checks.':'There isn’t a previous reply to explain yet.';break;
+          const last=previous.lastPlan,read=actLabels[last?.act]||'part of our conversation';plan.text=last?'I took your last message as '+read+'. '+(last.claims.length?'My reply drew on '+(last.claims.length===1?'one thing':last.claims.length+' things')+' you’ve told me. ':'My reply didn’t rely on anything you’ve told me before. ')+'The wording comes from my dialogue rules—open “Sources & reasoning” under any reply to see every record and check.':'There isn’t a previous reply to explain yet.';break;
         }
-        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic('support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
+        case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic(parsed.loss?'loss':'support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
+        case 'about':{
+          const kind=parsed.aboutKind,o=parsed.object;
+          if(kind==='capabilities'||kind==='honest'){plan.text=generic(kind);askLastQuestion('general',0);}
+          else if(kind==='taste'||kind==='favorite'){
+            const topic=o.candidates.length===1?this.engine.topicFor(o.concept):null;
+            if(/^(?:me|us|talking to me|this)$/.test(K.fold(o.label)))plan.text='I enjoy your company here, in the way a fictional character can. What made you ask?';
+            else if(topic==='music')plan.text='In character, I’m drawn to late-night music—something quiet with a bit of texture. '+(kind==='favorite'?'What’s yours?':'What do you listen to?');
+            else plan.text=kind==='favorite'?'I’m a fictional character, so I don’t have a true favorite '+o.label+'. What’s yours?':'I’m a fictional character, so I don’t have real tastes of my own—but I’d like to hear yours. How do you feel about '+o.label+'?';
+            askLastQuestion(topic||'general',0);
+          }else plan.text=generic('about');
+          break;
+        }
+        case 'social':{
+          const kind=parsed.socialKind;
+          if(kind==='laugh'&&['joke','prompt'].includes(previous.lastPlan?.act)){plan.text=generic('laugh');state.context.pending={kind:'offer',act:previous.lastPlan.act};}
+          else{plan.text=kind==='laugh'?'Ha—glad something made you smile. What’s on your mind?':generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}
+          break;
+        }
         case 'affection':plan.text=generic(state.settings.boundary==='flirty'&&state.relationship.points>=4?'flirt':'affection');break;
         case 'greet':{
           const r=this.engine.query({op:'realize',c:'c:greeting-word',target:[state.settings.register,0]});plan.semantics.push(r);plan.slots.push({concept:'c:greeting-word',sense:r.value.chosen,type:'speech-act',context:'extensional'});
           const word=this.engine.a.senses.find(s=>s.id===r.value.chosen).lemma,name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
           if(name){claims([name]);plan.text=word[0].toUpperCase()+word.slice(1)+', '+name.object.label+'. '+ask('general',0,'What’s on your mind?');}
-          else{plan.text=generic('greet').replace('{greeting}',word[0].toUpperCase()+word.slice(1))+' What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}break;
+          else{plan.text=generic('greet').replace('{greeting}',word[0].toUpperCase()+word.slice(1)).replace(/\s+[^.!?]*\?$/,'')+' What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}break;
         }
         default:plan.text=generic(K.DIALOGUE.responses[intent]?intent:'about');
       }
       if(parsed.elaboration){discourse(parsed.elaboration);plan.text=plan.text.replace(/\s+[^.!?]*\?$/,'')+' You gave this reason: “'+parsed.elaboration+'”. '+ask(K.conversationTopic(parsed.text,this.engine)||'general',1);}
       for(const act of parsed.afterActs||[]){const r=this.engine.query({op:'route',intent:act.intent});K.assert(r.outcome==='Computed','Secondary act was not admitted');plan.semantics.push(r);const kind=act.intent.slice(2);plan.text+='\n\n'+generic(kind);plan.policy.secondaryActs=(plan.policy.secondaryActs||[]).concat(kind);state.context.pending=null;}
-      if(['how','about'].includes(intent)||(parsed.afterActs||[]).some(a=>a.intent==='c:how'))ask('general',0,'How are you doing?');
+      if(intent==='how'||intent==='about'&&!parsed.aboutKind||(parsed.afterActs||[]).some(a=>a.intent==='c:how'))ask('general',0,'How are you doing?');
       if(parsed.supported)state.context.misses=0;
       if(parsed.supported&&intent!=='crisis'){
         const fingerprint=K.hash(K.fold(parsed.text));if(!state.relationship.seen.includes(fingerprint)){state.relationship.seen.push(fingerprint);state.relationship.points=Math.min(100,state.relationship.points+1);}
@@ -1895,7 +2028,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.1.3","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"ec50d3b01c3b7be5913765c046c71125628496326d88e0266874385c78d3a8ce","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"83205638cdf19f1828a96cfc19d316a013f53d354a0a65b78c12d45ce6a3c79a","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);
@@ -1917,7 +2050,7 @@ self.onmessage=event=>{
 <script>'use strict';
 // Adapter: one atomic localStorage value holds the complete version-pinned event log.
 (function(K){
-  const KEY='kira_rse_4_1_3';
+  const KEY='kira_rse_4_2_0';
   function pack(events,state,meta){const payload={format:'kira-session/4.1',assets:meta,events,stateDigest:K.hash(state)};return {...payload,checksum:K.hash(payload)};}
   function inspectEnvelope(value,meta){
     K.assert(value&&value.format==='kira-session/4.1','Unsupported save format');
@@ -2030,7 +2163,7 @@ self.onmessage=event=>{
       const active=state.memories.filter(m=>m.status==='active');$('memory-count').textContent=active.length;$('rail-count').textContent=active.length;$('stage-pill').textContent=K.relationshipStage(state.relationship.points);
       $('relationship-title').textContent=state.relationship.points>=32?'A familiar presence.':state.relationship.points>=12?'A rhythm of our own.':state.relationship.points>=4?'Little things add up.':'A first hello.';
       $('relationship-copy').textContent=state.turn?state.turn+' turn'+(state.turn===1?'':'s')+' together. The small details give this conversation its shape.':'There’s no rush. Start with something small.';
-      $('familiarity-fill').style.width=Math.max(4,state.relationship.points)+'%';
+      $('familiarity-fill').style.width=Math.max(4,Math.min(100,Math.round(state.relationship.points/32*100)))+'%';
       clear($('memory-preview'));if(!active.length)$('memory-preview').append(el('p','tiny','A name, a preference, a detail worth keeping. Nothing assumed.'));else for(const m of active.slice(-3)){const n=el('div','preview-note',K.describeMemory(m));n.append(el('span','','You told Kira · turn '+m.turn));$('memory-preview').append(n);}
       this.renderMessages();this.renderMemories();this.quickPrompts();$('event-count').textContent=state.revision+' events';
       $('artifact-stats').textContent=K.ARTIFACT.concepts.length+' concepts · '+K.ARTIFACT.senses.length+' senses · '+K.ARTIFACT.classification.nodes.length+' checked facts\nSHA-256 '+K.ARTIFACT.hash;
@@ -2072,8 +2205,8 @@ self.onmessage=event=>{
       if(!records.length){const empty=el('div','empty-memory');empty.append(el('h3','','Nothing on this page yet.'),el('p','','Try “My name is Alex” or “I like coffee” to give Kira a place to start.'));box.append(empty);return;}
       for(const m of records){const card=el('article','memory-card '+(m.status==='active'?'':'retired')),type=el('div','memory-type',m.kind);type.append(el('span','',m.status));card.append(type,el('h3','',K.describeMemory(m)),el('p','',m.attribution.replace(/_/g,' ')+' · '+m.temporal));
         const source=this.state.messages.find(x=>x.id===m.sourceMessage);if(source)card.append(el('p','memory-source','“'+source.text+'”'));
-        if(m.supersedes.length)card.append(el('p','tiny','Supersedes '+m.supersedes.join(', ')));
-        if(m.object.concept)card.append(el('p','tiny',m.object.concept));
+        if(m.supersedes.length)card.append(el('p','tiny','Replaces '+(m.supersedes.length===1?'an earlier record':m.supersedes.length+' earlier records')));
+        const meaning=m.object.concept&&K.ARTIFACT.concepts.find(c=>c.id===m.object.concept);if(meaning)card.append(el('p','tiny','Meaning · '+meaning.label));
         const footer=el('footer');footer.append(button('Source · turn '+m.turn,'source-link',()=>this.source(m.sourceMessage)));if(m.status==='active')footer.append(button('Retire','text-button',()=>this.run(()=>this.presenter.retire(m.id))));card.append(footer);box.append(card);
       }
     }
@@ -2091,7 +2224,7 @@ self.onmessage=event=>{
       box.append(button('Export this reply and its semantic artifact ↓','secondary',()=>download('kira-reply-proof.json',JSON.stringify({artifact:K.ARTIFACT,plan},null,2))));$('inspect-dialog').showModal();
     }
     openSettings(){const s=this.state.settings;$('persona-select').value=s.persona;$('register-range').value=s.register;$('boundary-select').value=s.boundary;this.avatarDraft=s.avatar;this.settingsLabels();$('settings-dialog').showModal();}
-    settingsLabels(){$('persona-description').textContent=K.DIALOGUE.personas[$('persona-select').value].description;const n=Number($('register-range').value);$('register-output').textContent=n<0?'Casual '+n:n>0?'Formal +'+n:'Neutral';}
+    settingsLabels(){$('persona-description').textContent=K.DIALOGUE.personas[$('persona-select').value].description;const n=Number($('register-range').value);$('register-output').textContent=n<=-1500?'Very casual':n<0?'Casual':n>=1500?'Very formal':n>0?'Formal':'Neutral';}
     queryFields(){
       const kind=$('query-kind').value,box=$('query-fields');clear(box);
       const selectField=(id,title,values,selected)=>{const label=el('label','field-label',title);label.htmlFor=id;const select=el('select');select.id=id;for(const v of values){const o=el('option','',v.label);o.value=v.id;select.append(o);}if(selected)select.value=selected;box.append(label,select);return select;};

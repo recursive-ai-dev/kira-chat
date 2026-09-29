@@ -75,7 +75,7 @@ test('not loving something does not erase a reported liking', () => {
 
 test('ambiguous reports stay uncommitted until a meaning is selected', () => {
   const {state, replies} = conversation(['I like bass', 'bass guitar']);
-  assert.match(replies[0].text, /I haven’t saved this message’s reports yet/);
+  assert.match(replies[0].text, /I’ll save it once I know which one you mean/);
   assert.equal(active(state).length, 1);
   assert.equal(active(state)[0].object.concept, 'c:bass-instrument');
   assert.equal(active(state)[0].sourceMessage, 'user:1');
@@ -112,8 +112,58 @@ test('answering a support follow-up keeps attribution to the source message', ()
 });
 
 test('the new model rejects an older version-pinned session', () => {
-  assert.equal(K.STORE_KEY, 'kira_rse_4_1_3');
-  const oldMetadata = K.clone({...K.APP_META, version: '4.1.2', modelHash: 'old-model-hash'});
+  assert.equal(K.STORE_KEY, 'kira_rse_4_2_0');
+  const oldMetadata = K.clone({...K.APP_META, version: '4.1.3', modelHash: 'old-model-hash'});
   const envelope = K.packSession([], K.initialState(), oldMetadata);
   assert.throws(() => K.inspectEnvelope(envelope, K.APP_META), /different version of Kira/);
+});
+
+test('emphasis words do not become part of a preference', () => {
+  const {state, replies} = conversation(['I really like cats', 'I like pizza a lot', 'I like pizza so much']);
+  assert.deepEqual([...active(state).map(K.describeMemory)], ['You like cats', 'You like pizza']);
+  assert.match(replies[2].text, /I have that saved already/);
+});
+
+test('a stated favorite is saved as a preference with its original casing', () => {
+  const {state} = conversation(['my favorite band is Radiohead', 'coffee is my favourite drink']);
+  assert.deepEqual([...active(state).map(K.describeMemory)], ['You love Radiohead', 'You love coffee']);
+});
+
+test('hard news gets a gentle reply and saves nothing', () => {
+  const {state, replies} = conversation(['my dog died']);
+  assert.equal(replies[0].act, 'support');
+  assert.match(replies[0].text, /sorry/i);
+  assert.equal(state.memories.length, 0);
+  assert.equal(state.context.pending.topic, 'support');
+});
+
+test('confirming a suggested name saves it', () => {
+  const {state, replies} = conversation(["I'm Damien", 'yes', "what's my name?"]);
+  assert.deepEqual([...active(state).map(K.describeMemory)], ['Your name is Damien']);
+  assert.equal(replies.at(-1).text, 'You’re Damien.');
+});
+
+test('recall finds a preference saved under a clarified meaning', () => {
+  const {replies} = conversation(['I like bass', 'bass guitar', 'Do I like bass?']);
+  assert.match(replies.at(-1).text, /^You like bass/);
+});
+
+test('small talk, jokes, and questions about Kira get direct replies', () => {
+  const {replies} = conversation(['Tell me a joke', 'another one', 'haha', 'yes', 'ok', 'are you real?', 'what can you do?']);
+  const jokes = replies.slice(0, 4).filter(r => r.act === 'joke').map(r => r.text);
+  assert.equal(jokes.length, 3);
+  assert.equal(new Set(jokes).size, 3, 'jokes should not repeat');
+  assert.equal(replies[2].act, 'social');
+  assert.equal(replies[4].act, 'social');
+  assert.match(replies[5].text, /fictional character/);
+  assert.match(replies[6].text, /What would you like to start with\?$/);
+  for (const r of replies) assert.doesNotMatch(r.text, /lost the thread|lexicon yet/);
+});
+
+test('the vocabulary explorer lists words by label without dialogue internals', () => {
+  const {lexicon} = loadModel();
+  const {entries} = lexicon({text: ''});
+  assert.ok(!entries.some(e => e.id === 'c:about' || e.id === 'c:affection'));
+  const labels = entries.map(e => K.fold(e.label));
+  assert.deepEqual(labels, labels.slice().sort());
 });

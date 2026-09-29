@@ -1,7 +1,7 @@
 'use strict';
 // Adapter: one atomic localStorage value holds the complete version-pinned event log.
 (function(K){
-  const KEY='kira_rse_4_1_3';
+  const KEY='kira_rse_4_2_0';
   function pack(events,state,meta){const payload={format:'kira-session/4.1',assets:meta,events,stateDigest:K.hash(state)};return {...payload,checksum:K.hash(payload)};}
   function inspectEnvelope(value,meta){
     K.assert(value&&value.format==='kira-session/4.1','Unsupported save format');

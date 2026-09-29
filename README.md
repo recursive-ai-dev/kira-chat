@@ -4,7 +4,7 @@
 
 Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and authored dialogue plans to carry a conversation.
 
-The current release is **4.1.3**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
+The current release is **4.2.0**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
 
 Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped by what characters know, remember, want, and experience in a world that continues without the player.** The current release is a standalone companion and engine demonstrator; a game integration SDK is future work.
 
@@ -14,7 +14,7 @@ Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped 
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The bundled application version is **4.1.3**.
+The bundled application version is **4.2.0**.
 
 If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
@@ -56,6 +56,8 @@ Kira can store and display images, but she cannot interpret their contents. Fami
 | `I like bass` | Asks which meaning you intend; try `bass guitar` |
 | `I like bass and python` | Resolves both meanings before saving either report |
 | `I like atmospheric black metal` | Recognizes a specific concept and opens a music discussion |
+| `My favorite band is Radiohead` | Saves a stated favorite as a preference, keeping your casing |
+| `What can you do?` | Lists the kinds of sentences Kira understands |
 | `What is a synthesizer?` | Explains its place in the curated taxonomy |
 | `Is python an animal?` | Clarifies the meaning before answering the semantic question |
 | `What is a more formal word for synth?` | Checks a same-meaning register shift |
@@ -67,7 +69,7 @@ The parser supports a bounded English grammar. These examples show its supported
 
 ## Lexicon depth
 
-Version 4.1.3 ships the expanded vocabulary across music, instruments, software, hardware, game genres, literature, feelings, food, nature, science, and everyday objects. The figures below compare 4.1.1 with the expanded 4.1.2 lexicon, which 4.1.3 carries forward unchanged.
+Version 4.2.0 ships the expanded vocabulary across music, instruments, software, hardware, game genres, literature, feelings, food, nature, science, and everyday objects. The figures below compare 4.1.1 with the expanded 4.1.2 lexicon, which 4.2.0 carries forward unchanged.
 
 | Metric | 4.1.1 | 4.1.2 |
 | --- | ---: | ---: |
@@ -197,7 +199,7 @@ Use **Settings & data → Export session** to keep a portable backup. If the app
 
 Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
 
-Version 4.1.3 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+Version 4.2.0 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
 
 Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
 

@@ -18,7 +18,7 @@
   function parseConversation(input,state,engine){
     const raw=K.nfc(input).trim(),text=raw.replace(/[’‘]/g,"'"),pending=state.context.pending;
     const base=(s=text)=>K.parseInput(s,state,engine);
-    const finish=r=>({...r,text:raw,version:'conversation-parser/4.1.2'});
+    const finish=r=>({...r,text:raw,version:'conversation-parser/4.2.0'});
     if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base());
     const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0},reason:null});
     // Do not turn a quoted or explicitly conditional statement into a report.
@@ -78,9 +78,13 @@
     art:['What kind of art draws you in?','Is it the subject, the materials, or the way it makes you feel?','Are you making something yourself?'],
     hiking:['Is there a place you like to return to?','What do you notice there that you miss elsewhere?','Do you go for the movement or the quiet?'],
     feelings:['Would you like to describe what brought that on?','What feels most important to say about it?','Would you like to stay with this, or take a break from the subject?'],
-    general:['What would you like me to know about that?','Which part matters most to you?','Would you like to stay with that, or change the subject?']
+    support:['What’s been the hardest part?','How are you holding up right now?','Has anything helped, even a little?','Would you like to keep talking about it, or take a breather with something lighter?'],
+    general:['How do you feel about that?','What’s that like for you?','Would you like to stay with that, or talk about something else?']
   };
   function nextQuestion(topic,step){const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';}
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion});
+  // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
+  const acknowledgements={gentle:['Thank you for telling me.','I’m listening.','That makes sense.'],direct:['Understood.','Okay.','Got it.'],default:['I’m with you.','Mm, okay.','Thanks for sharing that.','That’s good to know.']};
+  const acknowledge=(topic,persona,turn)=>{const a=['support','feelings','repair'].includes(topic)?acknowledgements.gentle:persona==='direct'?acknowledgements.direct:acknowledgements.default;return a[turn%a.length];};
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
 })(Kira);
 

@@ -167,3 +167,16 @@ test('the vocabulary explorer lists words by label without dialogue internals', 
   const labels = entries.map(e => K.fold(e.label));
   assert.deepEqual(labels, labels.slice().sort());
 });
+
+test('duplicate word in preference list is treated as one preference, not two', () => {
+  // "I like coffee and coffee" — the same label appears twice in a conjunction.
+  // The model must save exactly one memory and must NOT reply with the spurious
+  // "I've kept those reports separately" message (which implies two distinct items).
+  const {state, replies} = conversation(['I like coffee and coffee']);
+  const activeMemories = state.memories.filter(m => m.status === 'active');
+  assert.equal(activeMemories.length, 1, 'only one memory should be created');
+  assert.equal(K.describeMemory(activeMemories[0]), 'You like coffee');
+  assert.doesNotMatch(replies[0].text, /kept those reports separately/,
+    'duplicate input must not trigger the multi-item reply');
+  assert.match(replies[0].text, /coffee/, 'reply must mention the preference');
+});

@@ -910,9 +910,14 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       const plan={id:'plan:'+event.seq,act:intent,claims:[],semantics:[routing],slots:[],policy:{kind:'dialogue_policy',handler:routing.value.pick,persona,relationshipStage:stage(state.relationship.points),boundary:state.settings.boundary},interpretation:parsed,text:''};
       const claims=memories=>{for(const m of memories)plan.claims.push({kind:'attribution',memoryId:m.id,sourceMessage:m.sourceMessage,predicate:m.predicate,objectKey:m.object.key,polarity:m.polarity,temporal:m.temporal});};
       const applyFrames=()=>{
-        const added=parsed.frames.map(f=>recordFrame(state,f,parsed.sourceMessage||uid,parsed.resolvedPending||parsed.confirmedName?uid:null));claims(added.map(x=>x.memory));
-        const last=added[added.length-1]?.memory;if(last?.kind==='preference')state.context.focus={object:K.clone(last.object),turn:state.turn,sourceMessage:last.sourceMessage};
-        return added;
+        const added=parsed.frames.map(f=>recordFrame(state,f,parsed.sourceMessage||uid,parsed.resolvedPending||parsed.confirmedName?uid:null));
+        // Deduplicate: the same label appearing twice in a conjunction (e.g. "I like X and X")
+        // produces two frames that resolve to one memory. Collapse them so the reply handler
+        // sees a single entry instead of incorrectly triggering the multi-item "kept separately" path.
+        const seen=new Set(),unique=added.filter(r=>{if(seen.has(r.memory.id))return false;seen.add(r.memory.id);return true;});
+        claims(unique.map(x=>x.memory));
+        const last=unique[unique.length-1]?.memory;if(last?.kind==='preference')state.context.focus={object:K.clone(last.object),turn:state.turn,sourceMessage:last.sourceMessage};
+        return unique;
       };
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
@@ -1061,7 +1066,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"83205638cdf19f1828a96cfc19d316a013f53d354a0a65b78c12d45ce6a3c79a","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6ff76566168ca31f4023289c5be83242cec25e1c84a8c5cf182aa891659eaf63","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -1877,9 +1882,14 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
       const plan={id:'plan:'+event.seq,act:intent,claims:[],semantics:[routing],slots:[],policy:{kind:'dialogue_policy',handler:routing.value.pick,persona,relationshipStage:stage(state.relationship.points),boundary:state.settings.boundary},interpretation:parsed,text:''};
       const claims=memories=>{for(const m of memories)plan.claims.push({kind:'attribution',memoryId:m.id,sourceMessage:m.sourceMessage,predicate:m.predicate,objectKey:m.object.key,polarity:m.polarity,temporal:m.temporal});};
       const applyFrames=()=>{
-        const added=parsed.frames.map(f=>recordFrame(state,f,parsed.sourceMessage||uid,parsed.resolvedPending||parsed.confirmedName?uid:null));claims(added.map(x=>x.memory));
-        const last=added[added.length-1]?.memory;if(last?.kind==='preference')state.context.focus={object:K.clone(last.object),turn:state.turn,sourceMessage:last.sourceMessage};
-        return added;
+        const added=parsed.frames.map(f=>recordFrame(state,f,parsed.sourceMessage||uid,parsed.resolvedPending||parsed.confirmedName?uid:null));
+        // Deduplicate: the same label appearing twice in a conjunction (e.g. "I like X and X")
+        // produces two frames that resolve to one memory. Collapse them so the reply handler
+        // sees a single entry instead of incorrectly triggering the multi-item "kept separately" path.
+        const seen=new Set(),unique=added.filter(r=>{if(seen.has(r.memory.id))return false;seen.add(r.memory.id);return true;});
+        claims(unique.map(x=>x.memory));
+        const last=unique[unique.length-1]?.memory;if(last?.kind==='preference')state.context.focus={object:K.clone(last.object),turn:state.turn,sourceMessage:last.sourceMessage};
+        return unique;
       };
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
@@ -2028,7 +2038,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"83205638cdf19f1828a96cfc19d316a013f53d354a0a65b78c12d45ce6a3c79a","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6ff76566168ca31f4023289c5be83242cec25e1c84a8c5cf182aa891659eaf63","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);

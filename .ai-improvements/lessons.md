@@ -1,3 +1,8 @@
+## Run 5 (2026-10-10): "forget my name" fails to retire name memory (+1 net)
+- **Bug:** "forget my name" replied "I don't have an active memory matching that." even when the name was saved. The forget parser passed "my name" through the generic object() helper, producing a literal hash key that never matches the stored name memory's key.
+- **Fix:** Added nameOnly flag to forget intent in parser.js; extended forget filter in dialogue.js to match m.kind==="name" when parsed.nameOnly. Mirrors the existing pattern in recall.
+- **Lesson:** The forget handler was asymmetric to recall — this is now closed.
+
 ## Run 4 — 2026-10-10
 **Bug:** Mixed-new/existing conjunction (e.g. "I like coffee and pizza" after coffee is already saved) triggered "I've kept those reports separately" — a message designed for all-new conjunctions.
 **Root cause:** The `records.length > 1` branch used `anyNew = records.some(r=>r.created)` which fires even for partially-new conjunctions.

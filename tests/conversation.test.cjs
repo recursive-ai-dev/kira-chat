@@ -194,3 +194,18 @@ test('repeating the same preference conjunction says "already saved", not "kept 
   assert.match(replies[1].text, /saved already/,
     'reply must acknowledge the memories were already saved');
 });
+
+test('mixed-new/existing conjunction must not say "kept separately" for the known item', () => {
+  // When user says "I like coffee and tea" then "I like coffee and pizza",
+  // coffee is already saved (created=false) and pizza is brand new (created=true).
+  // Saying "I've kept those reports separately" is misleading because coffee was
+  // already known — the reply must not use that phrase, and must mention pizza
+  // (the newly added preference).
+  const {state, replies} = conversation(['I like coffee and tea', 'I like coffee and pizza']);
+  const activeMemories = state.memories.filter(m => m.status === 'active');
+  assert.equal(activeMemories.length, 3, 'three active memories: coffee, tea, pizza');
+  assert.doesNotMatch(replies[1].text, /kept those reports separately/,
+    'mixed new/existing conjunction must not trigger the "kept separately" reply');
+  assert.match(replies[1].text, /pizza/,
+    'reply must mention the newly added preference');
+});

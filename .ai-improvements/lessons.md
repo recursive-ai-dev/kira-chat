@@ -1,3 +1,9 @@
+## Run 4 — 2026-10-10
+**Bug:** Mixed-new/existing conjunction (e.g. "I like coffee and pizza" after coffee is already saved) triggered "I've kept those reports separately" — a message designed for all-new conjunctions.
+**Root cause:** The `records.length > 1` branch used `anyNew = records.some(r=>r.created)` which fires even for partially-new conjunctions.
+**Fix:** Replaced `anyNew` with `allNew = records.every(r=>r.created)` for the "kept separately" message, adding a third "noted those" case for mixed sets with `(already saved)` labels on pre-existing items.
+**Lesson:** The multi-item reply branch now has the complete three-way classification: allNew → "kept separately", mixed → "noted those", allExisting → "saved already". This branch is fully hardened against conjunction-state edge cases.
+
 ## Run 3 — 2026-10-10
 **Bug:** Repeated preference conjunction (e.g. 'I like coffee and tea' said twice) triggered 'I've kept those reports separately' even when no new memory was created.
 **Fix:** Added `anyNew = records.some(r => r.created)` guard in the `records.length > 1` branch of dialogue.js. Reply now says 'I have those saved already' when all items exist.

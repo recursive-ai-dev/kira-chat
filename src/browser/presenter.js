@@ -24,6 +24,8 @@
         this.mode=await this.bridge.start();const envelope=this.store.read();
         if(envelope){K.inspectEnvelope(envelope,K.APP_META);const restored=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(restored)===envelope.stateDigest,'Saved conversation did not replay exactly');this.state=restored;this.events=envelope.events;}
         this.view.render(this.state);this.savedStatus();
+        // First run only: follow the system color preference so the default theme feels native.
+        if(!envelope&&globalThis.matchMedia?.('(prefers-color-scheme: light)')?.matches)await this.settings({theme:'dawn'});
       }catch(e){this.blocked=true;this.view.render(this.state);this.view.error('Could not open the saved conversation. '+e.message+' You can export the saved bytes or reset in Settings.');}
       finally{this.view.setBusy(false);}
     });}

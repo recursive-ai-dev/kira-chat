@@ -1,3 +1,8 @@
+### Run 6 (2026-10-10): "forget everything" fails to retire all memories (+1 net)
+- **Bug:** "forget everything" replied "I don't have an active memory matching that." even with active memories. The parser produced a literal key for "everything" that never matched any stored memory key.
+- **Fix:** Added `forgetAll` flag in parser.js (set when forget target is "everything" / "all"). The forget handler in dialogue.js now short-circuits to match all active memories when `forgetAll` is set.
+- **Lesson:** When a forget target is a semantic wildcard ("everything", "all"), key-based matching must be bypassed entirely. Pattern: flag-based override in parser, condition prepended to filter in handler.
+
 ## Run 5 (2026-10-10): "forget my name" fails to retire name memory (+1 net)
 - **Bug:** "forget my name" replied "I don't have an active memory matching that." even when the name was saved. The forget parser passed "my name" through the generic object() helper, producing a literal hash key that never matches the stored name memory's key.
 - **Fix:** Added nameOnly flag to forget intent in parser.js; extended forget filter in dialogue.js to match m.kind==="name" when parsed.nameOnly. Mirrors the existing pattern in recall.

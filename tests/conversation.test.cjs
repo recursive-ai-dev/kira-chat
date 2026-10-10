@@ -224,3 +224,18 @@ test('"forget my name" retires the saved name memory', () => {
   assert.match(replies[1].text, /stop using/,
     'reply must confirm the memory was retired');
 });
+
+test('"forget everything" retires all active memories', () => {
+  // When the user says "forget everything", the forget handler must retire ALL
+  // active memories regardless of their kind or key.
+  // Before the fix, the parser produced a literal key for "everything" that
+  // matched nothing, so the reply was "I don't have an active memory matching
+  // that." while all memories remained active.
+  const {state, replies} = conversation(['My name is Alice', 'I like coffee', 'forget everything']);
+  const activeMemories = state.memories.filter(m => m.status === 'active');
+  assert.equal(activeMemories.length, 0, 'all memories must be retired after "forget everything"');
+  assert.doesNotMatch(replies[2].text, /don't have an active memory/,
+    'must not claim no matching memory when memories are saved');
+  assert.match(replies[2].text, /stop using/,
+    'reply must confirm the memories were retired');
+});

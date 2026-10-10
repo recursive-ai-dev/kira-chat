@@ -151,7 +151,7 @@
           break;
         }
         case 'forget':{
-          const records=state.memories.filter(m=>m.status==='active'&&((parsed.nameOnly&&m.kind==='name')||m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key)||K.fold(m.object.label)===K.fold(parsed.object.label)));
+          const records=state.memories.filter(m=>m.status==='active'&&(parsed.forgetAll||(parsed.nameOnly&&m.kind==='name')||m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key)||K.fold(m.object.label)===K.fold(parsed.object.label)));
           const ids=records.map(m=>m.id);state.memories=state.memories.map(m=>ids.includes(m.id)?{...m,status:'retired',retiredAt:event.seq}:m);
           if(records.length)state.context.focus=null;
           plan.text=records.length?'I’ll stop using '+(records.length===1?'that memory':'those memories')+'. The original messages and retired records remain in the history; “Reset conversation” removes this app’s saved session.':'I don’t have an active memory matching that.';
@@ -250,4 +250,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"b6956d391c20e7353845fd5c8ae90026bffd9f08f926122a3774cca84334490e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"4ed3ce577972e53ce1a12e5dbdcb434e03b0b1ab85724f381325bc3514b9da42","unicode":"15.0.0","profile":"EXPERIMENTAL"};

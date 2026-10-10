@@ -61,7 +61,7 @@
     ];
     for(const [intent,pattern]of fixed)if(pattern.test(core))return result(intent,{speechAct:['how','about','recall','why'].includes(intent)?'question':'statement',nameOnly:/my name/.test(core),preferencesOnly:core==='what do i like'});
     if((m=core.match(/^do i (like|love|enjoy|hate|dislike) (.+)$/)))return result('recall',{speechAct:'question',predicate:m[1],object:object(m[2])});
-    if((m=core.match(/^(?:forget|stop remembering) (.+)$/)))return result('forget',{speechAct:'request',object:object(m[1]),nameOnly:/^my name$/.test(m[1].trim().toLowerCase())});
+    if((m=core.match(/^(?:forget|stop remembering) (.+)$/)))return result('forget',{speechAct:'request',object:object(m[1]),nameOnly:/^my name$/.test(m[1].trim().toLowerCase()),forgetAll:/^(?:everything|all(?:\s+(?:memories|of it|you know|i(?:'ve|\s+have)\s+(?:told|shared with)\s+you))?)$/.test(m[1].trim().toLowerCase())});
     function semanticDraft(draft){
       for(const slot of ['a','b'])if(draft[slot]){if(!draft[slot].length)return clarify((draft.labels?.[slot]?'“'+draft.labels[slot]+'” isn’t in my vocabulary yet':'That term isn’t in my vocabulary yet')+', so I can’t answer reliably. You can browse the words I do know in Engine lab.');if(draft[slot].length>1)return result('clarify',{supported:false,semanticAmbiguity:{slot,draft,candidates:draft[slot]},reason:'Which meaning do you intend?'});}
       return result('semantic',{speechAct:'question',...(draft.op==='describe'?{definition:draft.a[0]}:{query:{op:'subsumes',a:draft.a[0],b:draft.b[0]}})});

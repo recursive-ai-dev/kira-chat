@@ -209,3 +209,18 @@ test('mixed-new/existing conjunction must not say "kept separately" for the know
   assert.match(replies[1].text, /pizza/,
     'reply must mention the newly added preference');
 });
+
+test('"forget my name" retires the saved name memory', () => {
+  // When the user says "forget my name", the forget handler must retire the
+  // active name memory even though "my name" does not appear in the lexicon and
+  // therefore yields a literal key that will not match the stored name object key.
+  // Before the fix, this replied "I don't have an active memory matching that."
+  // while the name was still active.
+  const {state, replies} = conversation(['My name is Alice', 'forget my name']);
+  const activeMemories = state.memories.filter(m => m.status === 'active');
+  assert.equal(activeMemories.length, 0, 'name memory must be retired after "forget my name"');
+  assert.doesNotMatch(replies[1].text, /don't have an active memory/,
+    'must not claim no matching memory when the name is saved');
+  assert.match(replies[1].text, /stop using/,
+    'reply must confirm the memory was retired');
+});

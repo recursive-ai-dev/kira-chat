@@ -1,3 +1,8 @@
+## Run 3 — 2026-10-10
+**Bug:** Repeated preference conjunction (e.g. 'I like coffee and tea' said twice) triggered 'I've kept those reports separately' even when no new memory was created.
+**Fix:** Added `anyNew = records.some(r => r.created)` guard in the `records.length > 1` branch of dialogue.js. Reply now says 'I have those saved already' when all items exist.
+**Lesson:** The multi-item branch at `records.length > 1` is a semantic hotspot — always check the `created` flag before choosing the reply variant. Probe edge cases with repeated identical conjunctions.
+
 ## Run 2 (2026-10-09) — Duplicate-Word Preference Conjunction Bug
 - **Easiest bug category:** Logic bugs in dialogue state machines caught by targeted adversarial input testing
 - **Strategy that worked:** Enumerate conjunction edge cases (same word twice, empty, very long) and run them through the live model to observe unexpected replies

@@ -180,3 +180,17 @@ test('duplicate word in preference list is treated as one preference, not two', 
     'duplicate input must not trigger the multi-item reply');
   assert.match(replies[0].text, /coffee/, 'reply must mention the preference');
 });
+
+test('repeating the same preference conjunction says "already saved", not "kept separately"', () => {
+  // When a user repeats "I like coffee and tea" verbatim, both memories already
+  // exist so nothing new is created. The reply must NOT say "I've kept those
+  // reports separately" (which implies a new operation). Instead it must
+  // acknowledge the memories were already saved.
+  const {state, replies} = conversation(['I like coffee and tea', 'I like coffee and tea']);
+  const activeMemories = state.memories.filter(m => m.status === 'active');
+  assert.equal(activeMemories.length, 2, 'still exactly two memories');
+  assert.doesNotMatch(replies[1].text, /kept those reports separately/,
+    'second identical conjunction must not trigger the "kept separately" reply');
+  assert.match(replies[1].text, /saved already/,
+    'reply must acknowledge the memories were already saved');
+});

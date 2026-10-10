@@ -113,7 +113,7 @@
         case 'name':case 'preference':case 'mood':case 'note':{
           const records=applyFrames(),first=records[0]?.memory;
           if(!first){plan.text='What would you like me to remember?';break;}
-          if(records.length>1)plan.text='I’ve kept those reports separately:\n'+records.map(r=>'• '+describeMemory(r.memory)+'.').join('\n')+'\n'+ask('general',0,'Which would you like to talk about first?');
+          if(records.length>1){const anyNew=records.some(r=>r.created);plan.text=anyNew?'I’ve kept those reports separately:\n'+records.map(r=>'• '+describeMemory(r.memory)+'.').join('\n')+'\n'+ask('general',0,'Which would you like to talk about first?'):'I have those saved already:\n'+records.map(r=>'• '+describeMemory(r.memory)+'.').join('\n')+'\n'+ask('general',0,'Which would you like to talk about?');}
           else if(first.kind==='name')plan.text=(parsed.nameConfirmation?'Yes—'+first.object.label+'.':records[0].created?(first.supersedes.length?'Got it, '+first.object.label+'. I’ve corrected your name.':'Hi, '+first.object.label+'. It’s good to meet you.'):first.object.label+'—I have your name saved.')+' '+ask('general',0,'What have you been spending time on lately?');
           else if(first.kind==='note')plan.text='I’ve kept that as a note you gave me: “'+first.object.label+'”';
           else if(first.kind==='mood'){
@@ -250,4 +250,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6ff76566168ca31f4023289c5be83242cec25e1c84a8c5cf182aa891659eaf63","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"ce3744c90e5256c9500a43bf393751e2920a30124667ba4cafac1fe3354ff42c","unicode":"15.0.0","profile":"EXPERIMENTAL"};

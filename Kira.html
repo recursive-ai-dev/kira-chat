@@ -674,7 +674,15 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     const clauses=text.replace(/^(?:actually|correction)[:,]?\s*/i,'').split(/(?:[.;]\s+|,?\s+but\s+|\s+and\s+(?=I\b))/i);
     const frames=[];
     for(let clause of clauses){
-      clause=clause.replace(/[.!?]+$/,'').trim();const c=K.fold(clause);let f=null;
+      clause=clause.replace(/[.!?]+$/,'').trim();
+      // Looser phrasings of a direct preference are rewritten to the verbs the grammar already checks.
+      clause=clause
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? not (?:really )?(?:into|a fan of|keen on)\s+/i,"I don't like ")
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? (?:really |so |totally |way |very much )?(?:into|a fan of|obsessed with|hooked on|keen on|crazy about)\s+/i,'I love ')
+        .replace(/^i (?:can(?:'t|not)|can not|couldn't) (?:stand|bear)\s+/i,'I hate ')
+        .replace(/^i (?:(?:really|definitely|usually|generally) )?(?:prefer|fancy|adore|dig)\s+/i,'I like ')
+        .replace(/^i(?:'ve| have) always (?:loved|liked|enjoyed)\s+/i,'I love ');
+      const c=K.fold(clause);let f=null;
       const favorite=c.match(/^my (?:absolute )?fav(?:ou?rite)? [\p{L} ]{1,40}? (?:is|are) (.+)$/u)||c.match(/^(.+?) (?:is|are) my (?:absolute )?fav(?:ou?rite)?(?: [\p{L} ]{1,40})?$/u);
       if(favorite&&!/^(?:it|that|this|them)$/.test(favorite[1])&&favorite[1].length<=100&&!/[.;!?]/.test(favorite[1])){
         const piece=clause.slice(c.lastIndexOf(favorite[1]),c.lastIndexOf(favorite[1])+favorite[1].length).trim();
@@ -802,9 +810,33 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     art:[[/\b(?:digital|procreate|photoshop|tablet|pixel)\b/i,'What do you like about working digitally?'],[/\b(?:paint|painting|oil|watercolou?r|acrylic)\b/i,'What do you find yourself painting most?'],[/\b(?:draw|drawing|sketch|sketching|ink)\b/i,'Do you sketch loosely first, or start with the final lines?']]
   };
   const anyTopic=[[/\b(?:stuck|struggling|blocked|can't figure|cannot figure|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|by myself|just me|on my own)\b/i,'What is it like doing that on your own?'],[/\b(?:godot|unity|unreal|phaser|love2d)\b/i,'How is that engine working out for you so far?']];
+  // Pull a short noun phrase out of an answer ("Making 2d games with custom art" -> "2d games") so a
+  // question can name it. Returns null unless the result is short and plainly a phrase.
+  function focusPhrase(answer){
+    if(typeof answer!=='string')return null;
+    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
+    const words=t.split(/\s+/).filter(Boolean);
+    if(words.length<1||words.length>4||t.length>32)return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
+    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't)\b/i.test(t))return null;
+    // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
+    return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
+  }
+  const phraseQuestions={
+    gaming:[p=>'What got you started on '+p+'?',p=>'Which part of '+p+' do you enjoy most?'],
+    coding:[p=>'What has been the hardest part of '+p+' so far?',p=>'What would make '+p+' feel finished to you?'],
+    music:[p=>'What first drew you to '+p+'?',p=>'When do you find yourself coming back to '+p+'?'],
+    writing:[p=>'What made you start on '+p+'?',p=>'What do you want '+p+' to feel like?'],
+    art:[p=>'What do you like most about '+p+'?',p=>'How did you first get into '+p+'?'],
+    general:[p=>'What do you like most about '+p+'?',p=>'What got you interested in '+p+'?']
+  };
   function nextQuestion(topic,step,answer,asked){
     const seen=asked||[];
     if(typeof answer==='string')for(const [cue,q] of (tailored[topic]||[]).concat(anyTopic))if(cue.test(answer)&&!seen.includes(q))return q;
+    const phrase=seen.length%2===0?focusPhrase(answer):null;
+    if(phrase){const t=phraseQuestions[topic]||phraseQuestions.general;for(let i=0;i<t.length;i++){const q=t[((seen.length)+i)%t.length](phrase);if(!seen.includes(q))return q;}}
     const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';
   }
   // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
@@ -817,7 +849,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     if(!gentle&&quote&&quote.length<=60&&quote.split(/\s+/).length>=3)return echoes[turn%echoes.length](quote);
     return a[turn%a.length];
   };
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,focusPhrase,acknowledge});
 })(Kira);
 
 'use strict';
@@ -1037,7 +1069,8 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else plan.text=misses===1?'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.':'I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
+            else if(misses===1)plan.text=/\?\s*$/.test(parsed.text)?'I can’t answer that one. I can answer things like “What do you remember about me?”, “What is a guitar?”, or “Is a violin an instrument?”.':/^i(?:'m| am|'ve| have| want| need| think| wish| would| had| was| got| went| work| play| make| write)\b/i.test(parsed.text)?'I couldn’t read that as something to remember. Could you say it as “I like …”, “I feel …”, or “I love …”, or keep it as a note with “Remember this: …”?':'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.';
+            else plan.text='I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
           break;
         }
@@ -1119,7 +1152,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"f307a3b8ff9a4e951e4930501eb4e88868de74a6265a2b60206169d977c937cb","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"eeec9e5e0f7627844b308d7bd61256844908b72be493902586e58c9aa07d1101","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -1662,7 +1695,15 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     const clauses=text.replace(/^(?:actually|correction)[:,]?\s*/i,'').split(/(?:[.;]\s+|,?\s+but\s+|\s+and\s+(?=I\b))/i);
     const frames=[];
     for(let clause of clauses){
-      clause=clause.replace(/[.!?]+$/,'').trim();const c=K.fold(clause);let f=null;
+      clause=clause.replace(/[.!?]+$/,'').trim();
+      // Looser phrasings of a direct preference are rewritten to the verbs the grammar already checks.
+      clause=clause
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? not (?:really )?(?:into|a fan of|keen on)\s+/i,"I don't like ")
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? (?:really |so |totally |way |very much )?(?:into|a fan of|obsessed with|hooked on|keen on|crazy about)\s+/i,'I love ')
+        .replace(/^i (?:can(?:'t|not)|can not|couldn't) (?:stand|bear)\s+/i,'I hate ')
+        .replace(/^i (?:(?:really|definitely|usually|generally) )?(?:prefer|fancy|adore|dig)\s+/i,'I like ')
+        .replace(/^i(?:'ve| have) always (?:loved|liked|enjoyed)\s+/i,'I love ');
+      const c=K.fold(clause);let f=null;
       const favorite=c.match(/^my (?:absolute )?fav(?:ou?rite)? [\p{L} ]{1,40}? (?:is|are) (.+)$/u)||c.match(/^(.+?) (?:is|are) my (?:absolute )?fav(?:ou?rite)?(?: [\p{L} ]{1,40})?$/u);
       if(favorite&&!/^(?:it|that|this|them)$/.test(favorite[1])&&favorite[1].length<=100&&!/[.;!?]/.test(favorite[1])){
         const piece=clause.slice(c.lastIndexOf(favorite[1]),c.lastIndexOf(favorite[1])+favorite[1].length).trim();
@@ -1790,9 +1831,33 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     art:[[/\b(?:digital|procreate|photoshop|tablet|pixel)\b/i,'What do you like about working digitally?'],[/\b(?:paint|painting|oil|watercolou?r|acrylic)\b/i,'What do you find yourself painting most?'],[/\b(?:draw|drawing|sketch|sketching|ink)\b/i,'Do you sketch loosely first, or start with the final lines?']]
   };
   const anyTopic=[[/\b(?:stuck|struggling|blocked|can't figure|cannot figure|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|by myself|just me|on my own)\b/i,'What is it like doing that on your own?'],[/\b(?:godot|unity|unreal|phaser|love2d)\b/i,'How is that engine working out for you so far?']];
+  // Pull a short noun phrase out of an answer ("Making 2d games with custom art" -> "2d games") so a
+  // question can name it. Returns null unless the result is short and plainly a phrase.
+  function focusPhrase(answer){
+    if(typeof answer!=='string')return null;
+    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
+    const words=t.split(/\s+/).filter(Boolean);
+    if(words.length<1||words.length>4||t.length>32)return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
+    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't)\b/i.test(t))return null;
+    // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
+    return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
+  }
+  const phraseQuestions={
+    gaming:[p=>'What got you started on '+p+'?',p=>'Which part of '+p+' do you enjoy most?'],
+    coding:[p=>'What has been the hardest part of '+p+' so far?',p=>'What would make '+p+' feel finished to you?'],
+    music:[p=>'What first drew you to '+p+'?',p=>'When do you find yourself coming back to '+p+'?'],
+    writing:[p=>'What made you start on '+p+'?',p=>'What do you want '+p+' to feel like?'],
+    art:[p=>'What do you like most about '+p+'?',p=>'How did you first get into '+p+'?'],
+    general:[p=>'What do you like most about '+p+'?',p=>'What got you interested in '+p+'?']
+  };
   function nextQuestion(topic,step,answer,asked){
     const seen=asked||[];
     if(typeof answer==='string')for(const [cue,q] of (tailored[topic]||[]).concat(anyTopic))if(cue.test(answer)&&!seen.includes(q))return q;
+    const phrase=seen.length%2===0?focusPhrase(answer):null;
+    if(phrase){const t=phraseQuestions[topic]||phraseQuestions.general;for(let i=0;i<t.length;i++){const q=t[((seen.length)+i)%t.length](phrase);if(!seen.includes(q))return q;}}
     const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';
   }
   // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
@@ -1805,7 +1870,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     if(!gentle&&quote&&quote.length<=60&&quote.split(/\s+/).length>=3)return echoes[turn%echoes.length](quote);
     return a[turn%a.length];
   };
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,focusPhrase,acknowledge});
 })(Kira);
 
 'use strict';
@@ -2025,7 +2090,8 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else plan.text=misses===1?'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.':'I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
+            else if(misses===1)plan.text=/\?\s*$/.test(parsed.text)?'I can’t answer that one. I can answer things like “What do you remember about me?”, “What is a guitar?”, or “Is a violin an instrument?”.':/^i(?:'m| am|'ve| have| want| need| think| wish| would| had| was| got| went| work| play| make| write)\b/i.test(parsed.text)?'I couldn’t read that as something to remember. Could you say it as “I like …”, “I feel …”, or “I love …”, or keep it as a note with “Remember this: …”?':'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.';
+            else plan.text='I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
           break;
         }
@@ -2107,7 +2173,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"f307a3b8ff9a4e951e4930501eb4e88868de74a6265a2b60206169d977c937cb","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"eeec9e5e0f7627844b308d7bd61256844908b72be493902586e58c9aa07d1101","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);

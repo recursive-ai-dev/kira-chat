@@ -176,3 +176,19 @@ test('greetings with a name or filler are recognised', () => {
     assert.equal(out.state.lastPlan.act, 'greet', text);
   }
 });
+
+test('looser preference phrasings are saved as preferences', () => {
+  const cases = [["I'm really into jazz", 'jazz'], ["I can't stand cilantro", 'cilantro'], ['I prefer tea', 'tea'], ["I've always loved hiking", 'hiking']];
+  for (const [text, label] of cases) {
+    const out = dialogue.step(K.initialState(), {type: 'message', text, seq: 1, time: 0});
+    assert.ok(out.state.memories.some(m => m.kind === 'preference' && m.object.label === label), text);
+  }
+});
+
+test('follow-up questions name the topic phrase from the answer', () => {
+  assert.equal(K.focusPhrase('Making games mostly'), 'games');
+  assert.equal(K.focusPhrase('Pixel platformers'), 'pixel platformers');
+  assert.equal(K.focusPhrase('Godot'), 'Godot');
+  assert.equal(K.focusPhrase('yes'), null);
+  assert.equal(K.focusPhrase('I am not sure what I want'), null);
+});

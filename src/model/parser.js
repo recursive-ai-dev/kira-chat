@@ -86,7 +86,15 @@
     const clauses=text.replace(/^(?:actually|correction)[:,]?\s*/i,'').split(/(?:[.;]\s+|,?\s+but\s+|\s+and\s+(?=I\b))/i);
     const frames=[];
     for(let clause of clauses){
-      clause=clause.replace(/[.!?]+$/,'').trim();const c=K.fold(clause);let f=null;
+      clause=clause.replace(/[.!?]+$/,'').trim();
+      // Looser phrasings of a direct preference are rewritten to the verbs the grammar already checks.
+      clause=clause
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? not (?:really )?(?:into|a fan of|keen on)\s+/i,"I don't like ")
+        .replace(/^i(?:'m| am| have|'ve)(?: been)? (?:really |so |totally |way |very much )?(?:into|a fan of|obsessed with|hooked on|keen on|crazy about)\s+/i,'I love ')
+        .replace(/^i (?:can(?:'t|not)|can not|couldn't) (?:stand|bear)\s+/i,'I hate ')
+        .replace(/^i (?:(?:really|definitely|usually|generally) )?(?:prefer|fancy|adore|dig)\s+/i,'I like ')
+        .replace(/^i(?:'ve| have) always (?:loved|liked|enjoyed)\s+/i,'I love ');
+      const c=K.fold(clause);let f=null;
       const favorite=c.match(/^my (?:absolute )?fav(?:ou?rite)? [\p{L} ]{1,40}? (?:is|are) (.+)$/u)||c.match(/^(.+?) (?:is|are) my (?:absolute )?fav(?:ou?rite)?(?: [\p{L} ]{1,40})?$/u);
       if(favorite&&!/^(?:it|that|this|them)$/.test(favorite[1])&&favorite[1].length<=100&&!/[.;!?]/.test(favorite[1])){
         const piece=clause.slice(c.lastIndexOf(favorite[1]),c.lastIndexOf(favorite[1])+favorite[1].length).trim();

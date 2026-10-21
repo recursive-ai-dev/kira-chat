@@ -91,9 +91,33 @@
     art:[[/\b(?:digital|procreate|photoshop|tablet|pixel)\b/i,'What do you like about working digitally?'],[/\b(?:paint|painting|oil|watercolou?r|acrylic)\b/i,'What do you find yourself painting most?'],[/\b(?:draw|drawing|sketch|sketching|ink)\b/i,'Do you sketch loosely first, or start with the final lines?']]
   };
   const anyTopic=[[/\b(?:stuck|struggling|blocked|can't figure|cannot figure|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|by myself|just me|on my own)\b/i,'What is it like doing that on your own?'],[/\b(?:godot|unity|unreal|phaser|love2d)\b/i,'How is that engine working out for you so far?']];
+  // Pull a short noun phrase out of an answer ("Making 2d games with custom art" -> "2d games") so a
+  // question can name it. Returns null unless the result is short and plainly a phrase.
+  function focusPhrase(answer){
+    if(typeof answer!=='string')return null;
+    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
+    const words=t.split(/\s+/).filter(Boolean);
+    if(words.length<1||words.length>4||t.length>32)return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
+    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't)\b/i.test(t))return null;
+    // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
+    return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
+  }
+  const phraseQuestions={
+    gaming:[p=>'What got you started on '+p+'?',p=>'Which part of '+p+' do you enjoy most?'],
+    coding:[p=>'What has been the hardest part of '+p+' so far?',p=>'What would make '+p+' feel finished to you?'],
+    music:[p=>'What first drew you to '+p+'?',p=>'When do you find yourself coming back to '+p+'?'],
+    writing:[p=>'What made you start on '+p+'?',p=>'What do you want '+p+' to feel like?'],
+    art:[p=>'What do you like most about '+p+'?',p=>'How did you first get into '+p+'?'],
+    general:[p=>'What do you like most about '+p+'?',p=>'What got you interested in '+p+'?']
+  };
   function nextQuestion(topic,step,answer,asked){
     const seen=asked||[];
     if(typeof answer==='string')for(const [cue,q] of (tailored[topic]||[]).concat(anyTopic))if(cue.test(answer)&&!seen.includes(q))return q;
+    const phrase=seen.length%2===0?focusPhrase(answer):null;
+    if(phrase){const t=phraseQuestions[topic]||phraseQuestions.general;for(let i=0;i<t.length;i++){const q=t[((seen.length)+i)%t.length](phrase);if(!seen.includes(q))return q;}}
     const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';
   }
   // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
@@ -106,6 +130,6 @@
     if(!gentle&&quote&&quote.length<=60&&quote.split(/\s+/).length>=3)return echoes[turn%echoes.length](quote);
     return a[turn%a.length];
   };
-  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
+  Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,focusPhrase,acknowledge});
 })(Kira);
 

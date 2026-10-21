@@ -163,7 +163,8 @@
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else plan.text=misses===1?'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.':'I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
+            else if(misses===1)plan.text=/\?\s*$/.test(parsed.text)?'I can’t answer that one. I can answer things like “What do you remember about me?”, “What is a guitar?”, or “Is a violin an instrument?”.':/^i(?:'m| am|'ve| have| want| need| think| wish| would| had| was| got| went| work| play| make| write)\b/i.test(parsed.text)?'I couldn’t read that as something to remember. Could you say it as “I like …”, “I feel …”, or “I love …”, or keep it as a note with “Remember this: …”?':'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.';
+            else plan.text='I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
           break;
         }
@@ -245,4 +246,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"f307a3b8ff9a4e951e4930501eb4e88868de74a6265a2b60206169d977c937cb","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"eeec9e5e0f7627844b308d7bd61256844908b72be493902586e58c9aa07d1101","unicode":"15.0.0","profile":"EXPERIMENTAL"};

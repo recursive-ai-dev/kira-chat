@@ -192,3 +192,22 @@ test('follow-up questions name the topic phrase from the answer', () => {
   assert.equal(K.focusPhrase('yes'), null);
   assert.equal(K.focusPhrase('I am not sure what I want'), null);
 });
+
+test('a known name and saved preference shape the next greeting, with the memory grounded as a claim', () => {
+  let state = K.initialState();
+  for (const text of ['My name is Sam', 'I love jazz', 'hello']) {
+    state = dialogue.step(state, {type: 'message', text, seq: state.revision + 1, time: 0}).state;
+  }
+  assert.match(state.lastPlan.text, /^Hello, Sam\. .*jazz/);
+  assert.equal(state.lastPlan.claims.length, 2);
+});
+
+test('thanks and farewells rotate through different wordings', () => {
+  let state = K.initialState();
+  const seen = new Set();
+  for (let i = 0; i < 6; i++) {
+    state = dialogue.step(state, {type: 'message', text: 'thanks', seq: state.revision + 1, time: 0}).state;
+    seen.add(state.lastPlan.text);
+  }
+  assert.ok(seen.size >= 4, 'expected at least four distinct replies, got ' + seen.size);
+});

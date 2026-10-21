@@ -101,6 +101,16 @@
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
       const ask=(topic,step,question,answer,asked)=>{const q=question||K.nextConversationQuestion(topic,step,answer,asked);state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid,asked:(asked||[]).concat(q).slice(-12)};return q;};
+      // A returning-conversation hook: the least-recalled positive preference, grounded as a claim.
+      const recallHook=()=>{
+        const prefs=state.memories.filter(m=>m.status==='active'&&m.kind==='preference'&&m.polarity==='positive'&&m.temporal==='present'&&['like','love','enjoy'].includes(m.predicate));
+        if(!prefs.length)return null;
+        const m=prefs.slice().sort((a,b)=>(state.usage['recall:'+a.id]||0)-(state.usage['recall:'+b.id]||0)||K.cmp(a.id,b.id))[0],n=state.usage['recall:'+m.id]||0;
+        state.usage['recall:'+m.id]=n+1;claims([m]);
+        const label=m.object.label,topic=(m.object.concept&&this.engine.topicFor(m.object.concept))||'general';
+        const lines=['You told me you '+m.predicate+' '+label+'. What’s been happening with that lately?','I still have it that you '+m.predicate+' '+label+'. Has anything new come up there?','Earlier you said you '+m.predicate+' '+label+'. Is that still on your mind?'];
+        return {text:lines[n%lines.length],topic};
+      };
       const askLastQuestion=(topic,step)=>{const match=plan.text.match(/(?:^|[.!?]\s+)([^.!?]*\?)\s*$/u);K.assert(match,'Support reply must end in a question');return ask(topic,step,match[1]);};
       const discourse=(text,questionMessage)=>{plan.policy.discourse={kind:'quoted_conversation',sourceMessage:uid,questionMessage:questionMessage||null,text};state.context.thread=(state.context.thread||[]).concat({sourceMessage:uid,questionMessage:questionMessage||null,text}).slice(-8);};
       state.context.pending=null;
@@ -210,14 +220,14 @@
         case 'social':{
           const kind=parsed.socialKind;
           if(kind==='laugh'&&['joke','prompt'].includes(previous.lastPlan?.act)){plan.text=generic('laugh');state.context.pending={kind:'offer',act:previous.lastPlan.act};}
-          else{plan.text=kind==='laugh'?'Ha—glad something made you smile. What’s on your mind?':generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}
+          else{const hook=kind==='ack'||kind==='decline'?recallHook():null;if(hook){plan.text=(kind==='decline'?'That’s fine. ':'Okay. ')+hook.text;askLastQuestion(hook.topic,0);}else{plan.text=kind==='laugh'?'Ha—glad something made you smile. What’s on your mind?':generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}}
           break;
         }
         case 'affection':plan.text=generic(state.settings.boundary==='flirty'&&state.relationship.points>=4?'flirt':'affection');break;
         case 'greet':{
           const r=this.engine.query({op:'realize',c:'c:greeting-word',target:[state.settings.register,0]});plan.semantics.push(r);plan.slots.push({concept:'c:greeting-word',sense:r.value.chosen,type:'speech-act',context:'extensional'});
           const word=this.engine.a.senses.find(s=>s.id===r.value.chosen).lemma,name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
-          if(name){claims([name]);plan.text=word[0].toUpperCase()+word.slice(1)+', '+name.object.label+'. '+ask('general',0,'What’s on your mind?');}
+          if(name){claims([name]);const hook=recallHook(),hello=word[0].toUpperCase()+word.slice(1)+', '+name.object.label+'. ';if(hook){plan.text=hello+hook.text;ask(hook.topic,0,hook.text.replace(/^.*?([^.!?]*\?)$/,'$1').trim());}else plan.text=hello+ask('general',0,'What’s on your mind?');}
           else{plan.text=generic('greet').replace('{greeting}',word[0].toUpperCase()+word.slice(1)).replace(/\s+[^.!?]*\?$/,'')+' What should I call you?';state.context.pending={kind:'name',questionMessage:aid};}break;
         }
         default:plan.text=generic(K.DIALOGUE.responses[intent]?intent:'about');
@@ -246,4 +256,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"eeec9e5e0f7627844b308d7bd61256844908b72be493902586e58c9aa07d1101","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6c647e6e27300df2e6a581a03a5aeccce900fd31eb59f79e8c951a5d2d97b53e","unicode":"15.0.0","profile":"EXPERIMENTAL"};

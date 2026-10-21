@@ -50,3 +50,24 @@
   });
 })(Kira);
 
+// More wording variety. Selection stays "least used, then stable ID", so extra lines simply stretch the rotation.
+(function(K){
+  const more={
+    greet:[{id:'greet:window',text:'{greeting}. I was just rearranging the notebooks. What’s been on your mind?'},{id:'greet:kettle',text:'{greeting}. The kettle’s on, figuratively. What shall we talk about?'},{id:'greet:easy',text:'{greeting}. No agenda here. Where would you like to begin?'}],
+    farewell:[{id:'bye:lamp',text:'Goodnight, or good day, whichever fits. I’ll keep the lamp on.'},{id:'bye:later',text:'Talk later. Take whatever you need from the rest of today.'},{id:'bye:door',text:'The door stays unlocked. Come back whenever you like.'}],
+    stay:[{id:'stay:here',text:'I’m still here. Do you want to keep going where we were, or start somewhere new?'},{id:'stay:chair',text:'Okay, pulling the chair closer. What would help right now?'}],
+    thanks:[{id:'thanks:anytime',text:'Anytime. It’s a pleasure to have something to listen to.'},{id:'thanks:glad',text:'I’m glad. Is there anything else you’d like to get into?'},{id:'thanks:noted',text:'You’re welcome. I like how this conversation is going.'}],
+    social:[{id:'social:thread',text:'Mm-hm. Is there a thread you’d like to pull on?'},{id:'social:go',text:'Right. Do you want to say more, or take us somewhere else?'},{id:'social:listen',text:'I’m following. What comes to mind next?'}],
+    decline:[{id:'decline:other',text:'Understood. What would you rather do instead?'},{id:'decline:swap',text:'That’s all right. What would you like to change the subject to?'}],
+    laugh:[{id:'laugh:ha',text:'Ha. I’ll take it. Another?'},{id:'laugh:ok',text:'Good, that one earned its place. Want one more?'}],
+    support:[{id:'support:time',text:'There’s no rush. Which part is easiest to say first?'},{id:'support:close',text:'I’m here. What’s sitting heaviest right now?'}],
+    loss:[{id:'loss:here',text:'I’m so sorry. I’m here, and there’s no need to say it neatly. What would help you right now?'}]
+  };
+  for(const family of Object.keys(more).sort())for(const t of more[family])K.DIALOGUE.responses[family].push(t);
+  const persona={
+    greet:{warm:['{greeting}. I’m glad you came by. What’s on your heart today?'],playful:['{greeting}. Plot twist: it’s you. What are we getting into?'],thoughtful:['{greeting}. Take a moment if you need one. What’s been lingering with you?'],direct:['{greeting}. What would you like to talk about?']},
+    thanks:{warm:['You’re welcome. It means something to me that you said so.'],playful:['You’re welcome. I accept payment in good stories.'],thoughtful:['You’re welcome. It’s good to know the conversation is doing something for you.'],direct:['You’re welcome. Anything else?']},
+    support:{warm:['I’m listening, and there’s no hurry. What happened?'],playful:['Joke break is over for now. Tell me what’s going on?'],thoughtful:['Let’s look at it slowly. What feels like the center of it?'],direct:['I’m listening. What happened?']}
+  };
+  for(const family of Object.keys(persona).sort())for(const p of Object.keys(persona[family]).sort())persona[family][p].forEach((text,i)=>K.DIALOGUE.responses[family].push({id:family+':'+p+':more'+i,personas:[p],text}));
+})(Kira);

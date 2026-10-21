@@ -167,3 +167,12 @@ test('the vocabulary explorer lists words by label without dialogue internals', 
   const labels = entries.map(e => K.fold(e.label));
   assert.deepEqual(labels, labels.slice().sort());
 });
+
+test('greetings with a name or filler are recognised', () => {
+  const {K} = loadModel({withPersistence: false});
+  const engine = new K.SemanticEngine(K.ARTIFACT), dialogue = new K.DialogueModel(engine, K.APP_META);
+  for (const text of ['Hello Kira', 'hi there', 'Hey, Kira!', 'good morning kira', 'hello again']) {
+    const out = dialogue.step(K.initialState(), {type: 'message', text, seq: 1, time: 0});
+    assert.equal(out.state.lastPlan.act, 'greet', text);
+  }
+});

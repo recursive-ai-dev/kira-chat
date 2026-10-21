@@ -47,7 +47,7 @@
     if(/^(?:cool|nice|neat|great|awesome|interesting|i see|got it|fair enough|true|hmm+|mm+|oh|ah|wow|right|alright|sounds good|makes sense|not much|nothing much|nothing)$/.test(core))return result('social',{socialKind:'ack'});
     if(loss.test(core))return result('support',{loss:true});
     const fixed=[
-      ['greet',/^(?:hi|hello|hey|yo|hey kira|hi kira|good morning|good afternoon|good evening)$/],
+      ['greet',/^(?:(?:hi|hello|hey|hiya|howdy|yo|heya|hullo|greetings|good (?:morning|afternoon|evening)|morning|evening)(?:,?\s+(?:there|kira|again|everyone|friend))*|hello,? how are you)$/],
       ['farewell',/^(?:bye|goodbye|good night|goodnight|see you|see ya|talk later)$/],
       ['how',/^(?:how are you|how are you doing|how are you today|how's it going|how have you been|what's up|sup|what are you thinking about|what are you up to)$/],
       ['about',/^(?:who are you|what are you|tell me about (?:you|yourself)|what do you like|what's your name|what is your name|what should i call you|introduce yourself)$/],

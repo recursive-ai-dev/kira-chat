@@ -20,7 +20,7 @@
     const base=(s=text)=>K.parseInput(s,state,engine);
     const finish=r=>({...r,text:raw,version:'conversation-parser/4.2.0'});
     if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base());
-    const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0},reason:null});
+    const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0,asked:thread.asked||[]},reason:null});
     // Do not turn a quoted or explicitly conditional statement into a report.
     const protectedText=/["“”]|^(?:if|suppose|imagine|maybe|perhaps)\b/i.test(text);
     if(!protectedText){
@@ -81,10 +81,31 @@
     support:['What’s been the hardest part?','How are you holding up right now?','Has anything helped, even a little?','Would you like to keep talking about it, or take a breather with something lighter?'],
     general:['How do you feel about that?','What’s that like for you?','Would you like to stay with that, or talk about something else?']
   };
-  function nextQuestion(topic,step){const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';}
+  // Answer-aware questions: the first rule whose cue appears in the answer and whose question has not
+  // been asked yet in this thread wins; otherwise the fixed list continues. Cues only choose a question.
+  const tailored={
+    gaming:[[/\b(?:art|pixel|sprites?|drawings?|animation|visuals?|painted|hand[- ]drawn)\b/i,'What look are you going for with the art, and how does it shape the way the game plays?'],[/\b(?:story|narrative|characters?|dialogue|writing)\b/i,'Whose story does the player get to live through?'],[/\b(?:puzzle|puzzles)\b/i,'What is the first puzzle the player will meet?'],[/\b(?:multiplayer|co-?op|online|friends)\b/i,'How do the players affect each other?'],[/\b(?:platformer|jump|jumping|movement)\b/i,'What does moving through the world feel like?'],[/\b(?:unity|godot|unreal|engine|javascript|python|c\+\+|c#|lua|phaser|love2d)\b/i,'How is that setup working for you so far?'],[/\b(?:stuck|hard|struggling|can't|cannot|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|myself|by myself)\b/i,'What is it like building the whole thing on your own?']],
+    coding:[[/\b(?:bug|bugs|error|errors|broken|crash|crashes|stuck)\b/i,'What happens when it fails, and what did you expect instead?'],[/\b(?:web|website|browser|html|javascript|frontend|react)\b/i,'Who is the page for, and what should they be able to do first?'],[/\b(?:python|rust|go|java|c\+\+|c#|lua|typescript)\b/i,'What made you choose that language for it?'],[/\b(?:game|engine)\b/i,'Which system in it are you working on right now?'],[/\b(?:learning|beginner|new to|tutorial)\b/i,'What would feel like a good first win?']],
+    music:[[/\b(?:guitar|bass|drums?|piano|keys|synth|violin|sing|singing|vocals?)\b/i,'How long have you been playing, and what do you reach for first?'],[/\b(?:lyrics?|songwriting|write|writing)\b/i,'Where do your songs usually start, with a line, a sound, or a feeling?'],[/\b(?:metal|rock|punk|rap|hip-?hop|jazz|folk|pop|electronic|classical)\b/i,'What is it about that sound that works for you?'],[/\b(?:producing|production|mixing|recording|daw|beats?)\b/i,'What does your setup look like when you sit down to make something?']],
+    writing:[[/\b(?:poem|poetry|poems)\b/i,'Do your poems start with an image or with a line?'],[/\b(?:novel|book|chapter)\b/i,'Where are you in it, and what comes next?'],[/\b(?:character|characters|protagonist)\b/i,'What does that character want that they cannot say out loud?'],[/\b(?:stuck|blocked|can't|cannot)\b/i,'What usually unblocks you, even slightly?']],
+    art:[[/\b(?:digital|procreate|photoshop|tablet|pixel)\b/i,'What do you like about working digitally?'],[/\b(?:paint|painting|oil|watercolou?r|acrylic)\b/i,'What do you find yourself painting most?'],[/\b(?:draw|drawing|sketch|sketching|ink)\b/i,'Do you sketch loosely first, or start with the final lines?']]
+  };
+  const anyTopic=[[/\b(?:stuck|struggling|blocked|can't figure|cannot figure|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|by myself|just me|on my own)\b/i,'What is it like doing that on your own?'],[/\b(?:godot|unity|unreal|phaser|love2d)\b/i,'How is that engine working out for you so far?']];
+  function nextQuestion(topic,step,answer,asked){
+    const seen=asked||[];
+    if(typeof answer==='string')for(const [cue,q] of (tailored[topic]||[]).concat(anyTopic))if(cue.test(answer)&&!seen.includes(q))return q;
+    const q=questions[topic]||questions.general;return step<q.length?q[step]:'Would you like to keep talking about this, or pick another subject?';
+  }
   // Short acknowledgements for follow-up answers; the answer itself stays in the discourse record.
   const acknowledgements={gentle:['Thank you for telling me.','I’m listening.','That makes sense.'],direct:['Understood.','Okay.','Got it.'],default:['I’m with you.','Mm, okay.','Thanks for sharing that.','That’s good to know.']};
-  const acknowledge=(topic,persona,turn)=>{const a=['support','feelings','repair'].includes(topic)?acknowledgements.gentle:persona==='direct'?acknowledgements.direct:acknowledgements.default;return a[turn%a.length];};
+  // A short answer is echoed back verbatim (never rewritten) so the reply visibly responds to it.
+  const echoes=[a=>'“'+a+'” — noted.',a=>'“'+a+'.” Got it.',a=>a+' — that gives me a clearer picture.'];
+  const acknowledge=(topic,persona,turn,answer)=>{
+    const gentle=['support','feelings','repair'].includes(topic),a=gentle?acknowledgements.gentle:persona==='direct'?acknowledgements.direct:acknowledgements.default;
+    const quote=typeof answer==='string'?answer.trim().replace(/[.!?\s]+$/,''):'';
+    if(!gentle&&quote&&quote.length<=60&&quote.split(/\s+/).length>=3)return echoes[turn%echoes.length](quote);
+    return a[turn%a.length];
+  };
   Object.assign(K,{parseConversation,conversationTopic:topicCue,nextConversationQuestion:nextQuestion,conversationQuestions:questions,acknowledge});
 })(Kira);
 

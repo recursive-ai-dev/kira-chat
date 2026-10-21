@@ -100,7 +100,7 @@
       };
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
-      const ask=(topic,step,question)=>{const q=question||K.nextConversationQuestion(topic,step);state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid};return q;};
+      const ask=(topic,step,question,answer,asked)=>{const q=question||K.nextConversationQuestion(topic,step,answer,asked);state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid,asked:(asked||[]).concat(q).slice(-12)};return q;};
       const askLastQuestion=(topic,step)=>{const match=plan.text.match(/(?:^|[.!?]\s+)([^.!?]*\?)\s*$/u);K.assert(match,'Support reply must end in a question');return ask(topic,step,match[1]);};
       const discourse=(text,questionMessage)=>{plan.policy.discourse={kind:'quoted_conversation',sourceMessage:uid,questionMessage:questionMessage||null,text};state.context.thread=(state.context.thread||[]).concat({sourceMessage:uid,questionMessage:questionMessage||null,text}).slice(-8);};
       state.context.pending=null;
@@ -180,7 +180,7 @@
             discourse(answer,f?.questionMessage);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic};
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,'What would you rather talk about?');}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,topic==='support'?'What happened?':'Which part would you like to start with?');}
-            else plan.text=K.acknowledge(topic,persona,state.turn)+' '+ask(topic,step);
+            else plan.text=K.acknowledge(topic,persona,state.turn,answer)+' '+ask(topic,step,undefined,answer,cue&&cue!==f?.topic?[]:f?.asked);
             break;
           }
           const o=parsed.object,topic=this.engine.topicFor(o.concept),lines=K.DIALOGUE.topics['c:'+topic];
@@ -245,4 +245,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"e8b88d9b6e0cc62e2852a99376bc3cf362f71ce2b950c39f47903357b56f214e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"f307a3b8ff9a4e951e4930501eb4e88868de74a6265a2b60206169d977c937cb","unicode":"15.0.0","profile":"EXPERIMENTAL"};

@@ -256,4 +256,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6c647e6e27300df2e6a581a03a5aeccce900fd31eb59f79e8c951a5d2d97b53e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"21cd8ab17fbace24fd878b0040b954e66ec0d0e397493cf1207f37dfe4569552","unicode":"15.0.0","profile":"EXPERIMENTAL"};

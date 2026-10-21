@@ -920,7 +920,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   for(const family of Object.keys(more).sort())for(const t of more[family])K.DIALOGUE.responses[family].push(t);
   const persona={
     greet:{warm:['{greeting}. I’m glad you came by. What’s on your heart today?'],playful:['{greeting}. Plot twist: it’s you. What are we getting into?'],thoughtful:['{greeting}. Take a moment if you need one. What’s been lingering with you?'],direct:['{greeting}. What would you like to talk about?']},
-    thanks:{warm:['You’re welcome. It means something to me that you said so.'],playful:['You’re welcome. I accept payment in good stories.'],thoughtful:['You’re welcome. It’s good to know the conversation is doing something for you.'],direct:['You’re welcome. Anything else?']},
+    thanks:{warm:['You’re welcome. It means something to me that you said so.','Of course. I’m glad to be here for it.','Any time. You don’t have to thank me for listening.'],playful:['You’re welcome. I accept payment in good stories.','Happy to help. I’ll add it to my very short list of accomplishments.','You’re welcome. Please direct all further compliments to the notebook.'],thoughtful:['You’re welcome. It’s good to know the conversation is doing something for you.','You’re welcome. I think the thinking was mostly yours.','Of course. It’s easier to find a thought when someone is listening for it.'],direct:['You’re welcome. Anything else?','Sure. What’s next?','Glad to help. What else do you need?']},
     support:{warm:['I’m listening, and there’s no hurry. What happened?'],playful:['Joke break is over for now. Tell me what’s going on?'],thoughtful:['Let’s look at it slowly. What feels like the center of it?'],direct:['I’m listening. What happened?']}
   };
   for(const family of Object.keys(persona).sort())for(const p of Object.keys(persona[family]).sort())persona[family][p].forEach((text,i)=>K.DIALOGUE.responses[family].push({id:family+':'+p+':more'+i,personas:[p],text}));
@@ -1183,7 +1183,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6c647e6e27300df2e6a581a03a5aeccce900fd31eb59f79e8c951a5d2d97b53e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"21cd8ab17fbace24fd878b0040b954e66ec0d0e397493cf1207f37dfe4569552","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -1972,7 +1972,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   for(const family of Object.keys(more).sort())for(const t of more[family])K.DIALOGUE.responses[family].push(t);
   const persona={
     greet:{warm:['{greeting}. I’m glad you came by. What’s on your heart today?'],playful:['{greeting}. Plot twist: it’s you. What are we getting into?'],thoughtful:['{greeting}. Take a moment if you need one. What’s been lingering with you?'],direct:['{greeting}. What would you like to talk about?']},
-    thanks:{warm:['You’re welcome. It means something to me that you said so.'],playful:['You’re welcome. I accept payment in good stories.'],thoughtful:['You’re welcome. It’s good to know the conversation is doing something for you.'],direct:['You’re welcome. Anything else?']},
+    thanks:{warm:['You’re welcome. It means something to me that you said so.','Of course. I’m glad to be here for it.','Any time. You don’t have to thank me for listening.'],playful:['You’re welcome. I accept payment in good stories.','Happy to help. I’ll add it to my very short list of accomplishments.','You’re welcome. Please direct all further compliments to the notebook.'],thoughtful:['You’re welcome. It’s good to know the conversation is doing something for you.','You’re welcome. I think the thinking was mostly yours.','Of course. It’s easier to find a thought when someone is listening for it.'],direct:['You’re welcome. Anything else?','Sure. What’s next?','Glad to help. What else do you need?']},
     support:{warm:['I’m listening, and there’s no hurry. What happened?'],playful:['Joke break is over for now. Tell me what’s going on?'],thoughtful:['Let’s look at it slowly. What feels like the center of it?'],direct:['I’m listening. What happened?']}
   };
   for(const family of Object.keys(persona).sort())for(const p of Object.keys(persona[family]).sort())persona[family][p].forEach((text,i)=>K.DIALOGUE.responses[family].push({id:family+':'+p+':more'+i,personas:[p],text}));
@@ -2235,7 +2235,7 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"6c647e6e27300df2e6a581a03a5aeccce900fd31eb59f79e8c951a5d2d97b53e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"21cd8ab17fbace24fd878b0040b954e66ec0d0e397493cf1207f37dfe4569552","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);

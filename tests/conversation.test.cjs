@@ -121,7 +121,7 @@ test('the new model rejects an older version-pinned session', () => {
 test('emphasis words do not become part of a preference', () => {
   const {state, replies} = conversation(['I really like cats', 'I like pizza a lot', 'I like pizza so much']);
   assert.deepEqual([...active(state).map(K.describeMemory)], ['You like cats', 'You like pizza']);
-  assert.match(replies[2].text, /I have that saved already/);
+  assert.match(replies[2].text, /I have that saved already|I already have that|That’s already saved|I’ve got that one/);
 });
 
 test('a stated favorite is saved as a preference with its original casing', () => {
@@ -210,4 +210,34 @@ test('thanks and farewells rotate through different wordings', () => {
     seen.add(state.lastPlan.text);
   }
   assert.ok(seen.size >= 4, 'expected at least four distinct replies, got ' + seen.size);
+});
+
+test('new vocabulary gives topic-specific questions that stay on topic', () => {
+  const {replies} = conversation([
+    'I like soccer',
+    'Midfield mostly, I play with my friends on weekends',
+  ]);
+  assert.match(replies[0].text, /plays it, watches it, or both/);
+  // "friends" is incidental: the thread stays on sports instead of moving to the people ladder.
+  assert.equal(replies[1].policy.topicSelection.topic, 'sports');
+  assert.match(replies[1].text, /Who do you usually do that with\?/);
+});
+
+test('possessives are reported back in the second person and stay distinct from the general concept', () => {
+  const {state, replies} = conversation(['I love my dog', 'I like dogs']);
+  assert.match(replies[0].text, /You love your dog\./);
+  assert.equal(active(state).length, 2);
+});
+
+test('phrases with pronouns are not offered as names', () => {
+  const {replies} = conversation(['I watch anime', 'My mom is visiting']);
+  for (const reply of replies) assert.doesNotMatch(reply.text, /name you’d like me to use/);
+});
+
+test('an unstorable statement that names a known concept continues on that topic', () => {
+  const {replies, state} = conversation(['I am planning a trip to Japan']);
+  assert.equal(replies[0].policy.topicSelection.topic, 'travel');
+  assert.equal(replies[0].policy.topicSelection.fallback, 'unparsed statement');
+  assert.equal(active(state).length, 0, 'nothing is stored as a fact');
+  assert.doesNotMatch(replies[0].text, /couldn’t read that/);
 });

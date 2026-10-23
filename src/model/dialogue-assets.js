@@ -46,7 +46,17 @@
     'c:nature':['Is there an animal, plant, or place you keep noticing?','What do you like observing about it?','Do you encounter it nearby, or mostly read about it?'],
     'c:science':['Which part makes you curious: how it works, how we know, or what remains unexplained?','Is there a particular question you keep returning to?'],
     'c:cooking':['Is that something you like making, or something you enjoy eating or drinking?','What makes a good version of it for you?'],
-    'c:feelings':['Would you like to describe what brought that feeling on?','Would you rather explore it or have a distraction?']
+    'c:feelings':['Would you like to describe what brought that feeling on?','Would you rather explore it or have a distraction?'],
+    'c:sports':['Are you someone who plays it, watches it, or both?','What is the moment in it that you never get tired of?'],
+    'c:screen':['Do you tend to rewatch favourites, or chase something new?','What is something you watched that stayed with you afterwards?'],
+    'c:pets':['Tell me about them: what is their personality like?','What is their favourite way to spend a day?'],
+    'c:people':['Tell me about them: what are they like?','What is something about them you’d like me to remember?'],
+    'c:travel':['Is it a place you’re heading to, remembering, or imagining?','What would you want to see first when you arrive?'],
+    'c:weather':['What does it do to your mood?','Do you like to be out in it, or watch it from inside?'],
+    'c:school':['Is it something you’re doing now, or remembering?','What is the part you wish you could do again, or skip?'],
+    'c:work':['Is it something that energises you or something that drains you?','What is the part of it you would keep if you could pick?'],
+    'c:hobbies':['What got you started?','What does it do for you when you sit down and do it?'],
+    'c:home':['What is your favourite spot there?','What would make it feel even more like yours?']
   });
 })(Kira);
 

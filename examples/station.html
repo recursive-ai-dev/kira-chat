@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<title>Kira Narrative SDK · The Last Station</title>
+<link rel="stylesheet" href="station.css">
+</head>
+<body>
+<header><p class="eyebrow">Kira Narrative SDK / offline example</p><h1>The Last Station</h1><p>Two characters. Separate memories. One shared world.</p></header>
+<main>
+<section class="conversation" aria-labelledby="conversation-heading">
+  <h2 id="conversation-heading">A conversation at the platform</h2>
+  <label for="actor">Speak to</label><select id="actor"><option value="keeper">Mara · station keeper</option><option value="porter">Ivo · porter</option></select>
+  <div id="transcript" role="log" aria-live="polite"><p class="empty">Try “Hello”, “What about the signal?”, or “I like coffee”. Tell one character something, then ask the other what they remember.</p></div>
+  <form id="message-form"><label for="message">Your words</label><div class="input-row"><input id="message" maxlength="2000" autocomplete="off" placeholder="What about the signal?" required><button type="submit">Say it</button></div></form>
+</section>
+<aside>
+  <section aria-labelledby="world-heading"><h2 id="world-heading">Stage an event</h2><p class="hint">These are host controls. Characters learn only what they witness or hear.</p>
+    <button id="red">Signal turns red · only Mara sees</button>
+    <button id="rumour">Mara tells Ivo about the signal</button>
+    <button id="false-report">Tell Ivo the signal is red · a report</button>
+    <button id="clear">Signal clears · nobody sees</button>
+    <button id="initiate">Let the selected character speak first</button>
+    <button id="arrive">Train arrives · both see</button>
+  </section>
+  <section aria-labelledby="inspect-heading"><h2 id="inspect-heading">What they know</h2><pre id="inspection"></pre></section>
+  <section aria-labelledby="session-heading"><h2 id="session-heading">Replay &amp; backup</h2><div class="session-actions"><button id="verify">Verify replay</button><button id="export">Export session</button><label class="file-label">Import session<input id="import" type="file" accept="application/json,.json"></label><button id="reset">Reset example</button></div><p class="hint">This example stays in memory until exported. Imports replay the events before replacing it.</p></section>
+</aside>
+</main>
+<p id="status" role="status">Loading the shared engine…</p>
+<script src="../KiraSDK.js"></script><script src="station.js"></script>
+</body>
+</html>

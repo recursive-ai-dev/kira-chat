@@ -64,7 +64,7 @@
     return {id:selected.id,text:selected.text,selection:{kind:'dialogue_policy',rule:'least used template, then stable ID',candidates:pool.map(x=>x.id).sort(K.cmp),chosen:selected.id}};
   }
   class DialogueModel{
-    constructor(engine,meta){this.engine=engine;this.meta=meta;}
+    constructor(engine,meta){this.engine=engine;this.meta=meta;this.field=new K.RingField(engine);}
     step(previous,event){
       validateEvent(previous,event);
       const state={...previous,revision:event.seq,settings:{...previous.settings},messages:previous.messages.slice(),memories:previous.memories.slice(),context:K.clone(previous.context),usage:{...previous.usage},relationship:{points:previous.relationship.points,seen:previous.relationship.seen.slice()}};
@@ -85,7 +85,7 @@
         const plan={id:'plan:image',act:'acknowledge_image',claims:[],semantics:[],slots:[],policy:{kind:'dialogue_policy',rule:'Image bytes are opaque'},text:'I can keep this image in our chat, but I can’t see or interpret what it shows. Tell me what you’d like me to know about it.'};
         state.messages.push({id:aid,role:'assistant',text:plan.text,time:event.time,turn:state.turn,plan});state.lastPlan=plan;return {state,plan};
       }
-      let parsed=K.parseConversation(event.text,previous,this.engine);
+      let parsed=K.parseConversation(K.stripVariantMarks(event.text),previous,this.engine);
       if(conflictingPreferenceFrames(parsed.frames))parsed={...parsed,intent:'c:clarify',speechAct:'clarification',frames:[],supported:false,reasonCode:'conflicting_reports',reason:'Those reports conflict. Please send the current preference on its own so I can remember it correctly.'};
       state.messages.push({id:uid,role:'user',text:parsed.text,time:event.time,turn:state.turn});
       const routing=this.engine.query({op:'route',intent:parsed.intent,artifactHash:this.engine.a.hash});
@@ -100,7 +100,14 @@
       };
       const generic=name=>{const t=choose(state,name,persona);plan.policy.template=t.selection;return t.text;};
       const meaningChoices=ids=>ids.map(id=>{const c=this.engine.concepts.get(id);return {id,label:c.label,aliases:c.aliases.filter(alias=>{const found=this.engine.lookup(alias);return found.length===1&&found[0]===id;})};});
-      const ask=(topic,step,question,answer,asked)=>{const q=question||K.nextConversationQuestion(topic,step,answer,asked);state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid,asked:(asked||[]).concat(q).slice(-12)};return q;};
+      const ask=(topic,step,question,answer,asked)=>{
+        // Questions already asked in a topic stay remembered across topic switches, so a ladder never repeats itself.
+        const field=state.context.field,seen=(asked||[]).concat(field?.askedBy?.[topic]||[]);
+        const q=question||K.nextConversationQuestion(topic,step,answer,seen);
+        state.context.pending={kind:'detail',topic:topic||'general',step,question:q,questionMessage:aid,asked:(asked||[]).concat(q).slice(-12)};
+        if(field){const by=field.askedBy,key=topic||'general';by[key]=(by[key]||[]).concat(q).slice(-8);const keys=Object.keys(by);if(keys.length>12)delete by[keys[0]];}
+        return q;
+      };
       // A returning-conversation hook: the least-recalled positive preference, grounded as a claim.
       const recallHook=()=>{
         const prefs=state.memories.filter(m=>m.status==='active'&&m.kind==='preference'&&m.polarity==='positive'&&m.temporal==='present'&&['like','love','enjoy'].includes(m.predicate));
@@ -108,12 +115,16 @@
         const m=prefs.slice().sort((a,b)=>(state.usage['recall:'+a.id]||0)-(state.usage['recall:'+b.id]||0)||K.cmp(a.id,b.id))[0],n=state.usage['recall:'+m.id]||0;
         state.usage['recall:'+m.id]=n+1;claims([m]);
         const label=m.object.label,topic=(m.object.concept&&this.engine.topicFor(m.object.concept))||'general';
-        const lines=['You told me you '+m.predicate+' '+label+'. What’s been happening with that lately?','I still have it that you '+m.predicate+' '+label+'. Has anything new come up there?','Earlier you said you '+m.predicate+' '+label+'. Is that still on your mind?'];
+        const lines=['⟦You told me|You mentioned|You said⟧ you '+m.predicate+' '+label+'. What’s been happening with that lately?','I still have it that you '+m.predicate+' '+label+'. Has anything new come up there?','Earlier you said you '+m.predicate+' '+label+'. Is that still on your mind?'];
         return {text:lines[n%lines.length],topic};
       };
       const askLastQuestion=(topic,step)=>{const match=plan.text.match(/(?:^|[.!?]\s+)([^.!?]*\?)\s*$/u);K.assert(match,'Support reply must end in a question');return ask(topic,step,match[1]);};
       const discourse=(text,questionMessage)=>{plan.policy.discourse={kind:'quoted_conversation',sourceMessage:uid,questionMessage:questionMessage||null,text};state.context.thread=(state.context.thread||[]).concat({sourceMessage:uid,questionMessage:questionMessage||null,text}).slice(-8);};
       state.context.pending=null;
+      // Where this message lands in the ring field; the field also decides how a topic thread continues.
+      const prevField=previous.context.field,hits=K.conversationTopics(parsed.text,this.engine);
+      for(const t of this.field.resolve(parsed.text,prevField))if(!hits.includes(t))hits.push(t);
+      state.context.field=this.field.advance(prevField,hits,state.turn);
       switch(intent){
         case 'name':case 'preference':case 'mood':case 'note':{
           const records=applyFrames(),first=records[0]?.memory;
@@ -129,7 +140,7 @@
             else plan.text='You said you '+(first.temporal==='past'?'felt':'feel')+' '+first.object.label+'. '+ask('general',0,first.object.label==='bored'?'Want a joke, a writing prompt, or something to talk about?':'What’s been behind that?');
           }else{
             const changed=first.supersedes.length>0,past=first.temporal==='past';
-            plan.text=(changed?'I’ve updated that. ':records[0].created?'I’ll remember that. ':'I have that saved already. ')+describeMemory(first)+'.';
+            plan.text=(changed?'⟦@updated⟧. ':records[0].created?'⟦@remember⟧. ':'⟦@saved⟧. ')+describeMemory(first)+'.';
             if(!past&&first.polarity==='positive'&&records[0].created){
               const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general',label=first.object.label,averse=['hate','dislike'].includes(first.predicate);
               const pool=averse?['What puts you off '+label+'?','What is it about '+label+' that doesn’t work for you?']:(K.DIALOGUE.topics['c:'+topic]||['What draws you to '+label+'?','What do you like most about '+label+'?']).concat(topic==='general'?[]:K.conversationQuestions[topic]||[]);
@@ -170,9 +181,15 @@
           else if(parsed.repair){plan.text='You’re right to call that out. I lost the thread. What part of your last message should we pick up?';ask('repair',0,'What part of your last message should we pick up?');}
           else if(parsed.reasonCode==='unparsed'&&previous.context.pending?.choices){state.context.pending=K.clone(previous.context.pending);plan.text='I still need a meaning choice. Please use its name or number:\n'+state.context.pending.choices.map((c,i)=>(i+1)+'. '+c.label).join('\n');}
           else if(parsed.reasonCode==='unparsed'){
+            let topicCue=null;
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
             if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
+            else if(!/\?\s*$/.test(parsed.text)&&(topicCue=K.conversationTopic(parsed.text,this.engine))){
+              // A statement the grammar cannot store, but whose words name a known concept: keep the conversation on that topic.
+              state.context.misses=0;discourse(parsed.text);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic:topicCue,fallback:'unparsed statement'};
+              plan.text=K.acknowledge(topicCue,persona,state.turn,parsed.text)+' '+ask(topicCue,0,undefined,parsed.text,[]);
+            }
             else if(misses===1)plan.text=/\?\s*$/.test(parsed.text)?'I can’t answer that one. I can answer things like “What do you remember about me?”, “What is a guitar?”, or “Is a violin an instrument?”.':/^i(?:'m| am|'ve| have| want| need| think| wish| would| had| was| got| went| work| play| make| write)\b/i.test(parsed.text)?'I couldn’t read that as something to remember. Could you say it as “I like …”, “I feel …”, or “I love …”, or keep it as a note with “Remember this: …”?':'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.';
             else plan.text='I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
           }else plan.text=parsed.reason;
@@ -187,11 +204,23 @@
         }
         case 'topic':{
           if(parsed.followUp||parsed.activity){
-            const f=parsed.followUp,answer=f?f.answer:parsed.activity,cue=K.conversationTopic(answer,this.engine),topic=cue||f?.topic||'general',step=f?(cue&&cue!==f.topic?0:f.step+1):0;
+            const f=parsed.followUp,answer=f?f.answer:parsed.activity,found=K.conversationTopic(answer,this.engine);
+            // A thread stays on its topic unless the answer is only a short phrase or says outright that the subject has changed.
+            // Returning to a topic that was in play a moment ago, or landing near a ring that is still warm, also counts as a move.
+            const back=f?hits.find(t=>t!==f.topic&&((prevField?.visited||[]).slice(-4).includes(t)||this.field.warm(prevField,t,f.topic,state.turn))):null;
+            const settled=f&&f.topic&&f.topic!=='general',moves=!settled||!!back||/^(?:actually|anyway|by the way|speaking of|on another note|how about|what about)\b/i.test(answer)||answer.trim().split(/\s+/).length<=2;
+            const cue=moves?(back||found):null,topic=cue||f?.topic||'general',step=f?(cue&&cue!==f.topic?0:f.step+1):0;
             discourse(answer,f?.questionMessage);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic};
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,'What would you rather talk about?');}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,topic==='support'?'What happened?':'Which part would you like to start with?');}
-            else plan.text=K.acknowledge(topic,persona,state.turn,answer)+' '+ask(topic,step,undefined,answer,cue&&cue!==f?.topic?[]:f?.asked);
+            else{
+              const lead=K.acknowledge(topic,persona,state.turn,answer),asked=cue&&cue!==f?.topic?[]:f?.asked;
+              const move=f?this.field.nextMove({ctx:state.context.field,topic,step,ladderLength:(K.conversationQuestions[topic]||[]).length,answer,memories:state.memories,turn:state.turn}):{kind:'ladder'};
+              if(move.kind==='remind'){claims([move.memory]);plan.text=lead+' '+ask(topic,step,move.question,answer,asked);}
+              else if(move.kind==='bridge'){plan.text=lead+' '+ask(move.topic,1,move.question,answer,[]);}
+              else plan.text=lead+' '+ask(topic,step,undefined,answer,asked);
+              if(move.trace){plan.policy.field=move.trace;this.field.record(state.context.field,move,state.turn);}
+            }
             break;
           }
           const o=parsed.object,topic=this.engine.topicFor(o.concept),lines=K.DIALOGUE.topics['c:'+topic];
@@ -239,6 +268,8 @@
       if(parsed.supported&&intent!=='crisis'){
         const fingerprint=K.hash(K.fold(parsed.text));if(!state.relationship.seen.includes(fingerprint)){state.relationship.seen.push(fingerprint);state.relationship.points=Math.min(100,state.relationship.points+1);}
       }
+      plan.policy.field=plan.policy.field||this.field.trace(state.context.field,'none');
+      plan.text=K.expandVariants(plan.text,{seed:K.sha256(event.seq+'|'+event.time+'|'+parsed.text),usage:state.usage,persona,phase:this.field.phase(state.context.field,state.turn)});
       this.verifyPlan(state,plan);
       plan.digest=K.hash({id:plan.id,act:plan.act,text:plan.text,claims:plan.claims,semantics:plan.semantics.map(s=>s.digest),slots:plan.slots,policy:plan.policy,interpretation:plan.interpretation});
       state.messages.push({id:aid,role:'assistant',text:plan.text,time:event.time,turn:state.turn,plan});state.lastPlan=plan;
@@ -256,4 +287,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.2.0","artifactHash":"cd2a42985526286ce664ec04492ed59dbedb09d2957df1160c54cebe0e373128","modelHash":"21cd8ab17fbace24fd878b0040b954e66ec0d0e397493cf1207f37dfe4569552","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.2.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"0c71dbf436111b8f2fa380638662eb6e1c8f440ff5a2020c286ba3650191b565","unicode":"15.0.0","profile":"EXPERIMENTAL"};

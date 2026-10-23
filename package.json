@@ -1,8 +1,8 @@
 {
   "name": "kira-chat",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "private": true,
-  "description": "Kira - offline dialogue with inspectable memory, deterministic replay, and checked semantics. Runs in a single HTML file with no account, API key, or LLM.",
+  "description": "Offline dialogue and a deterministic multi-character narrative SDK with attributed memory, knowledge, and replay.",
   "license": "Apache-2.0",
   "type": "commonjs",
   "engines": {
@@ -10,15 +10,27 @@
   },
   "scripts": {
     "build": "python3 tools/build.py",
-    "check": "python3 tools/build.py --check",
+    "check": "python3 tools/build.py --check && node tools/build-themes.cjs --check && node tools/extend-artifact.cjs --check",
     "test": "node --test tests/*.test.cjs",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "demo": "python3 -m http.server 8042 --bind 127.0.0.1",
+    "example": "node examples/station.cjs",
+    "compile:narrative": "node tools/narrative.cjs",
+    "apk": "cd android && gradle --no-daemon assembleRelease",
+    "themes": "node tools/build-themes.cjs",
+    "vocab": "node tools/extend-artifact.cjs && python3 tools/build.py --pin"
   },
   "files": [
     "Kira.html",
     "src",
     "tools",
     "LICENSE",
-    "README.md"
-  ]
+    "README.md",
+    "KiraSDK.js",
+    "examples",
+    "docs",
+    "android",
+    "themes"
+  ],
+  "main": "KiraSDK.js"
 }

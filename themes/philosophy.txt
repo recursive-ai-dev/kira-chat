@@ -1,0 +1,18 @@
+# Philosophy: questions and the people who asked them. Cue-only: Kira does not claim answers.
+topic: philosophy
+open: Philosophy usually starts with a question that will not stay quiet. What is yours? | Is that something you have turned over for a long time, or did it just surface?
+ask: What question keeps coming back to you? | Where do you land on it today, and has that moved over time? | Is there a thinker or a book that shaped how you see it? | What would actually change your mind? | How does it show up in your ordinary days?
+cue: /\b(?:free will|determinis\w*|fate|destiny|choice|responsib\w*)\b/ => Does it change how you think about responsibility, yours or anyone else's?
+cue: /\b(?:meaning|purpose|absurd\w*|nihilis\w*|pointless)\b/ => What gives your days meaning, even a little?
+cue: /\b(?:ethic\w*|moral\w*|right and wrong|virtue|duty|justice|fair\w*)\b/ => Has there been a time your principles pulled in two directions?
+cue: /\b(?:conscious\w*|mind|self|identity|qualia|perception)\b/ => When you look inward, what do you actually find there?
+cue: /\b(?:truth|knowledge|certain\w*|doubt|skeptic\w*|reason\w*|logic)\b/ => How sure do you need to be before you call something known?
+cue: /\b(?:stoic\w*|marcus aurelius|epictetus|seneca)\b/ => Which part of that do you actually manage to practise?
+cue: /\b(?:nietzsche|kierkegaard|sartre|camus|heidegger|existential\w*)\b/ => What does that thinker make you feel, rather than think?
+cue: /\b(?:plato|aristotle|socrates|kant|hume|locke|descartes|spinoza|wittgenstein|hegel|arendt|beauvoir)\b/ => Which argument of theirs do you find yourself defending in your head?
+phrase: What draws you to {p}? | What is the strongest objection to {p}, in your view?
+words:
+  branches: philosophy, ethics, metaethics, metaphysics, epistemology, logic, aesthetics, ontology, phenomenology, hermeneutics, political philosophy, philosophy of mind, philosophy of science
+  schools: stoicism, epicureanism, skepticism, empiricism, rationalism, idealism, materialism, dualism, existentialism, absurdism, nihilism, pragmatism, utilitarianism, deontology, virtue ethics, humanism, determinism, relativism, positivism, structuralism, taoism, confucianism, cynicism, hedonism
+  questions: free will, consciousness, meaning of life, personal identity, moral responsibility, the good life, the self, truth, knowledge, justice, freedom, authenticity, the absurd, being, nothingness, causality, mind and body, the social contract, categorical imperative, thought experiment, trolley problem, ship of theseus
+  thinkers: socrates, plato, aristotle, epicurus, epictetus, seneca, marcus aurelius, descartes, spinoza, leibniz, locke, hume, kant, hegel, schopenhauer, kierkegaard, nietzsche, heidegger, sartre, camus, beauvoir, arendt, wittgenstein, russell, rawls, confucius, laozi, zhuangzi, hypatia, simone weil

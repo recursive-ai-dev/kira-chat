@@ -1,0 +1,233 @@
+{
+  "id": "last-station",
+  "version": "1.0.0",
+  "speakers": [
+    {
+      "id": "traveller",
+      "name": "Traveller"
+    }
+  ],
+  "topics": [
+    {
+      "id": "signal",
+      "label": "the signal",
+      "aliases": [
+        "signal",
+        "red lamp",
+        "semaphore"
+      ]
+    },
+    {
+      "id": "train",
+      "label": "the late train",
+      "aliases": [
+        "train",
+        "night express"
+      ]
+    }
+  ],
+  "facts": [
+    {
+      "id": "signal_red",
+      "topic": "signal",
+      "text": "The signal is red."
+    },
+    {
+      "id": "train_arrived",
+      "topic": "train",
+      "text": "The night express has arrived."
+    }
+  ],
+  "characters": [
+    {
+      "id": "keeper",
+      "name": "Mara",
+      "persona": "direct",
+      "fallback": "Mara glances towards the platform. “Tell me plainly what you need.”",
+      "knowledge": [],
+      "goals": [
+        {
+          "id": "clear_platform",
+          "label": "Keep the traveller off the platform",
+          "requires": [
+            {
+              "fact": "signal_red",
+              "value": true
+            }
+          ],
+          "completedBy": [
+            {
+              "fact": "train_arrived",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "id": "greeting",
+          "on": {
+            "intent": "greet"
+          },
+          "parts": [
+            "“Evening, {speaker}. Mara. I keep the station.”"
+          ]
+        },
+        {
+          "id": "signal_known",
+          "priority": 10,
+          "on": {
+            "topic": "signal"
+          },
+          "requires": [
+            {
+              "fact": "signal_red",
+              "value": true
+            }
+          ],
+          "parts": [
+            [
+              "Mara checks the window. ",
+              "Mara lowers her voice. "
+            ],
+            "“{fact:signal_red} ",
+            [
+              "Wait here.”",
+              "Stay away from the platform.”"
+            ]
+          ]
+        },
+        {
+          "id": "signal_clear",
+          "priority": 10,
+          "on": {
+            "topic": "signal"
+          },
+          "requires": [
+            {
+              "fact": "signal_red",
+              "value": false,
+              "kind": "witnessed"
+            }
+          ],
+          "parts": [
+            "“It has cleared. I saw it change.”"
+          ]
+        },
+        {
+          "id": "signal_unknown",
+          "on": {
+            "topic": "signal"
+          },
+          "parts": [
+            "“I haven’t looked at the signal. Ask the porter.”"
+          ]
+        },
+        {
+          "id": "train_known",
+          "on": {
+            "topic": "train"
+          },
+          "requires": [
+            {
+              "fact": "train_arrived",
+              "value": true
+            }
+          ],
+          "parts": [
+            "“{fact:train_arrived} Mind the gap.”"
+          ]
+        },
+        {
+          "id": "preference",
+          "on": {
+            "intent": "preference"
+          },
+          "memoryKind": "preference",
+          "parts": [
+            "“{report}. All right. I’ll keep that in mind.”"
+          ]
+        },
+        {
+          "id": "recall",
+          "on": {
+            "intent": "recall"
+          },
+          "memoryKind": "preference",
+          "parts": [
+            "“{report}. You told me that yourself.”"
+          ]
+        },
+        {
+          "id": "warn",
+          "on": {
+            "intent": "initiate"
+          },
+          "goal": "clear_platform",
+          "requires": [
+            {
+              "fact": "signal_red",
+              "value": true
+            }
+          ],
+          "parts": [
+            "Mara catches your sleeve. “Wait. {fact:signal_red}”"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "porter",
+      "name": "Ivo",
+      "persona": "warm",
+      "fallback": "Ivo sets down his broom. “I’m not sure I follow.”",
+      "knowledge": [],
+      "rules": [
+        {
+          "id": "greeting",
+          "on": {
+            "intent": "greet"
+          },
+          "parts": [
+            "“Ivo. Last porter on the line. What brings you out here?”"
+          ]
+        },
+        {
+          "id": "signal_known",
+          "priority": 10,
+          "on": {
+            "topic": "signal"
+          },
+          "requires": [
+            {
+              "fact": "signal_red",
+              "value": true
+            }
+          ],
+          "parts": [
+            "“{fact:signal_red} That’s the word I have, anyway.”"
+          ]
+        },
+        {
+          "id": "signal_unknown",
+          "on": {
+            "topic": "signal"
+          },
+          "parts": [
+            "“Nobody has told me anything about the signal.”"
+          ]
+        },
+        {
+          "id": "recall",
+          "on": {
+            "intent": "recall"
+          },
+          "memoryKind": "preference",
+          "parts": [
+            "“{report}. I remember.”"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+# Deeper music. This extends the built-in "music" topic: its questions follow the general ones.
+topic: music
+open: Do you listen more for the melody, the harmony, or the rhythm? | Is it the sound itself, or what it reminds you of?
+ask: Do you read music, play by ear, or a bit of both? | Is there a recording you would play to introduce someone to it? | What do you hear in it that other people tend to miss?
+cue: /\b(?:bach|mozart|beethoven|chopin|debussy|ravel|satie|brahms|schubert|vivaldi|handel|haydn|liszt|tchaikovsky|stravinsky|mahler|bartok|shostakovich)\b/ => What is it about that composer's voice that you come back to?
+cue: /\b(?:coltrane|miles davis|monk|mingus|ellington|parker|bill evans|jazz)\b/ => Do you prefer the written themes or the moments where they start to improvise?
+cue: /\b(?:harmony|chords?|scales?|modes?|modulat\w*|cadence|counterpoint|voicing|progression)\b/ => What do you hear happening in the harmony when it lands?
+cue: /\b(?:rhythm|tempo|beat|groove|syncopat\w*|time signature|polyrhythm\w*)\b/ => Is it the pulse or the way it bends against the pulse that gets you?
+cue: /\b(?:lyrics?|words|poetry|verse|chorus)\b/ => Do the words matter as much as the sound, or less?
+cue: /\b(?:live|concert|gig|festival|show)\b/ => What is different about hearing it in a room full of people?
+cue: /\b(?:mix\w*|master\w*|reverb|sampl\w*|synth\w*|production|producing|daw)\b/ => What is the first thing you do when you start a new track?
+cue: /\b(?:practi[sc]e\w*|lessons?|learning|teach\w*)\b/ => What do you work on when nobody is listening?
+phrase: What first drew you to {p}? | What do you hear in {p} that you do not hear elsewhere?
+words:
+  forms: symphony, sonata, concerto, fugue, opera, etude, prelude, nocturne, overture, requiem, suite, cantata, oratorio, minuet, rhapsody, serenade, waltz, lullaby, ballad, anthem, aria
+  theory: harmony, melody, rhythm, chord, scale, mode, tempo, timbre, cadence, counterpoint, modulation, arpeggio, syncopation, octave, interval, triad, dissonance, consonance, tonality, polyrhythm, voicing, improvisation, key signature, time signature, chord progression
+  eras: baroque, classical period, romanticism, impressionism, minimalism, bebop, big band, swing, motown, grunge, britpop, new wave, shoegaze, trip hop, lo-fi, vaporwave, bossa nova, flamenco, reggae, ska, dub, gospel, blues, soul, funk, disco, afrobeat, k-pop, country, bluegrass, opera singer
+  composers: bach, mozart, beethoven, chopin, debussy, ravel, satie, brahms, schubert, vivaldi, handel, haydn, liszt, tchaikovsky, stravinsky, mahler, bartok, shostakovich, philip glass, steve reich, ennio morricone, hans zimmer, john williams
+  players: coltrane, miles davis, thelonious monk, charles mingus, duke ellington, charlie parker, bill evans, jimi hendrix, david bowie, prince, nina simone, aretha franklin, bob dylan, joni mitchell, radiohead, daft punk, kraftwerk, aphex twin
+  craft: mixing, mastering, reverb, sampling, overdub, looping, arranging, orchestration, songwriting, lyricist, tablature, sheet music, metronome, amplifier, pedalboard, studio session

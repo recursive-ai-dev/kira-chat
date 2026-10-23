@@ -6,9 +6,8 @@ on:
   pull_request:
   workflow_dispatch:
 
-# The app is a single committed HTML file generated from src/. These two checks
-# are the whole contract: the generated file must match the modular source, and
-# the model must behave.
+# Both offline deliverables are generated from src/. Check their exact bytes
+# and exercise the companion plus the multi-character narrative runtime.
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -28,13 +27,18 @@ jobs:
           # The documented floor, so a new toolchain release cannot break the build.
           python-version: '3.9'
 
-      - name: Kira.html matches the modular source
+      - name: HTML and SDK match the modular source
         run: python3 tools/build.py --check
 
-      - name: Rebuilding does not change the committed file
+      - name: Theme packs and curated vocabulary match their sources
+        run: |
+          node tools/build-themes.cjs --check
+          node tools/extend-artifact.cjs --check
+
+      - name: Rebuilding does not change the committed files
         run: |
           python3 tools/build.py
-          git diff --exit-code -- Kira.html
+          git diff --exit-code -- Kira.html KiraSDK.js
 
-      - name: Conversation, canonical, persistence, and presenter tests
+      - name: Companion and narrative SDK regression tests
         run: npm test

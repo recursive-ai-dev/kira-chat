@@ -1,0 +1,19 @@
+# History: periods, people and the stories we keep retelling. Cue-only: Kira does not assert facts.
+topic: history
+open: Is it a period, a person, or an event that pulls you in? | What would you most like to see for yourself, if you could stand there for a day?
+ask: What do you think people living then understood least about their own time? | Is there a story from it that you find yourself retelling? | What does it explain about the world you live in now? | Where did you first come across it? | What do you wish more people knew about it?
+cue: /\b(?:war|battle|siege|army|invasion|front|conflict)\b/ => What do you think the people in it could not have known was coming?
+cue: /\b(?:empire|dynasty|kingdom|emperor|king|queen|caesar|pharaoh|monarch\w*)\b/ => What do you think held it together, or finally pulled it apart?
+cue: /\b(?:revolution\w*|reform\w*|uprising|rebellion|independence|protest)\b/ => Who do you think paid the most for it, and who gained?
+cue: /\b(?:grand(?:mother|father|parents?|ma|pa)|ancest\w*|family|great-)\b/ => Is there a family story that connects you to it?
+cue: /\b(?:museum|ruins?|site|castle|visit\w*|travell?ed)\b/ => What was it like standing somewhere it actually happened?
+cue: /\b(?:documentar\w*|book|podcast|novel|read\w*|watch\w*)\b/ => What did that leave you wondering about?
+cue: /\b(?:ancient|medieval|renaissance|victorian|bronze age|middle ages)\b/ => What do you picture first when you imagine an ordinary day then?
+cue: /\b(?:archaeolog\w*|excavat\w*|artefacts?|artifacts?|manuscripts?)\b/ => What would you most hope to find if you were digging?
+phrase: What first got you interested in {p}? | What is the part of {p} that people tend to get wrong?
+words:
+  eras: history, prehistory, antiquity, ancient history, classical antiquity, bronze age, iron age, middle ages, medieval, renaissance, reformation, enlightenment, industrial revolution, victorian era, edwardian, belle epoque, interwar, cold war, the sixties, the roaring twenties, great depression
+  events: world war, first world war, second world war, french revolution, american revolution, russian revolution, fall of rome, black death, crusades, hundred years war, thirty years war, napoleonic wars, civil war, american civil war, moon landing, fall of the berlin wall, partition, silk road, age of discovery, reconstruction
+  peoples: romans, greeks, egyptians, vikings, mongols, aztecs, incas, mayans, celts, normans, saxons, ottomans, byzantines, persians, phoenicians, babylonians, sumerians, samurai, knights, pharaohs, gladiators
+  figures: caesar, augustus, cleopatra, alexander the great, charlemagne, genghis khan, joan of arc, leonardo da vinci, galileo, newton, napoleon, elizabeth the first, queen victoria, abraham lincoln, churchill, gandhi, mandela, ada lovelace, marie curie, ramses, hannibal, saladin, tutankhamun
+  study: archaeology, archaeologist, historian, anthropology, manuscript, archive, primary source, chronicle, dynasty, empire, civilization, monarchy, republic, feudalism, colonialism, imperialism, nationalism, trade route, treaty, aristocracy

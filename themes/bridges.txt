@@ -1,0 +1,143 @@
+# Bridges: concepts that sit in two topic rings at once. Each pair is declared once and applies to both
+# rings. The size of an overlap, and which concepts it holds, steer where a conversation can glide next.
+# Use plain nouns: Kira asks "Does <bridge> come into it for you?"
+
+topic: music
+overlap: screen | soundtrack, film score, musical, theme song, singer, concert, headphones
+overlap: people | choir, first dance, mixtape, family singalong, band, lullaby
+overlap: hobbies | vinyl, busking, instrument, lessons, choir, songwriting
+overlap: feelings | nostalgia, comfort, goosebumps, catharsis, memory, mood
+overlap: coding | synthesizer, plugin, drum machine, generative music, audio software
+overlap: art | album cover, music video, poster, sleeve design, stage design
+
+topic: sports
+overlap: people | teammates, coach, rivalry, fans, club, family game
+overlap: hiking | trail running, climbing, cycling, endurance, fitness, swimming
+overlap: screen | highlights, commentary, replay, documentary, match
+overlap: feelings | adrenaline, pride, nerves, competition, focus, frustration
+
+topic: screen
+overlap: reading | adaptation, screenplay, subtitles, novel, series
+overlap: people | movie night, date night, binge, popcorn, family favourite
+overlap: art | cinematography, animation, costume, set design, visuals
+overlap: feelings | comfort show, tearjerker, nostalgia, suspense, escape
+
+topic: pets
+overlap: people | family, children, adoption, companionship, neighbours
+overlap: nature | wildlife, birds, habitat, park, walks
+overlap: home | bed, couch, routine, feeding time, garden
+overlap: hiking | dog walks, trails, fresh air, parks, leash
+
+topic: people
+overlap: feelings | loneliness, affection, gratitude, belonging, forgiveness, missing someone
+overlap: home | housemates, dinner table, guest room, hosting, neighbours
+overlap: travel | visiting family, reunion, holiday, wedding trip, long distance
+overlap: work | colleagues, mentor, team, lunch, networking
+overlap: cooking | family recipe, dinner party, birthday cake, potluck, hosting
+
+topic: travel
+overlap: cooking | street food, local cuisine, markets, restaurants, picnic
+overlap: hiking | trails, camping, mountains, coastline, national parks, backpacking
+overlap: nature | islands, beaches, rainforest, wildlife, volcano, scenery
+overlap: reading | guidebook, travel writing, maps, novels set abroad
+overlap: work | business trip, conference, remote work, commute, relocation
+overlap: weather | monsoon, sunshine, snow, seasons, climate
+overlap: history | ruins, museums, castles, old town, heritage, monuments
+
+topic: weather
+overlap: nature | seasons, storms, rainforest, snowfall, sunrise, clouds
+overlap: feelings | grey days, cosy, restless, calm, melancholy
+overlap: home | umbrella, fireplace, blanket, window, heating, rainy afternoon
+overlap: hiking | forecast, mist, wind, mud, summit
+
+topic: school
+overlap: work | career, internship, skills, graduation, mentor
+overlap: reading | textbooks, library, essays, reading list, study notes
+overlap: science | experiments, laboratory, physics, chemistry, research
+overlap: history | lessons, archives, dissertation, dates
+overlap: people | classmates, teachers, friends, reunion
+overlap: feelings | pressure, curiosity, pride, burnout, nerves
+
+topic: work
+overlap: coding | software, project, debugging, startup, remote work
+overlap: feelings | burnout, pride, stress, purpose, motivation
+overlap: home | desk, routine, work-life balance, commute
+overlap: writing | reports, emails, presentations, copywriting, articles
+
+topic: hobbies
+overlap: nature | gardening, birdwatching, foraging, fishing, plants
+overlap: art | pottery, knitting, sketching, crafts, photography
+overlap: home | workshop, sewing machine, balcony, kitchen table, shed
+overlap: cooking | baking, preserving, fermenting, bread, recipes, herbs
+overlap: feelings | calm, flow, patience, pride, mindfulness
+
+topic: home
+overlap: cooking | kitchen, pantry, recipes, leftovers, breakfast
+overlap: feelings | comfort, safety, cosy, belonging, quiet, clutter
+overlap: reading | bookshelf, armchair, reading nook, lamp
+overlap: nature | houseplants, window view, birdsong, seasons
+
+topic: coffee
+overlap: home | morning routine, mug, french press, quiet morning, breakfast
+overlap: work | office, break, meeting, afternoon slump, colleagues
+overlap: people | friends, cafe, catching up, conversation, date
+overlap: cooking | pastry, cake, beans, milk, dessert
+overlap: reading | novel, newspaper, quiet corner, journal
+
+topic: coding
+overlap: gaming | game engine, mods, shaders, pixel art, indie games
+overlap: science | algorithms, simulations, data, models, statistics
+overlap: writing | documentation, readme, comments, technical writing
+overlap: art | generative art, interfaces, animation, design
+
+topic: gaming
+overlap: people | co-op, multiplayer, game night, rivals, community
+overlap: writing | story, characters, dialogue, worldbuilding, lore, quests
+overlap: art | pixel art, soundtrack, concept art, visuals
+overlap: feelings | immersion, frustration, relaxation, challenge
+
+topic: reading
+overlap: writing | authors, style, drafts, poetry, editing
+overlap: history | biography, memoir, archives, historical fiction, letters
+overlap: philosophy | essays, treatises, classics, arguments, margins
+overlap: feelings | escape, comfort, empathy, wonder
+
+topic: writing
+overlap: art | illustration, calligraphy, zines, comics, typography
+overlap: feelings | catharsis, journal, honesty, voice, release
+overlap: philosophy | essay, argument, meaning, clarity, aphorism
+overlap: history | diaries, letters, chronicle, oral history
+
+topic: art
+overlap: nature | landscape, botanical, light, colour, seasons
+overlap: history | museum, renaissance, restoration, manuscripts, heritage
+overlap: philosophy | aesthetics, beauty, expression, taste, authenticity
+overlap: feelings | awe, calm, nostalgia, melancholy, joy
+
+topic: science
+overlap: nature | ecology, evolution, climate, botany, zoology, geology
+overlap: philosophy | epistemology, method, evidence, reason, paradox
+overlap: history | discoveries, inventions, eclipse, scientists, experiments
+overlap: weather | atmosphere, forecasting, storms, rainbow
+overlap: hiking | geology, stars, altitude, fossils, glaciers
+
+topic: philosophy
+overlap: feelings | meaning, anxiety, wonder, doubt, acceptance
+overlap: people | friendship, justice, community, love, responsibility
+overlap: history | enlightenment, ancient greece, revolution, tradition
+
+topic: history
+overlap: people | family history, ancestors, heritage, stories, traditions
+overlap: nature | ruins, landscapes, ice age, ancient forests
+
+topic: hiking
+overlap: nature | trees, birds, rivers, wildflowers, wildlife
+overlap: feelings | calm, awe, solitude, stillness, perspective
+overlap: home | boots, backpack, thermos, rest
+
+topic: cooking
+overlap: feelings | comfort food, nostalgia, care, celebration, craving
+overlap: nature | seasonal produce, herbs, garden, foraging, farmers market
+
+topic: nature
+overlap: feelings | awe, peace, solitude, renewal, wonder

@@ -4,9 +4,36 @@
 
 Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and authored dialogue plans to carry a conversation.
 
-The current release is **4.2.0**. It requires no account, API key, model download, or backend. The application runs locally and does not use an LLM.
+The platform release is **4.3.0**: the unchanged **4.2.0 companion app**, plus **Narrative SDK 0.1.0** for independent game characters. Neither requires an account, API key, model download, backend, or LLM.
 
-Kira is also a working foundation for a longer-term goal: **NPC dialogue shaped by what characters know, remember, want, and experience in a world that continues without the player.** The current release is a standalone companion and engine demonstrator; a game integration SDK is future work.
+Kira also provides **NPC dialogue shaped by what characters know, remember, and want**. The new SDK shares one semantic engine across independent characters, keeps private conversations separate, delivers witnessed events and attributed rumours, composes authored phrases, and replays complete world sessions. The host game controls time and actions. See the [Narrative SDK guide](docs/narrative-sdk.md).
+
+## Multi-character narrative SDK
+
+```sh
+npm run example   # a complete deterministic two-character demonstration
+npm run demo      # http://localhost:8042/examples/station.html
+```
+
+Load `KiraSDK.js` in a browser or `require('./KiraSDK.js')` in Node. Author custom topics, facts, characters, goals and reply rules in JSON; compile them with `node tools/narrative.cjs source.json compiled.json`. The SDK generates language by deterministic phrase composition, with a separate Kira conversation state for each character/partner pair.
+
+The station example demonstrates different voices, information held by only one character, rumours, memory callbacks, goal-driven initiative, and exact export/import replay. Custom narrative vocabulary is separate from the existing compiled RSE ontology. Full API, event formats, authoring rules and limits are in the [SDK guide](docs/narrative-sdk.md).
+
+## Android app
+
+`android/` wraps the unchanged `Kira.html` in a small native WebView shell (no network permission, no dependencies beyond the Android Gradle plugin). The page is served from an internal `https://` origin so saving, the Web Worker and replay behave exactly as in a desktop browser. The shell adds a file picker for imports and images, a system save dialog for exports, the back button, and system-bar colours that follow the theme. Phones get a bottom tab bar.
+
+```sh
+npm run build                    # regenerate Kira.html first
+cd android && gradle assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+Requires JDK 17 and an Android SDK (platform 36); set `sdk.dir` in `android/local.properties`. The release APK is signed with the debug key so it can be sideloaded; supply your own signing config before publishing. Data lives in the app's private storage, so use **Settings → Export** before uninstalling.
+
+## Vocabulary, themes and variety
+
+Kira's topics and wording grow through four layers, all deterministic and replay-safe: a checked curated lexicon (646 concepts), authored theme packs (`themes/`), a WordNet-derived word table, and variable `⟦a|b|c⟧` slots that vary wording. Add your own themes as short text files. See [docs/themes.md](docs/themes.md). On top of them, a **ring field** places every topic as an overlapping ring and moves the conversation through it, so follow-ups, bridges between topics and “that reminds me…” recalls follow geometry instead of chance. See [docs/field.md](docs/field.md).
 
 ## Quick start
 
@@ -139,8 +166,8 @@ node --test tests/*.test.cjs
 Or, with npm:
 
 ```sh
-npm run build     # rebuild Kira.html
-npm run check     # verify Kira.html is not stale
+npm run build     # rebuild Kira.html and KiraSDK.js
+npm run check     # verify both generated deliverables
 npm test          # run every test file
 npm run verify    # check + test, the same pair CI runs
 ```
@@ -157,9 +184,10 @@ Every push to `main` and every pull request runs the build checks and tests on N
 | `tests/canonical.test.cjs` | SHA-256 vectors, canonical encoding, NFC, merkle roots, potentials, artifact verification and tamper rejection, optimizer against the reference checker |
 | `tests/persistence.test.cjs` | Session envelopes, checksum and version pinning, multi-tab conflicts, event validation |
 | `tests/presenter.test.cjs` | Startup and replay ordering, save failures, import/reset locking, corrupt-save recovery, temporary sessions |
+| `tests/narrative.test.cjs` | Compiler validation, character/speaker isolation, beliefs, rumours, goals, phrase composition, SDK loading, and world replay |
 | `tests/helpers/load-model.cjs` | Loads the model and browser adapters out of `Kira.html` and runs code inside its realm |
 
-Tests read the model and browser adapters out of the generated `Kira.html` rather than re-concatenating `src/`, so they exercise exactly the bytes a user would open.
+Companion tests read the model and browser adapters out of generated `Kira.html`; narrative tests load generated `KiraSDK.js`. Both exercise shipped bytes rather than re-concatenating `src/`.
 
 One constraint is worth knowing before adding tests: the model runs inside a `vm` context, and `canonical()` only accepts objects whose prototype is that context's `Object.prototype`. A query object built in a test file is therefore rejected as *not canonical JSON data*. Build such objects with the loader's `query()`/`run()` helpers, which marshal them through JSON into the model's realm. In a browser the whole app shares one realm, so this never affects the application.
 
@@ -217,13 +245,13 @@ Current practical limits:
 
 State copying, save encoding, and replay grow with session length. The implementation targets a compact personal dialogue and curated ontology. Web Locks are used for turn commits, imports, and resets when available; fallback conflict checks do not provide a general atomic transaction across tabs.
 
-L5 discovery, arbitrary ontology imports, unrestricted coordinate systems, neural learning, image understanding, and multi-agent world simulation are outside the current release.
+L5 discovery, arbitrary ontology imports, unrestricted coordinate systems, neural learning, image understanding, and autonomous world simulation are outside the current release. Narrative SDK limits and explicit host-controlled event delivery are documented separately in the [SDK guide](docs/narrative-sdk.md).
 
 ## Direction
 
-Kira is an experimental step toward natural-feeling NPC conversations whose content comes from character and world state. Areas to explore include individual knowledge and mistaken beliefs, character goals, witnessed events and rumors, relationship-aware dialogue, richer sentence realization, and reusable authoring tools.
+The Narrative SDK now supplies a first reusable implementation of private character memory, individual and mistaken beliefs, witnessed events, attributed rumours, relationship conditions, goals, and compositional reply authoring. It is independent of any particular game.
 
-Those are development directions, not shipped features. The immediate focus is improving conversational continuity while keeping behavior reproducible and inspectable.
+Next directions include broader language interpretation, richer realization, tooling for larger authored worlds, explicit asset migrations, and host integrations that schedule characters and physical actions. Autonomous simulation and a compiler for the underlying RSE ontology remain future work.
 
 ## Reporting problems
 

@@ -13,7 +13,16 @@
     const clarify=reason=>result('clarify',{supported:false,reason});
     const span=v=>{const start=lower.indexOf(K.fold(v));return {start:Math.max(0,start),end:Math.max(0,start)+v.length};};
     const original=v=>{const i=lower.lastIndexOf(v);return i<0?v:text.slice(i,i+v.length);};
-    const object=v=>{const label=v.trim(),candidates=engine.lookup(label);return {label,candidates,concept:candidates.length===1?candidates[0]:null,key:candidates.length===1?candidates[0]:'literal:'+K.hash(K.fold(label))};};
+    const object=v=>{
+      const raw=v.trim(),possessed=raw.match(/^(?:my|our)\s+(.+)$/i);
+      if(possessed){
+        // "my dog" is a specific thing, not the general concept: keep it as its own key but remember the concept for topics.
+        const candidates=engine.lookup(possessed[1]),label=(/^our\b/i.test(raw)?'our ':'your ')+possessed[1].trim();
+        return {label,candidates,concept:candidates.length===1?candidates[0]:null,key:'literal:'+K.hash(K.fold(label))};
+      }
+      const label=raw.replace(/\bmyself\b/gi,'yourself').replace(/\bmy\b/gi,'your'),candidates=engine.lookup(label);
+      return {label,candidates,concept:candidates.length===1?candidates[0]:null,key:candidates.length===1?candidates[0]:'literal:'+K.hash(K.fold(label))};
+    };
     if(!text||text.length>2000)return clarify('A message must contain 1–2000 characters.');
     if(/\bnot\s+not\b|\b(?:don't|do not)\s+not\b/.test(lower))return clarify('The repeated negation has more than one plausible reading. Please say the intended feeling or preference directly.');
     if(/^i\b/i.test(text)&&/\?$/.test(text))return clarify('Is that a statement about you, or a question? I haven’t saved it as a report.');

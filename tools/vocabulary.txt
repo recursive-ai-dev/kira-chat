@@ -1,0 +1,293 @@
+# Authored vocabulary for the Kira artifact. Run `npm run vocab` to rebuild and re-seal
+# src/model/artifact-data.js from this file; the existing checker must accept the result.
+#
+#   id | label | extra aliases (comma) | parents (comma) | topic
+#
+# Ids omit the "c:" prefix. Plurals are added automatically; a label starting with "~"
+# is a mass noun and gets none. A concept may have several parents. Topics are inherited
+# through the taxonomy, and the most specific tagged ancestor wins.
+#
+#   @ id | topic=name | +parents=a,b | +aliases=x,y      patches an existing concept
+
+## Patches: give existing concepts a topic or extra parents
+@ food | topic=cooking
+@ tea | topic=cooking
+@ vehicle | topic=travel
+@ travel | topic=travel
+@ work | topic=work
+@ colleague | topic=work
+@ learning | topic=school
+@ television | topic=screen
+@ person | topic=people
+@ friend-person | topic=people
+@ neighbor | topic=people
+@ social-relationship | topic=people
+@ friendship | topic=people
+@ running | topic=sports
+@ swimming | topic=sports
+@ cycling | topic=sports
+@ dog | topic=pets | +parents=pet
+@ cat | topic=pets | +parents=pet
+@ rabbit | topic=pets | +parents=pet
+@ library-building | topic=school
+@ mathematics | topic=school
+@ history-study | topic=history
+@ photograph | topic=art
+@ journal | topic=writing
+
+## Sports
+sport | sport | | physical-activity | sports
+team-sport | team sport | | sport
+racket-sport | racket sport | | sport
+winter-sport | winter sport | | sport
+water-sport | water sport | | sport
+combat-sport | combat sport | | sport
+soccer | soccer | football,association football | team-sport
+american-football | American football | football | team-sport
+basketball | basketball | | team-sport
+baseball | baseball | | team-sport
+volleyball | volleyball | | team-sport
+hockey | hockey | ice hockey | team-sport, winter-sport
+cricket-sport | cricket | | team-sport
+rugby | rugby | | team-sport
+tennis | tennis | | racket-sport
+badminton | badminton | | racket-sport
+table-tennis | table tennis | ping pong | racket-sport
+golf | golf | | sport
+skiing | skiing | | winter-sport
+snowboarding | snowboarding | | winter-sport
+ice-skating | ice skating | skating | winter-sport
+surfing | surfing | | water-sport
+rowing | rowing | | water-sport
+sailing | sailing | | water-sport
+boxing | boxing | | combat-sport
+martial-arts | martial arts | karate,judo,taekwondo | combat-sport
+wrestling | wrestling | | combat-sport
+gymnastics | gymnastics | | sport
+weightlifting | weightlifting | lifting weights,weight training | sport
+yoga | ~yoga | | sport
+skateboarding | skateboarding | | sport
+archery | archery | | sport
+athlete | athlete | sportsperson | person | sports
+sports-team | sports team | | organization | sports
+stadium | stadium | | place | sports
+
+## Film and television
+film | film | movie,movies,flick | creative-work | screen
+documentary | documentary | docs | film
+animated-film | animated film | animated movie,cartoon film | film
+comedy-film | comedy | comedies,comedy film | film
+horror-film | horror film | horror movie,scary movie | film
+action-film | action film | action movie | film
+romance-film | romantic film | romance movie,romcom,rom-com | film
+drama-film | drama | dramas,drama film | film
+scifi-film | science fiction film | sci-fi movie,scifi movie | film
+tv-show | TV show | series,tv series,television show | creative-work | screen
+sitcom | sitcom | | tv-show
+anime | ~anime | | tv-show
+cartoon | cartoon | | tv-show
+reality-show | reality show | reality tv | tv-show
+streaming-service | streaming service | netflix | software | screen
+podcast | podcast | | creative-work | screen
+actor | actor | actress | person | screen
+film-director | film director | director | person | screen
+cinema | cinema | movie theater,movie theatre,theater | place | screen
+
+## Pets
+pet | pet | | animal | pets
+puppy | puppy | | dog | pets
+kitten | kitten | | cat | pets
+hamster | hamster | | pet, mammal | pets
+guinea-pig | guinea pig | | pet, mammal | pets
+ferret | ferret | | pet, mammal | pets
+parrot | parrot | | pet, bird | pets
+goldfish | goldfish | | pet, fish | pets
+pet-lizard | pet lizard | gecko,bearded dragon | pet, lizard | pets
+pet-snake | pet snake | | pet, snake | pets
+aquarium | aquarium | fish tank | artifact | pets
+veterinarian | veterinarian | vet | person | pets
+leash | leash | | artifact | pets
+dog-walk | dog walk | | physical-activity | pets
+
+## People and relationships
+relative | relative | family member,relatives | person
+family | family | | social-relationship
+parent | parent | parents | relative
+mother | mother | mom,mum,mama | parent
+father | father | dad,papa | parent
+sibling | sibling | | relative
+brother | brother | | sibling
+sister | sister | | sibling
+grandparent | grandparent | | relative
+grandmother | grandmother | grandma,nana,granny | grandparent
+grandfather | grandfather | grandpa,granddad | grandparent
+child | child | kid,kids,children | person
+son | son | | child, relative
+daughter | daughter | | child, relative
+baby | baby | babies | child
+teenager | teenager | teen | child
+cousin | cousin | | relative
+aunt | aunt | auntie | relative
+uncle | uncle | | relative
+spouse | spouse | | relative
+husband | husband | | spouse
+wife | wife | | spouse
+partner-person | partner | significant other | person
+boyfriend | boyfriend | | partner-person
+girlfriend | girlfriend | | partner-person
+roommate | roommate | flatmate | person
+best-friend | best friend | bestie | friend-person
+crush | crush | | social-relationship
+wedding | wedding | | activity | people
+birthday | birthday | | activity | people
+
+## Travel
+trip | trip | journey | travel
+vacation | vacation | holiday,holidays | travel
+road-trip | road trip | | trip
+flight | flight | | trip
+cruise | cruise | | trip
+camping | camping | | travel
+backpacking | backpacking | | travel
+airplane | airplane | plane,aeroplane,jet | vehicle
+train | train | | vehicle
+bus | bus | | vehicle
+subway | subway | metro,underground | vehicle
+motorcycle | motorcycle | motorbike | vehicle
+boat | boat | | vehicle
+ship | ship | ferry | vehicle
+airport | airport | | place | travel
+train-station | train station | | place | travel
+hotel | hotel | hostel | place | travel
+tent | tent | | artifact | travel
+passport | passport | | artifact | travel
+luggage | luggage | suitcase,baggage | artifact | travel
+map | map | | artifact | travel
+city | city | cities,town | place | travel
+village | village | | place | travel
+country | country | countries | place | travel
+island | island | | natural-place | travel
+museum | museum | | place | travel
+road | road | | place | travel
+restaurant | restaurant | cafe,diner | place | cooking
+bakery | bakery | | place | cooking
+
+## Weather and seasons
+weather | ~weather | | abstract | weather
+rain | ~rain | rainfall,drizzle | weather
+snow | ~snow | snowfall | weather
+storm | storm | thunderstorm,thunder | weather
+wind | ~wind | breeze | weather
+fog | ~fog | mist | weather
+sunshine | ~sunshine | sun,sunny weather | weather
+cloud | cloud | clouds | weather
+heat-wave | heat wave | hot weather | weather
+cold-snap | cold snap | cold weather,frost | weather
+rainbow | rainbow | | weather
+sunrise | sunrise | | weather
+sunset | sunset | | weather
+season | season | | abstract | weather
+spring | ~spring | springtime | season
+summer | ~summer | | season
+autumn | ~autumn | | season
+winter | ~winter | | season
+
+## School and learning
+school | school | | place | school
+university | university | college | place | school
+classroom | classroom | | place | school
+class | class | lesson,lecture | learning | school
+homework | ~homework | assignment | learning
+exam | exam | finals | learning
+teacher | teacher | professor,tutor | person | school
+student | student | pupil | person | school
+studying | ~studying | revision | learning
+notebook | notebook | | artifact | school
+backpack | backpack | school bag | artifact | school
+
+## Work
+job | job | | work
+career | career | | work
+office | office | workplace | place | work
+meeting | meeting | | work
+deadline | deadline | | abstract | work
+project | project | | work
+boss | boss | manager,supervisor | person | work
+interview | interview | job interview | work
+promotion | promotion | | abstract | work
+business | business | company,startup | organization | work
+freelancing | ~freelancing | freelance | work
+remote-work | ~remote work | working from home | work
+salary | salary | paycheck | abstract | work
+commute | commute | | travel | work
+
+## Hobbies and crafts
+hobby | hobby | pastime | activity | hobbies
+gardening | ~gardening | | hobby
+knitting | ~knitting | crochet | hobby
+sewing | ~sewing | embroidery | hobby
+woodworking | ~woodworking | carpentry | hobby
+pottery | ~pottery | ceramics | hobby
+origami | ~origami | | hobby
+fishing | ~fishing | | hobby
+birdwatching | ~birdwatching | bird watching | hobby
+collecting | ~collecting | | hobby
+jigsaw-puzzle | jigsaw puzzle | puzzles | hobby
+baking | ~baking | | hobby, cooking | cooking
+model-building | ~model building | | hobby
+board-gaming | ~board gaming | | hobby, gaming | gaming
+chess | ~chess | | board-game
+vinyl | vinyl | record collecting | hobby, music | music
+
+## Home
+home | home | | place | home
+house | house | | home
+apartment | apartment | flat | home
+room | room | | place | home
+kitchen | kitchen | | room
+bedroom | bedroom | | room
+living-room | living room | lounge | room
+bathroom | bathroom | | room
+garden | garden | yard,backyard | place | home
+balcony | balcony | | place | home
+furniture | ~furniture | | artifact | home
+bed | bed | | furniture
+couch | couch | sofa | furniture
+desk | desk | | furniture
+candle | candle | | artifact | home
+blanket | blanket | | artifact | home
+sleep | ~sleep | sleeping,naps,nap | activity | home
+cleaning | ~cleaning | tidying,housework | activity | home
+
+## Food and drink (topic inherited from food: cooking)
+meal | meal | breakfast,lunch,dinner,supper | food
+snack | snack | | food
+dessert | dessert | | food
+sandwich | sandwich | | meal
+burger | burger | hamburger | meal
+salad | salad | | meal
+sushi | ~sushi | | meal
+curry | ~curry | | meal
+taco | taco | burrito | meal
+ramen | ~ramen | noodles | meal
+steak | steak | | meal
+chicken | ~chicken | | meal
+egg | egg | | food
+bacon | ~bacon | | food
+pancake | pancake | waffle | meal
+cookie | cookie | biscuit | dessert
+ice-cream | ~ice cream | gelato | dessert
+pie | pie | | dessert
+donut | donut | doughnut | dessert
+popcorn | ~popcorn | | snack
+crisps | crisps | potato chips | snack
+cereal | ~cereal | oatmeal,porridge | meal
+yogurt | ~yogurt | yoghurt | food
+nut | nut | nuts,peanuts | snack
+honey | ~honey | | food
+spice | spice | spices,herbs | food
+beer | ~beer | | beverage
+wine | ~wine | | beverage
+milk | ~milk | | beverage
+soda | ~soda | soft drink,cola | beverage
+smoothie | smoothie | | beverage

@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'dev.kira.chat'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'dev.kira.chat'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '4.3.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Sideloadable out of the box; replace with a real key to publish.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+}
+
+// The app is the single generated Kira.html; it is copied in, never edited here.
+tasks.register('copyKira', Copy) {
+    from rootProject.file('../Kira.html')
+    into layout.projectDirectory.dir('src/main/assets')
+}
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'copyKira' }

@@ -33,3 +33,20 @@ dialog{overscroll-behavior:contain}
 .memory-card:hover{border-color:var(--accent)}
 .avatar-preview{width:54px;height:54px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 @media(max-width:600px){.composer textarea{font-size:16px;line-height:1.5}.composer-wrap{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}.jump-latest{bottom:118px;right:16px}}
+@media(max-width:600px){
+#app{flex-direction:column}
+main{order:1}
+.sidebar{order:2;padding:6px 8px;gap:0;border-bottom:0;border-top:1px solid var(--line);background:var(--sidebar)}
+.sidebar .brand{display:none}
+.sidebar nav{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.nav-item{justify-content:center;min-height:46px;padding:8px 6px;font-size:12px;border-radius:12px}
+.nav-item .count{display:inline;margin-left:2px;padding:0 6px;font-size:10px}
+.topbar{height:60px;padding:10px 16px}
+.topbar .eyebrow{display:none}
+.topbar h1{font-size:19px}
+.topbar .pill{display:none}
+.icon-button{width:44px;height:44px}
+.jump-latest{bottom:168px}
+body:has(.composer textarea:focus) .sidebar,body:has(.composer textarea:focus) .quick-prompts{display:none}
+body:has(.composer textarea:focus) .jump-latest{bottom:122px}
+}

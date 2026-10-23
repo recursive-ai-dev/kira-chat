@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432">
+  <defs>
+    <radialGradient id="bg" cx="42" cy="38" r="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e3234"/><stop offset="1" stop-color="#0a1113"/>
+    </radialGradient>
+  </defs>
+  <rect width="108" height="108" fill="url(#bg)"/>
+  <!-- inner hairline ring and its satellite -->
+  <circle cx="54" cy="54" r="14" fill="none" stroke="#a8c6b2" stroke-opacity=".28" stroke-width=".9"/>
+  <circle cx="43.28" cy="63" r="1.6" fill="#a8c6b2"/>
+  <!-- outer ring with a gap, and the orb resting in it -->
+  <path d="M78.13,49.75 A24.5,24.5 0 1,1 66.25,32.78" fill="none" stroke="#a8c6b2" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="74.07" cy="39.95" r="8.8" fill="#dba889" fill-opacity=".16"/>
+  <circle cx="74.07" cy="39.95" r="5.4" fill="#dba889"/>
+  <!-- core -->
+  <circle cx="54" cy="54" r="9" fill="#dba889" fill-opacity=".10"/>
+  <circle cx="54" cy="54" r="6.2" fill="#dba889" fill-opacity=".20"/>
+  <circle cx="54" cy="54" r="3.2" fill="#f3e4d6"/>
+</svg>

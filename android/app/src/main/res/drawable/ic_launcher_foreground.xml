@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A luminous orbit: a ring with a gap, an orb resting in it, and a soft core. Mirrors docs/brand/icon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- inner hairline ring and its satellite -->
+    <path
+        android:strokeColor="#A8C6B2"
+        android:strokeAlpha="0.28"
+        android:strokeWidth="0.9"
+        android:pathData="M68,54a14,14 0 1,0 -28,0a14,14 0 1,0 28,0" />
+    <path
+        android:fillColor="#A8C6B2"
+        android:pathData="M44.88,63a1.6,1.6 0 1,0 -3.2,0a1.6,1.6 0 1,0 3.2,0" />
+    <!-- outer ring with a gap -->
+    <path
+        android:strokeColor="#A8C6B2"
+        android:strokeWidth="2.8"
+        android:strokeLineCap="round"
+        android:pathData="M78.13,49.75A24.5,24.5 0 1,1 66.25,32.78" />
+    <!-- orb and halo -->
+    <path
+        android:fillColor="#DBA889"
+        android:fillAlpha="0.16"
+        android:pathData="M82.87,39.95a8.8,8.8 0 1,0 -17.6,0a8.8,8.8 0 1,0 17.6,0" />
+    <path
+        android:fillColor="#DBA889"
+        android:pathData="M79.47,39.95a5.4,5.4 0 1,0 -10.8,0a5.4,5.4 0 1,0 10.8,0" />
+    <!-- core -->
+    <path
+        android:fillColor="#DBA889"
+        android:fillAlpha="0.10"
+        android:pathData="M63,54a9,9 0 1,0 -18,0a9,9 0 1,0 18,0" />
+    <path
+        android:fillColor="#DBA889"
+        android:fillAlpha="0.20"
+        android:pathData="M60.2,54a6.2,6.2 0 1,0 -12.4,0a6.2,6.2 0 1,0 12.4,0" />
+    <path
+        android:fillColor="#F3E4D6"
+        android:pathData="M57.2,54a3.2,3.2 0 1,0 -6.4,0a3.2,3.2 0 1,0 6.4,0" />
+</vector>

@@ -37,15 +37,17 @@ Words that sit in two rings resolve to the ring the conversation is nearer to: �
 
 After an answer in a topic thread the field picks one of three moves, in this order:
 
-1. **Remind.** A remembered, positive, current preference whose topic ring overlaps this one by at least 50‰ (+300 if its concept is a member of this ring) and has not been discussed in the last 3 turns, nor reminded in the last 8. Kira asks “That rings a bell: you like coffee. Does that connect with this at all?”, and the memory is attached to the reply as a claim like any other.
+1. **Remind.** A remembered, positive, current preference whose topic ring overlaps this one by at least 50‰ (+300 if its concept is a member of this ring) and has not been discussed in the last 3 turns, nor reminded in the last 8. Kira generates an attributed report, such as “You told me that you like coffee”, and asks whether it connects to this subject. The memory is attached to the reply as a claim and a grounded sentence span. Declined subjects are excluded from automatic callbacks until explicitly reintroduced.
 2. **Bridge.** After at least two follow-ups, when a neighbouring ring shares a bridge concept outside this ring's core with the answer touching it, or when the ladder is spent. The score is overlap × the neighbour's activation × a novelty factor (visited rings count 20%). A touched concept gets a natural question about it; otherwise Kira names the link. The thread then continues in the new ring. A bridge is not repeated within 5 turns.
-3. **Ladder.** Stay and go deeper. Questions already asked in a topic are remembered across topic switches, so a ladder never repeats.
+3. **Ladder.** Stay and go deeper. The interaction grammar composes general questions, while matching authored theme cues and extensions can supply specific questions. Recent questions in a topic are remembered across topic switches and skipped during selection; this bounded history does not guarantee unlimited unique conversation.
 
 A thread stays in its ring unless the answer is one or two words, says outright that the subject changed, returns to a topic discussed in the last four, or lands in a ring that overlaps one discussed in the last three turns by at least 60‰.
 
 ## Wording
 
 The `⟦a|b|c⟧` slots pick by field position: the slot's own offset plus a phase derived from the position and turn selects the alternative, so wording drifts with the conversation instead of jumping. A slot still never repeats its previous choice.
+
+Generated conversational and fictional wording uses explicit variation counters and typed plans instead of template slots. Both the counters and the field state replay from the same event log. The field chooses a conversational direction; it does not turn a creative scene into a fact or authorize a question after a pause.
 
 ## Inspecting a decision
 

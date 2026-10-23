@@ -1,6 +1,6 @@
 # Growing Kira's vocabulary and variety
 
-Kira's reply choice has four layers. Each is deterministic, so a saved conversation replays to the identical replies.
+Kira combines topic cues, generation grammars, and authored extensions. Each is deterministic, so a saved conversation replays to the identical replies.
 
 | Layer | Source | Checked? | Used for |
 | --- | --- | --- | --- |
@@ -9,6 +9,8 @@ Kira's reply choice has four layers. Each is deterministic, so a saved conversat
 | WordNet table | `tools/wordnet_topics.py` → `src/model/wordnet-topics.js` | No | Last-resort topic for words nothing else knows |
 | Variable slots | `⟦a\|b\|c⟧` inside reply templates | n/a | Wording variety |
 | Ring field | derived from all of the above, `src/model/field.js` | No | Where a conversation sits, bridging, reminders (see [field.md](field.md)) |
+| Interaction grammar | `src/model/interaction.js` | Generated text reconstructed from speech acts | Social replies and general topic questions |
+| Creative grammar | `src/model/creative.js` | Fiction scope, compatible frames and generated text reconstructed | Wordplay and writing prompts |
 
 Everything except the curated lexicon only helps Kira choose a topic or a wording. None of it creates a memory or an ontology claim.
 
@@ -29,12 +31,14 @@ words:
   thinkers: socrates, kant, nietzsche
 ```
 
-- `topic:` starts a section; `---` ends it. A topic that already exists is extended, never replaced: new questions follow the built-in ones.
-- `open:` lines are used when someone names the topic itself. `ask:` is the question ladder, asked in order. `cue:` asks a particular question when the answer matches the regular expression (case-insensitive). `phrase:` asks about a noun phrase from the answer; `{p}` is that phrase.
+- `topic:` starts a section; `---` ends it. A topic that already exists is extended, never replaced.
+- `open:` lines are used on entry into a topic. `ask:` extends a thread after eight follow-up steps. `cue:` asks a particular question when the answer matches the regular expression (case-insensitive). `phrase:` can ask about a short noun phrase from the answer at every third step; `{p}` is that phrase. Unseen openers and matching cues take precedence over general generated questions. Aversion threads use neutral generated frames instead of positive authored prompts.
 - `words:` is an indented block. A `label:` prefix only groups words for the author. Words are lowercase letters, spaces, apostrophes and hyphens; the same word may not belong to two topics.
 - `overlap: other-topic | word, word` declares concepts that sit in both topics' rings. They are the bridges the [ring field](field.md) glides across; they do not change which topic a word is detected as. Each pair needs declaring once.
 - Words in one `words:` line group stay together as structure in the ring.
 - A thread stays on its topic unless the answer is one or two words or starts with “actually”, “anyway”, “speaking of”, “how about” or “what about”.
+
+Authored pack questions remain authored text: `plan.policy.questionOrigin` identifies `authored_theme` or `authored_cue`, while generated general questions use `compositional` and carry grammar spans. Pack wording does not acquire a semantic certificate merely by steering a topic.
 
 ## Variable slots
 

@@ -1,6 +1,6 @@
 'use strict';
 (function(K){
-  K.DIALOGUE={version:'dialogue/4.2.0',personas:{
+  K.DIALOGUE={version:'dialogue/4.4.0',personas:{
     warm:{name:'Warm',description:'Gentle, open, a little soft around the edges.',target:[-1000,0]},
     playful:{name:'Playful',description:'Light teasing, curious questions, small surprises.',target:[-2000,0]},
     thoughtful:{name:'Thoughtful',description:'Reflective, unhurried, drawn to the details.',target:[2000,0]},

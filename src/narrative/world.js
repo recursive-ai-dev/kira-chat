@@ -106,10 +106,12 @@
       const goals=new Set(this.activeGoals(state,event.actor).map(g=>g.id));
       const memoryFor=r=>{
         const candidates=session.dialogue.memories.filter(m=>m.status==='active'&&m.kind===r.memoryKind);
-        // A question about coffee must never be answered from a newer memory
-        // about tea. The companion's grounded recall selection is authoritative.
-        if(native?.act==='recall')return candidates.filter(m=>native.claims.some(c=>c.memoryId===m.id)).at(-1);
-        return candidates.at(-1);
+        const grounded=candidates.filter(m=>native?.claims.some(c=>c.memoryId===m.id));
+        // Reports and questions must use the companion's grounded selection.
+        // Repeating an old preference does not make it the newest memory, and
+        // a report of one kind cannot supply an unrelated kind's older record.
+        if(['name','preference','mood','note','recall'].includes(native?.act))return grounded.at(-1);
+        return grounded.at(-1)||candidates.at(-1);
       };
       const pending=session.dialogue.context.pending,clarification=native?.act==='clarify'&&pending&&pending.kind!=='detail';
       const candidates=topics.length>1||clarification?[]:character.rules.filter(r=>
@@ -125,26 +127,46 @@
         const conditions=rule.requires.concat(rule.goal?character.goals.find(g=>g.id===rule.goal).requires:[]);
         for(const fact of new Set(conditions.map(c=>c.fact)))evidence.push({kind:'belief',belief:K.clone(newest(actor.beliefs,fact))});
       }
-      let text=character.fallback,phrases=[];
-      if(clarification)text=native.text;
+      let text=character.fallback,phrases=[],realizations=[];
+      if(clarification){text=native.text;realizations=K.clone(native.realizations||[]);}
       else if(topics.length>1)text='Which subject do you mean: '+topics.map(id=>this.topics.get(id).label).join(' / ')+'?';
       else if(rule){
+        let combination=actor.usage['rule:'+rule.id]||0,offset=0,renderedLength=0;
         actor.usage['rule:'+rule.id]=(actor.usage['rule:'+rule.id]||0)+1;
         text=rule.parts.map((alternatives,part)=>{
           const key='phrase:'+rule.id+':'+part+':';
-          const index=alternatives.map((_,i)=>i).sort((a,b)=>(actor.usage[key+a]||0)-(actor.usage[key+b]||0)||a-b)[0];
+          // Read the use count as mixed-radix digits. Each lower digit rotates
+          // later parts, preserving variety while visiting every combination
+          // once per cycle. No Cartesian product or large product is needed.
+          const digit=combination%alternatives.length,index=(digit+offset)%alternatives.length;
+          combination=Math.floor(combination/alternatives.length);offset+=digit;
           actor.usage[key+index]=(actor.usage[key+index]||0)+1;phrases.push(index);
-          return alternatives[index].replace(/\{([^{}]+)\}/g,(_,slot)=>{
-            if(slot==='character')return character.name;
-            if(slot==='speaker')return this.identities.get(event.speaker).name;
-            if(slot==='memory')return memory.object.label;
-            if(slot==='report')return K.describeMemory(memory);
-            return this.facts.get(slot.slice(5)).text;
+          let delta=0;
+          const expanded=alternatives[index].replace(/\{([^{}]+)\}/g,(match,slot,position)=>{
+            let value;
+            if(slot==='character')value=character.name;
+            else if(slot==='speaker')value=this.identities.get(event.speaker).name;
+            else if(slot==='memory')value=memory.object.label;
+            else if(slot==='report'){
+              // Authored punctuation surrounds a verified grammar fragment.
+              // Offsets follow expanded slots across every preceding part.
+              const result=K.Realization.realize(K.Realization.memory(memory),{
+                memories:session.dialogue.memories,messages:session.dialogue.messages,contractions:false,terminal:false
+              });
+              const start=renderedLength+position+delta;
+              realizations.push({result,start,end:start+result.text.length});value=result.text;
+            }else value=this.facts.get(slot.slice(5)).text;
+            delta+=value.length-match.length;return value;
           });
+          renderedLength+=expanded.length;return expanded;
         }).join('');
       }
       N.check(text.length<=16000,'generated reply is too long');
-      const payload={event:event.seq,actor:event.actor,speaker:event.speaker,text,rule:rule?.id??null,goal:rule?.goal??null,topic,intent,topics,phrases,evidence,
+      for(const span of realizations){
+        K.Realization.verify(span.result,{memories:session.dialogue.memories,messages:session.dialogue.messages});
+        N.check(text.slice(span.start,span.end)===span.result.text,'realized report does not match its reply span');
+      }
+      const payload={event:event.seq,actor:event.actor,speaker:event.speaker,text,rule:rule?.id??null,goal:rule?.goal??null,topic,intent,topics,phrases,evidence,realizations,
         interpretation:native?.interpretation??null,origin:clarification?'parser_clarification':topics.length>1?'topic_clarification':rule?'authored_rule':'authored_fallback'};
       const reply={...payload,digest:K.hash(payload)};
       session.replies.push(reply);
@@ -152,8 +174,9 @@
         // Follow-up state must describe the sentence actually shown, rather
         // than a question from the companion persona which was never spoken.
         if(!clarification)session.dialogue.context.pending=null;
-        const plan={...native,text,policy:{...native.policy,narrative:{rule:reply.rule,replyDigest:reply.digest}},digest:null};
-        plan.digest=K.hash({id:plan.id,act:plan.act,text:plan.text,claims:plan.claims,semantics:plan.semantics.map(s=>s.digest),slots:plan.slots,policy:plan.policy,interpretation:plan.interpretation});
+        const plan={...native,text,realizations,policy:{...native.policy,narrative:{rule:reply.rule,replyDigest:reply.digest}},digest:null};
+        this.dialogue.verifyPlan(session.dialogue,plan);
+        plan.digest=K.hash({id:plan.id,act:plan.act,text:plan.text,claims:plan.claims,semantics:plan.semantics.map(s=>s.digest),slots:plan.slots,realizations:plan.realizations,policy:plan.policy,interpretation:plan.interpretation});
         session.dialogue.lastPlan=plan;
         const assistant=session.dialogue.messages.at(-1);assistant.text=text;assistant.plan=plan;
       }

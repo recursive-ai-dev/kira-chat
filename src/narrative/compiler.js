@@ -109,5 +109,5 @@
     const rebuilt=compile(pkg.definition);
     check(pkg.hash===rebuilt.hash&&K.hash(pkg)===K.hash(rebuilt),'compiled package does not match its definition');return rebuilt;
   }
-  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.1.0'};
+  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.3.0'};
 })(Kira);

@@ -97,7 +97,7 @@ test('support follow-up stores the exact question the user saw', () => {
       const question = state.context.pending?.question;
       assert.ok(question?.endsWith('?'));
       assert.ok(replies.at(-1).text.endsWith(question));
-      if (persona === 'thoughtful') assert.equal(question, 'Is there a detail you want to start with?');
+      if (persona === 'thoughtful') assert.equal(question, 'Is there a detail you would like to start with?');
     }
   }
 });
@@ -112,8 +112,8 @@ test('answering a support follow-up keeps attribution to the source message', ()
 });
 
 test('the new model rejects an older version-pinned session', () => {
-  assert.equal(K.STORE_KEY, 'kira_rse_4_2_0');
-  const oldMetadata = K.clone({...K.APP_META, version: '4.1.3', modelHash: 'old-model-hash'});
+  assert.equal(K.STORE_KEY, 'kira_rse_4_4_0');
+  const oldMetadata = K.clone({...K.APP_META, version: '4.3.0', modelHash: 'old-model-hash'});
   const envelope = K.packSession([], K.initialState(), oldMetadata);
   assert.throws(() => K.inspectEnvelope(envelope, K.APP_META), /different version of Kira/);
 });
@@ -140,7 +140,7 @@ test('hard news gets a gentle reply and saves nothing', () => {
 test('confirming a suggested name saves it', () => {
   const {state, replies} = conversation(["I'm Damien", 'yes', "what's my name?"]);
   assert.deepEqual([...active(state).map(K.describeMemory)], ['Your name is Damien']);
-  assert.equal(replies.at(-1).text, 'You’re Damien.');
+  assert.equal(replies.at(-1).text, 'Your name is Damien.');
 });
 
 test('recall finds a preference saved under a clarified meaning', () => {
@@ -217,10 +217,11 @@ test('new vocabulary gives topic-specific questions that stay on topic', () => {
     'I like soccer',
     'Midfield mostly, I play with my friends on weekends',
   ]);
-  assert.match(replies[0].text, /plays it, watches it, or both/);
+  assert.match(replies[0].text, /soccer\?/);
+  assert.equal(replies[0].policy.questionOrigin, 'compositional');
   // "friends" is incidental: the thread stays on sports instead of moving to the people ladder.
   assert.equal(replies[1].policy.topicSelection.topic, 'sports');
-  assert.match(replies[1].text, /Who do you usually do that with\?/);
+  assert.match(replies[1].text, /sports\?/);
 });
 
 test('possessives are reported back in the second person and stay distinct from the general concept', () => {

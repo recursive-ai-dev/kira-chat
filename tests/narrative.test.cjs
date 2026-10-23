@@ -34,7 +34,7 @@ test('SDK contains the exact companion model and does not pollute Node globals',
   const code = fs.readFileSync(path.join(__dirname, '../KiraSDK.js'), 'utf8');
   const context = vm.createContext({TextEncoder});
   vm.runInContext(code, context);
-  assert.equal(context.Kira.Narrative.version, '0.1.0');
+  assert.equal(context.Kira.Narrative.version, '0.3.0');
   assert.equal(context.Kira.APP_META.modelHash, K.APP_META.modelHash);
 });
 

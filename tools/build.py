@@ -31,6 +31,9 @@ MODEL = (
     "themes.js",
     "field.js",
     "variation.js",
+    "interaction.js",
+    "creative.js",
+    "realization.js",
     "dialogue.js",
 )
 BROWSER = ("persistence.js", "presenter.js", "view.js")
@@ -89,7 +92,7 @@ def build_sdk() -> str:
     model = read_parts("model", MODEL)
     narrative = read_parts("narrative", NARRATIVE)
     sdk_hash = sha256((model + narrative).encode("utf-8")).hexdigest()
-    metadata = json.dumps({"version": "0.1.0", "sdkHash": sdk_hash}, separators=(",", ":"))
+    metadata = json.dumps({"version": "0.3.0", "sdkHash": sdk_hash}, separators=(",", ":"))
     # A private global object lets the unchanged browser model run in CommonJS
     # without leaking Kira onto Node's global scope.
     return (

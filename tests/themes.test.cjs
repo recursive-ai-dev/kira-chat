@@ -70,7 +70,9 @@ test('WordNet-derived cues cover words the curated lexicon lacks, and curated wo
   assert.equal(K.conversationTopic('lacrosse', null) === null, true, 'no engine: regex fallback only');
   const [soccer] = talk(['I like lacrosse']);
   assert.equal(soccer.policy.template === undefined, true);
-  assert.match(soccer.text, /plays it, watches it, or both/);
+  assert.match(soccer.text, /lacrosse\?/);
+  assert.equal(soccer.policy.questionOrigin, 'compositional');
   const [coffee] = talk(['I like espresso']);
-  assert.match(coffee.text, /taste, the ritual/);
+  assert.match(coffee.text, /espresso\?/);
+  assert.equal(coffee.policy.questionOrigin, 'compositional');
 });

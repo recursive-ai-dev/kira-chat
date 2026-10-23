@@ -1,6 +1,6 @@
 {
   "name": "kira-chat",
-  "version": "4.3.0",
+  "version": "4.5.0",
   "private": true,
   "description": "Offline dialogue and a deterministic multi-character narrative SDK with attributed memory, knowledge, and replay.",
   "license": "Apache-2.0",
@@ -12,6 +12,7 @@
     "build": "python3 tools/build.py",
     "check": "python3 tools/build.py --check && node tools/build-themes.cjs --check && node tools/extend-artifact.cjs --check",
     "test": "node --test tests/*.test.cjs",
+    "test:nlg": "node --test tests/adversarial-*.test.cjs tests/realization.test.cjs tests/compositional-*.test.cjs tests/generative-*.test.cjs",
     "verify": "npm run check && npm test",
     "demo": "python3 -m http.server 8042 --bind 127.0.0.1",
     "example": "node examples/station.cjs",

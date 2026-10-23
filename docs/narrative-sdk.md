@@ -103,7 +103,7 @@ A rule can constrain topic, parsed intent, beliefs, relationship and active goal
 }
 ```
 
-Each `parts` entry is a literal string or a nonempty array of alternatives. Parts concatenate exactly; authors provide spaces and punctuation. Selection composes parts without enumerating their Cartesian product. Eligible rules rank by descending priority, then least use, then stable ID. Each part independently picks its least-used alternative, with source order breaking ties. Usage belongs to that character, across its interlocutors.
+Each `parts` entry is a literal string or a nonempty array of alternatives. Parts concatenate exactly; authors provide spaces and punctuation. Selection composes parts without enumerating their Cartesian product. Eligible rules rank by descending priority, then least use, then stable ID. A deterministic counter cycles through combinations, rotating later parts so equal-sized pools do not stay synchronized. Every combination is visited before repeating when a full cycle fits within the event limit. Usage belongs to that character, across its interlocutors.
 
 Rules match all supplied constraints. `on.intent` uses Kira's parsed act names (`greet`, `preference`, `recall`, etc.), plus `initiate`. `on.topic` matches whole normalized alias phrases, case-insensitively. Multiple matched topics produce a clarification rather than guessing. The player can restate one topic; a host UI can also supply a validated `topic` on a message event.
 
@@ -117,9 +117,20 @@ Conditions use the character's latest belief. Unknown is different from false. O
 | `{speaker}` | Conversation partner's display name |
 | `{fact:signal_red}` | Authored proposition text; requires a positive condition for that fact |
 | `{memory}` | Selected active memory's object label |
-| `{report}` | Kira's attributed description, such as `You like coffee` |
+| `{report}` | A grammar-generated memory clause, such as `You like coffee`, with a verified sentence plan and text span |
 
-Memory slots require `memoryKind`: `name`, `preference`, `mood`, or `note`. Selection takes place only within that character's session with the current speaker. For recall questions it respects the companion model's grounded query selection; otherwise it chooses the latest active memory of that kind. Superseded or retired memories cannot fill slots.
+Memory slots require `memoryKind`: `name`, `preference`, `mood`, or `note`. Selection takes place only within that character's session with the current speaker. Reports and recall questions respect the companion model's grounded memory selection, including repeated reports of an older preference. A report cannot substitute an unrelated memory of another kind. Other acts prefer a grounded memory when available, then the latest active memory of that kind. Superseded or retired memories cannot fill slots.
+
+`{report}` uses the shared controlled grammar with `terminal: false`, so authors still supply punctuation. Notes are explicitly attributed quotations; potentially clause-like object labels are quoted as literals. Each generated report is recorded in `reply.realizations` as `{result, start, end}`, using UTF-16 offsets into `reply.text`. The result contains its meaning tree, grammar version, derivation, memory references, and digest. `Kira.Realization.verify(result, {memories, messages})` reconstructs the clause and checks its sources; messages are optional for standalone use, while the dialogue integration also requires source user messages. Raw `{memory}` labels and other authored slots do not acquire a grammar proof.
+
+Grammar results also include a checked `scope`: `reported`, `conversation`, `fiction`, or `mixed`. The SDK exports `Kira.Interaction` for compositional speech-act/question plans and `Kira.Creative` for fictional wordplay and story plans. These helpers are deterministic and accept an explicit variation `index`; the host owns progression. They do not create beliefs or private memories. Existing narrative rules and fallbacks retain the authored character's wording; the companion's generated social or creative text does not replace that fallback implicitly.
+
+```js
+const tree = Kira.Creative.plan('prompt', {index: 0, persona: 'thoughtful'});
+const result = Kira.Realization.realize(Kira.Realization.creative(tree), {memories: []});
+Kira.Realization.verify(result, {memories: []});
+console.log(result.scope, result.text); // fiction, Writing prompt: ...
+```
 
 Parser ambiguity that needs a meaning choice takes precedence over narrative rules. The original clarification is shown so the pending parser question matches the actual transcript. Other companion follow-up questions are cleared when authored wording replaces them. Unsupported text can receive a domain-topic reply or the character's fallback without silently becoming a memory.
 
@@ -162,9 +173,9 @@ Relationship points are separate for each character/partner pair. Supported nove
 
 World truth is stored under `state.world`. Each `state.actors[id]` has an append-only belief history, phrase usage, and private sessions keyed by partner ID. Each session contains its Kira dialogue state and emitted narrative replies. Corrections and retirement retain history.
 
-Replies identify the actor, partner, selected rule and goal, matched topics, interpretation, phrase indices, and evidence. Belief evidence carries the delivery event, source, and relay chain. Memory evidence identifies the partner, memory and source message. The response has a canonical digest. Hosts should render text as text, not HTML.
+Replies identify the actor, partner, selected rule and goal, matched topics, interpretation, phrase indices, evidence, and generated text spans. Belief evidence carries the delivery event, source, and relay chain. Memory evidence identifies the partner, memory and source message. The canonical response digest includes its realization proofs. When authored wording replaces a companion reply, native grammar proofs are replaced with proofs for the report slots actually displayed; literal fallbacks carry none. Parser clarifications preserve the displayed native question's proof. Hosts should render text as text, not HTML.
 
-The compiler checks structure and slot grounding. The semantic checker checks supported semantic queries. **Neither establishes that arbitrary authored prose is factually true or consistent with every belief.** Authors can deliberately write lies and unreliable voices; use conditions and attribution traces to make that intentional.
+The compiler checks structure and slot grounding. The semantic checker checks supported semantic queries. The realization checker grounds and reconstructs only the marked generated spans. **These checks do not establish that arbitrary authored prose is factually true or consistent with every belief.** Authors can deliberately write lies and unreliable voices; use conditions and attribution traces to make that intentional.
 
 ```js
 const saved = world.export(events);
@@ -185,4 +196,4 @@ npm run build    # generate Kira.html and KiraSDK.js
 npm run verify   # exact generated bytes + companion and SDK regressions
 ```
 
-Narrative sources live in `src/narrative/`. The build hash pins both those sources and the shared model. The companion HTML and its 4.2.0 model/storage identity remain unchanged in platform release 4.3.0. The SDK's own version is 0.1.0; it has a separate session format and does not import companion session envelopes.
+Narrative sources live in `src/narrative/`. The build hash pins both those sources and the shared model. Platform release 4.5.0 includes companion model 4.4.0 with a new storage identity, plus SDK 0.3.0. The SDK has a separate session format and does not import companion session envelopes. Earlier world-session exports require their original SDK and model hashes.

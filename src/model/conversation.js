@@ -58,11 +58,27 @@
   function parseConversation(input,state,engine){
     const raw=K.nfc(input).trim(),text=raw.replace(/[’‘]/g,"'"),pending=state.context.pending;
     const base=(s=text)=>K.parseInput(s,state,engine);
-    const finish=r=>({...r,text:raw,version:'conversation-parser/4.2.0'});
-    if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base());
+    const finish=r=>({...r,text:raw,version:'conversation-parser/4.4.0'});
+    const relocate=(r,offset)=>{
+      // Pending sense resolution retains spans in the original source message. Fresh parses use
+      // offsets into this raw message, including uncommitted candidate frames awaiting a choice.
+      if(!r.sourceMessage)for(const frame of new Set([...(r.frames||[]),...(r.candidateFrames||[]),r.ambiguity].filter(Boolean)))frame.span={start:frame.span.start+offset,end:frame.span.end+offset};
+      return r;
+    };
+    if(/^(?:remember (?:this|that)|note):?\s+/i.test(text))return finish(base(raw));
     const questionReply=(answer,thread)=>finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],followUp:{answer,question:thread.question,questionMessage:thread.questionMessage,topic:thread.topic,step:thread.step||0,asked:thread.asked||[]},reason:null});
     // Do not turn a quoted or explicitly conditional statement into a report.
     const protectedText=/["“”]|^(?:if|suppose|imagine|maybe|perhaps)\b/i.test(text);
+    // Conversation controls take precedence over a pending answer. Otherwise a refusal is echoed as
+    // if it supplied a detail, and the next question continues the subject the user just declined.
+    if(!protectedText){
+      const command=K.fold(text).replace(/[.!?]+$/,'').trim().replace(/^please\s+/,'').replace(/,?\s+please$/,'');
+      const control=(kind,reason)=>finish({intent:'c:clarify',speechAct:'request',supported:false,frames:[],quoted:[],control:kind,reasonCode:'conversation_control',reason});
+      if(/^(?:stop asking(?: me)?(?: any| more)? questions|no more questions|(?:don't|do not) ask(?: me)?(?: any)?(?: more)? questions)$/.test(command))return control('stop_questions','Okay. I’ll leave the questions there. You can lead the conversation.');
+      if(/^(?:ask me (?:a|another) question|you can ask(?: me)? questions(?: again)?|(?:start|resume) asking(?: me)? questions(?: again)?)$/.test(command))return control('resume_questions','Okay. What would you like to talk about?');
+      if(/^(?:(?:let's|can we|could we) )?(?:(?:change|switch)(?: the)? (?:subject|topics?)|talk about something else)$/.test(command)||command==='something else'&&pending?.kind==='detail')return control('change_subject','Of course. We can talk about something else.');
+      if(/^(?:no thanks|no thank you|not now|i(?:'d| would) rather not(?: (?:talk(?: about)?|discuss)(?: (?:it|that|this))?)?|i (?:don't|do not) want to (?:talk(?: about)?|discuss)(?: (?:it|that|this))?(?: anymore)?|(?:let's )?leave it(?: there)?|drop (?:it|the subject))$/.test(command)||['detail','support','offer'].includes(pending?.kind)&&/^(?:no|nope|not really)$/.test(command))return control('decline','That’s okay. We can leave it there.');
+    }
     if(!protectedText){
       const salutation=text.match(/^(?:hello|hi|hey|yo|good morning|good afternoon|good evening)(?:[ ,]+kira\b)?(?:\s*[,!.:]\s*|\s+)(?=\S)/i);
       let body=salutation?text.slice(salutation[0].length):text,offset=salutation?salutation[0].length:0;
@@ -73,10 +89,11 @@
       }
       const parts=[...body.matchAll(/[^.!?]+[.!?]*/g)].map(m=>({text:m[0].trim(),offset:offset+m.index+m[0].indexOf(m[0].trim())})).filter(p=>p.text);
       if(parts.length>1&&parts.length<=6){
-        const parsed=parts.map(p=>{const r=base(p.text);for(const f of r.frames)f.span={start:f.span.start+p.offset,end:f.span.end+p.offset};return r;});
+        const parsed=parts.map(p=>relocate(base(p.text),p.offset));
         const social=new Set(['c:greet','c:how','c:about','c:thanks','c:joke','c:prompt']);
         if(parsed.every(r=>r.supported&&(r.frames.length||social.has(r.intent)))){
           const frames=parsed.flatMap(r=>r.frames),acts=parsed.filter(r=>!r.frames.length&&r.intent!=='c:greet');
+          if(frames.length>12)return finish({intent:'c:clarify',speechAct:'clarification',supported:false,frames:[],quoted:[],reasonCode:'compound',reason:'Please give me up to twelve reports in one message. I haven’t saved any part of that batch.'});
           const primary=frames.length?parsed.find(r=>r.frames.length):parsed.find(r=>r.intent!=='c:greet')||parsed[0];
           return finish({...primary,frames,negativeMood:parsed.some(r=>r.negativeMood),greeted:!!salutation||parsed.some(r=>r.intent==='c:greet'),afterActs:frames.length?acts:acts.filter(r=>r!==primary),parts:parsed});
         }
@@ -85,8 +102,8 @@
       }
       // A reason is kept as a conversational quote, separately from the asserted report.
       const because=body.match(/^(.+?)\s+because\s+(.+)$/i);
-      if(because){const r=base(because[1]);if(r.supported&&r.frames.length&&r.frames.every(f=>['preference','mood'].includes(f.kind))){for(const f of r.frames)f.span={start:f.span.start+offset,end:f.span.end+offset};return finish({...r,greeted:!!salutation,elaboration:raw.slice(text.indexOf(because[2],offset))});}}
-      if(salutation){const r=base(body);for(const f of r.frames)f.span={start:f.span.start+offset,end:f.span.end+offset};if(r.supported||r.ambiguity)return finish({...r,greeted:true});}
+      if(because){const r=relocate(base(because[1]),offset);if(r.supported&&r.frames.length&&r.frames.every(f=>['preference','mood'].includes(f.kind)))return finish({...r,greeted:!!salutation,elaboration:raw.slice(text.indexOf(because[2],offset))});}
+      if(salutation){const r=relocate(base(body),offset);if(r.supported||r.ambiguity)return finish({...r,greeted:true});}
     }
     const parsed=base();
     if(parsed.supported||parsed.ambiguity)return finish(parsed);
@@ -98,11 +115,21 @@
     // Repeating the name just acknowledged is a conversational confirmation.
     const known=state.memories.find(m=>m.kind==='name'&&m.status==='active'&&K.fold(m.object.label)===K.fold(text));
     if(known&&state.lastPlan?.claims.some(c=>c.memoryId===known.id)){const r=base('My name is '+known.object.label);r.frames[0].span={start:0,end:raw.length};return finish({...r,nameConfirmation:true});}
+    // Feedback concerns the conversation itself, rather than the detail we happened to ask for.
+    // Match complete feedback or an explicit reply reference: "generic types", a "template renderer"
+    // and "I do not understand recursion" are substantive answers, not requests to repair this chat.
+    if(!protectedText&&parsed.reasonCode==='unparsed'){
+      const feedback=text.replace(/[.!?]+$/,'').trim().replace(/^kira[, :]\s*/i,'').replace(/^please\s+/i,'').replace(/,?\s+please$/i,'');
+      const bare=/^(?:(?:i )?(?:don't|do not) understand(?: (?:you|that|this|it))?|(?:(?:that|this|it) )?(?:doesn't|does not) work|not listening|generic|robotic|templated|template)$/i;
+      const reply=/^(?:(?:your|these|those|the|that|this)(?: last)? (?:repl(?:y|ies)|responses?|questions?|answers?|wording|conversation)|you)(?: (?:are|is|sound|sounds|seem|seems|feel|feels)(?: too| very| so)? (?:generic|robotic|templated)| (?:don't|do not|doesn't|does not) (?:work|make sense|listen)|(?:'re| are) not listening)$/i;
+      const understanding=/^i (?:don't|do not) understand (?:your|the|that|this)(?: last)? (?:reply|response|question|answer|wording|conversation)$/i;
+      const correction=/^(?:(?:you )?already asked(?: me)?(?: that| this)?|(?:that|this) (?:is not|isn't|was not|wasn't) what i said|i (?:didn't|did not) say that|(?:(?:can|could|would) you )?rephrase(?: (?:that|this|it|(?:your|the)(?: last)? (?:reply|response|question|answer)))?)$/i;
+      if([bare,reply,understanding,correction].some(pattern=>pattern.test(feedback)))return finish({...parsed,repair:true});
+    }
     // Questions always beat a pending answer; safety/negation/attribution failures stay failures.
     const yesNo=/^(?:yes|yeah|yep|sure|no|nope|not really|okay|ok)[.!]*$/i.test(text);
     if(pending?.kind==='detail'&&!protectedText&&!/\?$/.test(text)&&(parsed.reasonCode==='unparsed'||yesNo)&&!/^\s*(?:i (?:might|think|wish)|do i|what|who|why|how|can you|could you)\b/i.test(text))return questionReply(raw,pending);
     if(!protectedText&&parsed.reasonCode==='unparsed'&&/^i(?:'m| am)\s+(?:building|working on|writing|making|coding|creating)\s+.+/i.test(text))return finish({intent:'c:topic',speechAct:'statement',supported:true,frames:[],quoted:[],activity:raw,topicHint:topicCue(raw),reason:null});
-    if(parsed.reasonCode==='unparsed'&&/\b(?:don't understand|do not understand|template|generic|robotic|not listening|doesn't work|does not work)\b/i.test(text))return finish({...parsed,repair:true});
     return finish(parsed);
   }
   const questions={
@@ -126,7 +153,7 @@
   const tailored={
     gaming:[[/\b(?:art|pixel|sprites?|drawings?|animation|visuals?|painted|hand[- ]drawn)\b/i,'What look are you going for with the art, and how does it shape the way the game plays?'],[/\b(?:story|narrative|characters?|dialogue|writing)\b/i,'Whose story does the player get to live through?'],[/\b(?:puzzle|puzzles)\b/i,'What is the first puzzle the player will meet?'],[/\b(?:multiplayer|co-?op|online|friends)\b/i,'How do the players affect each other?'],[/\b(?:platformer|jump|jumping|movement)\b/i,'What does moving through the world feel like?'],[/\b(?:unity|godot|unreal|engine|javascript|python|c\+\+|c#|lua|phaser|love2d)\b/i,'How is that setup working for you so far?'],[/\b(?:stuck|hard|struggling|can't|cannot|bug|bugs)\b/i,'What is the part that keeps getting in the way?'],[/\b(?:solo|alone|myself|by myself)\b/i,'What is it like building the whole thing on your own?']],
     coding:[[/\b(?:bug|bugs|error|errors|broken|crash|crashes|stuck)\b/i,'What happens when it fails, and what did you expect instead?'],[/\b(?:web|website|browser|html|javascript|frontend|react)\b/i,'Who is the page for, and what should they be able to do first?'],[/\b(?:python|rust|go|java|c\+\+|c#|lua|typescript)\b/i,'What made you choose that language for it?'],[/\b(?:game|engine)\b/i,'Which system in it are you working on right now?'],[/\b(?:learning|beginner|new to|tutorial)\b/i,'What would feel like a good first win?']],
-    music:[[/\b(?:guitar|bass|drums?|piano|keys|synth|violin|sing|singing|vocals?)\b/i,'How long have you been playing, and what do you reach for first?'],[/\b(?:lyrics?|songwriting|write|writing)\b/i,'Where do your songs usually start, with a line, a sound, or a feeling?'],[/\b(?:metal|rock|punk|rap|hip-?hop|jazz|folk|pop|electronic|classical)\b/i,'What is it about that sound that works for you?'],[/\b(?:producing|production|mixing|recording|daw|beats?)\b/i,'What does your setup look like when you sit down to make something?']],
+    music:[[/\b(?:guitar|bass|drums?|piano|keys|synth|violin|sing|singing|vocals?)\b/i,'Do you play it yourself, listen to it, or both?'],[/\b(?:lyrics?|songwriting|write|writing)\b/i,'Where do your songs usually start, with a line, a sound, or a feeling?'],[/\b(?:metal|rock|punk|rap|hip-?hop|jazz|folk|pop|electronic|classical)\b/i,'What is it about that sound that works for you?'],[/\b(?:producing|production|mixing|recording|daw|beats?)\b/i,'What does your setup look like when you sit down to make something?']],
     writing:[[/\b(?:poem|poetry|poems)\b/i,'Do your poems start with an image or with a line?'],[/\b(?:novel|book|chapter)\b/i,'Where are you in it, and what comes next?'],[/\b(?:character|characters|protagonist)\b/i,'What does that character want that they cannot say out loud?'],[/\b(?:stuck|blocked|can't|cannot)\b/i,'What usually unblocks you, even slightly?']],
     art:[[/\b(?:digital|procreate|photoshop|tablet|pixel)\b/i,'What do you like about working digitally?'],[/\b(?:paint|painting|oil|watercolou?r|acrylic)\b/i,'What do you find yourself painting most?'],[/\b(?:draw|drawing|sketch|sketching|ink)\b/i,'Do you sketch loosely first, or start with the final lines?']]
   };
@@ -140,6 +167,8 @@
     t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
     const words=t.split(/\s+/).filter(Boolean);
     if(words.length<1||words.length>4||t.length>32)return null;
+    // Places, reasons and time/frequency answers are useful discourse, but cannot fill a noun slot.
+    if(/^(?:at|in|on|to|from|with|without|by|for|about|because|during|after|before|under|over|around|through|every|each|all|once|twice)\b/i.test(t)||/^(?:usually|sometimes|often|always|never|daily|weekly|recently|yesterday|today|tomorrow|tonight)$/i.test(t))return null;
     if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
     if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?)\b/i.test(t))return null;
     // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").

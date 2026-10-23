@@ -48,7 +48,7 @@
     memory[memoryKey]=index;
     return alternatives[index];
   }
-  K.expandVariants=(text,{seed,usage,persona,phase})=>{
+  K.expandVariants=(text,{seed,usage,persona,phase,replacements})=>{
     let occurrence=0;
     return text.replace(SLOT,(match,body,offset)=>{
       let alternatives;
@@ -59,7 +59,9 @@
       }else alternatives=body.split('|');
       const picked=choose(alternatives,seed,body,occurrence++,usage,phase);
       // Capitalise when the slot opens a sentence.
-      return /(?:^|[.!?]\s+|\n\s*)$/.test(text.slice(0,offset))?picked[0].toUpperCase()+picked.slice(1):picked;
+      const rendered=/(?:^|[.!?]\s+|\n\s*)[“"‘'(\[]*$/.test(text.slice(0,offset))?picked[0].toUpperCase()+picked.slice(1):picked;
+      if(replacements)replacements.push({start:offset,end:offset+match.length,text:rendered});
+      return rendered;
     });
   };
   // User text may not contain slot brackets, so nobody can inject one into a reply.

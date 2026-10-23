@@ -7,7 +7,7 @@
   function download(name,text){if(window.KiraHost&&KiraHost.saveFile){KiraHost.saveFile(name,text);return;}const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   function detail(label,data){const d=el('details');d.append(el('summary','',label),el('pre','',typeof data==='string'?data:JSON.stringify(data,null,2)));return d;}
   const KIND_HELP={subsumes:'Checks whether the first concept is provably a kind of the second, using the bundled axioms and their closure.',existential:'Checks a typed part or role relation between two concepts.',relation:'Computes the set of possible basic lexical relations between two word senses.',entails:'Projects lexical edits through an extensional context and reports the surviving relations.',shift:'Finds an approved wording in the same meaning that moves register and affect in the requested directions.',realize:'Chooses the approved wording closest to an absolute register and affect target.'};
-  const DRAFT_KEY='kira_rse_draft_4_2_0';
+  const DRAFT_KEY='kira_rse_draft_4_4_0';
   function startOfDay(t){const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();}
   function timeLabel(time){try{const d=new Date(time),now=Date.now();if(startOfDay(now)!==startOfDay(time))return (startOfDay(now)-startOfDay(time))/864e5===1?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric'});return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return '';}}
   function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
@@ -101,11 +101,15 @@
       const interpretation=el('section');interpretation.append(el('h3','','1. The interpretation boundary'),el('p','','The parser’s supported reading is “'+plan.act+'”. This is a bounded grammar decision, not a proof of general English understanding.'));
       if(plan.interpretation)interpretation.append(detail('Parsed frames, scope, spans, and references',plan.interpretation));box.append(interpretation);
       const memories=el('section');memories.append(el('h3','','2. What the reply can attribute to you'));
-      if(!plan.claims.length)memories.append(el('p','','This reply does not make a claim from your memory.'));
+      const grammarSources=[...new Set((plan.realizations||[]).flatMap(span=>span.result.memoryIds))];
+      if(!plan.claims.length&&!grammarSources.length)memories.append(el('p','','This reply does not make a claim from your memory.'));
       for(const claim of plan.claims){const m=this.state.memories.find(m=>m.id===claim.memoryId);if(!m)continue;memories.append(el('p','',K.describeMemory(m)+' · record '+m.id+' · now '+m.status),button('Open the original message ↗','source-link',()=>this.source(m.sourceMessage)));}
+      for(const id of grammarSources.filter(id=>!plan.claims.some(claim=>claim.memoryId===id))){const m=this.state.memories.find(m=>m.id===id);if(!m)continue;memories.append(el('p','',K.describeMemory(m)+' · sentence source '+m.id+' · now '+m.status),button('Open the original message ↗','source-link',()=>this.source(m.sourceMessage)));}
       box.append(memories);const semantics=el('section');semantics.append(el('h3','','3. Checked semantic evidence'));
       for(const r of plan.semantics){semantics.append(el('p','',r.query.op+' → '+r.outcome+' · '+r.evidence?.type),detail('Inspect '+r.query.op+' certificate',r));}
-      box.append(semantics);const policy=el('section');policy.append(el('h3','','4. The dialogue policy'),el('p','','Eligibility is semantic. Personality, repetition, familiarity, and wording selection are application policy.'),detail('Policy and constrained wording slots',{policy:plan.policy,slots:plan.slots}),el('p','tiny','Turn digest: '+(plan.digest||'Image acknowledgment')));box.append(policy);
+      box.append(semantics);const policy=el('section');policy.append(el('h3','','4. The dialogue policy'),el('p','','Eligibility is semantic. Personality, repetition, familiarity, and wording selection are application policy.'),detail('Policy and constrained wording slots',{policy:plan.policy,slots:plan.slots}));
+      if(plan.realizations?.length)policy.append(detail('Generated sentence plans, scopes, and grammar derivations',plan.realizations),el('p','tiny','Reported spans retain memory sources; conversational spans check speech acts; fictional spans check creative structure. These checks do not certify authored text, factual truth, humor, or literary quality.'));
+      policy.append(el('p','tiny','Turn digest: '+(plan.digest||'Image acknowledgment')));box.append(policy);
       box.append(button('Export this reply and its semantic artifact ↓','secondary',()=>download('kira-reply-proof.json',JSON.stringify({artifact:K.ARTIFACT,plan},null,2))));this.dialogOpener=document.activeElement;$('inspect-dialog').showModal();
     }
     openSettings(){const s=this.state.settings;$('persona-select').value=s.persona;$('register-range').value=s.register;$('boundary-select').value=s.boundary;this.avatarDraft=s.avatar;this.settingsLabels();this.dialogOpener=document.activeElement;

@@ -10,8 +10,8 @@ android {
         applicationId 'dev.kira.chat'
         minSdk 24
         targetSdk 36
-        versionCode 1
-        versionName '4.3.0'
+        versionCode 4
+        versionName '4.5.0'
     }
 
     buildTypes {

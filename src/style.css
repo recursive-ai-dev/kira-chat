@@ -47,6 +47,6 @@ main{order:1}
 .topbar .pill{display:none}
 .icon-button{width:44px;height:44px}
 .jump-latest{bottom:168px}
-body:has(.composer textarea:focus) .sidebar,body:has(.composer textarea:focus) .quick-prompts{display:none}
-body:has(.composer textarea:focus) .jump-latest{bottom:122px}
+body:has(.composer:focus-within) .sidebar,body:has(.composer:focus-within) .quick-prompts{display:none}
+body:has(.composer:focus-within) .jump-latest{bottom:122px}
 }

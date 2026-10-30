@@ -73,6 +73,21 @@ test('nfc and fold normalize text for matching', () => {
   assert.throws(() => K.nfc('\ud800'), /surrogate/);
 });
 
+test('canonical strings reject lone surrogates without changing valid Unicode bytes', () => {
+  for (const invalid of ['\ud800', '\udfff', 'a\ud800b', '\ud800\ud800', '\udfff\ud800']) {
+    assert.throws(() => K.canonical(invalid), /Unpaired Unicode surrogate/);
+  }
+  assert.deepEqual(Array.from(K.canonical('🎧')), [0x64, 0xf0, 0x9f, 0x8e, 0xa7]);
+  assert.deepEqual(Array.from(K.canonical('\ufffd')), [0x63, 0xef, 0xbf, 0xbd]);
+  const rejected = run(`(() => {
+    const bad = String.fromCharCode(0xd800);
+    return [{nested:[bad]}, {[bad]:'value'}].map(value => {
+      try { Kira.hash(value); return false; } catch (error) { return /surrogate/.test(error.message); }
+    });
+  })()`);
+  assert.deepEqual(rejected, [true, true], 'nested strings and map keys obey the same encoding contract');
+});
+
 
 test('merkle roots reject ungrounded evidence', () => {
   const report = run(`(() => {
@@ -97,6 +112,60 @@ test('phi yields a bounded, strictly monotone potential', () => {
   assert.equal(K.phi(0, 256), 4294967296);
   assert.equal(K.phi(255, 256), 0);
   assert.throws(() => K.phi(-1, 256));
+});
+
+test('potential and logarithm helpers reject inexact counts and unbounded precision', () => {
+  for (const invalid of [NaN, Infinity, -Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, '3', 3n, null]) {
+    assert.throws(() => K.phi(0, invalid), /Invalid potential counts/);
+    assert.throws(() => K.phi(invalid, 256), /Invalid potential counts/);
+  }
+  for (const invalid of [0, -1, NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1, '2', 0n, -1n, 2n ** 53n]) {
+    assert.throws(() => K.logInterval(invalid, 64), /positive safe integer/);
+  }
+  for (const invalid of [0, -1, 513, Infinity, 1.5, '64', 64n]) {
+    assert.throws(() => K.logInterval(2, invalid), /precision/);
+  }
+  assert.deepEqual(Array.from(K.logInterval(1n, 512)), [0n, 0n]);
+});
+
+test('logarithm intervals enclose the true value using independent rational exponential bounds', () => {
+  // For x >= 0, sum_{k=0}^m x^k/k! is a lower bound for exp(x).
+  // The tail is at most the next term / (1 - x/(m+2)). All arithmetic
+  // below is rational BigInt arithmetic, independent of the log/atanh code.
+  const precision = 24, scale = 1n << BigInt(precision), terms = 160n;
+  function expBounds(x) {
+    let numerator = 1n, denominator = 1n, power = 1n;
+    for (let k = 1n; k <= terms; k++) {
+      power *= x;
+      numerator = numerator * scale * k + power;
+      denominator *= scale * k;
+    }
+    const ratioDenominator = scale * (terms + 2n) - x;
+    assert(ratioDenominator > 0n);
+    const factor = (terms + 1n) * ratioDenominator;
+    return {
+      lower: [numerator, denominator],
+      upper: [numerator * factor + power * x * (terms + 2n), denominator * factor],
+    };
+  }
+  for (const n of [1, 2, 3, 17, 256, 1000, Number.MAX_SAFE_INTEGER]) {
+    const [lo, hi] = K.logInterval(n, precision);
+    assert(0n <= lo && lo <= hi);
+    const [lowerN, lowerD] = expBounds(lo).upper;
+    const [upperN, upperD] = expBounds(hi).lower;
+    assert(lowerN <= BigInt(n) * lowerD, `exp(lower) <= ${n}`);
+    assert(upperN >= BigInt(n) * upperD, `exp(upper) >= ${n}`);
+  }
+});
+
+test('fixed-point potentials agree with independent high-precision reference values', () => {
+  // Independently computed with Python Decimal.ln at 90 decimal digits,
+  // evaluating 2^32 * (1 - ln(hypo+1)/ln(N)), rounded half up.
+  for (const [hypo, population, expected] of [
+    [1, 3, 1585144638], [1, 256, 3758096384], [17, 256, 2056255858],
+    [199, 256, 191203252], [12345, 1000000, 1366138707],
+    [1000000, 9007199254740991, 2679770289], [9007199254740000, 9007199254740991, 0],
+  ]) assert.equal(K.phi(hypo, population), expected);
 });
 
 test('the bundled artifact passes its own checker', () => {
@@ -188,6 +257,26 @@ test('malformed queries fail with a reason instead of throwing raw', () => {
 
 test('a query pinned to another artifact is refused', () => {
   assert.equal(query({op: 'subsumes', a: 'c:coffee', b: 'c:drink', artifactHash: 'other-hash'}).outcome, 'ArtifactMismatch');
+});
+
+test('non-JSON queries produce stable checked failures instead of crashing their certificates', () => {
+  const reports = run(`(() => {
+    const base = {op:'subsumes', a:'c:coffee', b:'c:coffee'};
+    const cyclic = {...base}; cyclic.self = cyclic;
+    return [
+      {...base, extra:1n}, {...base, extra:[{value:1n}]}, {...base, a:1n},
+      {...base, extra:undefined}, {...base, extra:String.fromCharCode(0xd800)},
+      {...base, op:String.fromCharCode(0xd800)}, cyclic,
+    ].map(query => {
+      const first = __engine.query(query), second = __engine.query(query);
+      return {outcome:first.outcome, checked:first.checked, evidence:first.evidence,
+        invalidEncoding:first.query.invalidEncoding, stable:first.digest===second.digest,
+        accepted:Kira.auditQuery(Kira.ARTIFACT, query, first).accepted};
+    });
+  })()`);
+  for (const report of reports) assert.deepEqual(report, {
+    outcome:'InvalidQuery', checked:true, evidence:null, invalidEncoding:true, stable:true, accepted:true,
+  });
 });
 
 test('an experimental artifact cannot be promoted to reviewed', () => {

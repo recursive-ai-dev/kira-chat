@@ -34,7 +34,7 @@ test('SDK contains the exact companion model and does not pollute Node globals',
   const code = fs.readFileSync(path.join(__dirname, '../KiraSDK.js'), 'utf8');
   const context = vm.createContext({TextEncoder});
   vm.runInContext(code, context);
-  assert.equal(context.Kira.Narrative.version, '0.3.0');
+  assert.equal(context.Kira.Narrative.version, '0.4.0');
   assert.equal(context.Kira.APP_META.modelHash, K.APP_META.modelHash);
 });
 
@@ -71,6 +71,27 @@ test('compiler rejects unsafe identities, dangling references and ungrounded slo
   for (const mutate of bad) {
     const s = source(); mutate(s);
     assert.throws(() => K.Narrative.compile(s), /Narrative:/);
+  }
+});
+
+test('compiler enforces text limits after normalization and verifies every accepted package', () => {
+  const invalid = [
+    s => { s.version = '\u0344'.repeat(64); },
+    s => { s.speakers[0].name = '\u0344'.repeat(100); },
+    s => { s.characters[0].name = '\u0344'.repeat(100); },
+    s => { s.characters[0].fallback = '\u0344'.repeat(2000); },
+    s => { s.facts[0].text = '\u0344'.repeat(2000); },
+    s => { s.characters[0].rules[0].parts = ['\u0344'.repeat(2000)]; },
+  ];
+  for (const mutate of invalid) {
+    const definition = source(); mutate(definition);
+    assert.throws(() => K.Narrative.compile(definition), /nonempty text/);
+  }
+  for (const name of ['\u0344'.repeat(50), 'e\u0301'.repeat(50), '🧭'.repeat(50)]) {
+    const definition = source(); definition.speakers[0].name = name;
+    const compiled = K.Narrative.compile(definition);
+    assert(compiled.definition.speakers[0].name.length <= 100);
+    assert.deepEqual(K.Narrative.verify(compiled), compiled);
   }
 });
 
@@ -248,6 +269,60 @@ test('command-line compiler emits the same package as the API', () => {
     const result = spawnSync(process.execPath, ['tools/narrative.cjs', 'examples/station.json', output], {cwd:path.join(__dirname, '..'), encoding:'utf8'});
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')), K.Narrative.compile(source()));
+  } finally { fs.rmSync(dir, {recursive:true, force:true}); }
+});
+
+test('command-line compiler refuses source overwrite through paths, hard links and symlinks', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kira-narrative-alias-'));
+  try {
+    const input = path.join(dir, 'source.json'), original = JSON.stringify(source());
+    fs.writeFileSync(input, original);
+    const hardlink = path.join(dir, 'hardlink.json');
+    fs.linkSync(input, hardlink);
+    const aliases = [input, path.join(dir, '.', 'source.json'), hardlink];
+    const symlink = path.join(dir, 'symlink.json');
+    try { fs.symlinkSync(input, symlink); aliases.push(symlink); }
+    catch (error) {
+      if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
+      t.diagnostic('Windows symlink privilege unavailable; direct and hard-link aliases still checked.');
+    }
+    for (const output of aliases) {
+      const result = spawnSync(process.execPath, ['tools/narrative.cjs', input, output], {cwd:path.join(__dirname, '..'), encoding:'utf8'});
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Source and output must be different files/);
+      assert.equal(fs.readFileSync(input, 'utf8'), original);
+    }
+    assert(!fs.readdirSync(dir).some(name => name.startsWith('.kira-narrative-')));
+  } finally { fs.rmSync(dir, {recursive:true, force:true}); }
+});
+
+test('command-line compiler leaves prior output intact on validation or rename failure', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kira-narrative-atomic-'));
+  try {
+    const input = path.join(dir, 'source.json'), output = path.join(dir, 'compiled.json');
+    const prior = 'previous compiled package\n';
+    fs.writeFileSync(output, prior);
+    fs.writeFileSync(input, '{"id":"incomplete"}');
+    const failedValidation = spawnSync(process.execPath, ['tools/narrative.cjs', input, output], {cwd:path.join(__dirname, '..'), encoding:'utf8'});
+    assert.equal(failedValidation.status, 1);
+    assert.equal(fs.readFileSync(output, 'utf8'), prior);
+
+    const original = JSON.stringify(source());
+    fs.writeFileSync(input, original);
+    const preload = path.join(dir, 'fail-rename.cjs');
+    fs.writeFileSync(preload, "require('node:fs').renameSync = () => { throw new Error('simulated rename failure'); };\n");
+    const failedRename = spawnSync(process.execPath, ['--require', preload, 'tools/narrative.cjs', input, output], {cwd:path.join(__dirname, '..'), encoding:'utf8'});
+    assert.equal(failedRename.status, 1);
+    assert.match(failedRename.stderr, /simulated rename failure/);
+    assert.equal(fs.readFileSync(input, 'utf8'), original);
+    assert.equal(fs.readFileSync(output, 'utf8'), prior);
+    assert(!fs.readdirSync(dir).some(name => name.startsWith('.kira-narrative-')), 'staged files must be cleaned up');
+
+    const succeeded = spawnSync(process.execPath, ['tools/narrative.cjs', input, output], {cwd:path.join(__dirname, '..'), encoding:'utf8'});
+    assert.equal(succeeded.status, 0, succeeded.stderr);
+    assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')), K.Narrative.compile(source()));
+    assert.equal(fs.readFileSync(input, 'utf8'), original);
+    assert(!fs.readdirSync(dir).some(name => name.startsWith('.kira-narrative-')));
   } finally { fs.rmSync(dir, {recursive:true, force:true}); }
 });
 

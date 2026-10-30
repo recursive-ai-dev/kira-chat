@@ -27,11 +27,11 @@ The shipped bridges are in `themes/bridges.txt`. Each pair is declared once and 
 
 ## Position
 
-Ring centres are laid out in the plane by classical MDS on `1 − overlap`, by power iteration with a fixed start and iteration count, giving integer coordinates in [−1000, 1000]. Rings that share many concepts sit close together.
+Ring centres use a normalized spectral layout. The algorithm squares `1 − overlap`, double-centres the resulting matrix, and extracts two axes by power iteration with fixed starting vectors and iteration counts. Each axis is independently normalized and rounded to integer coordinates in [−1000, 1000]. Zero axes are retained as zero, including singleton and coincident layouts. This is a bounded conversational policy: it omits the eigenvalue scaling of classical MDS and does not guarantee preservation of pairwise distances or nearest neighbours.
 
 A conversation carries an **activation** per topic (an integer in permille). Each turn the old activation decays by 40%, the topics the message touches are pulsed (+500 for the first, +250 for others), and the strongest pulse spreads to its four nearest rings in proportion to overlap. The **position** of the conversation is the activation-weighted centroid of the ring centres. A direct-hit turn is recorded separately from spreading, so “was this discussed recently?” is not confused with “is this nearby?”.
 
-Words that sit in two rings resolve to the ring the conversation is nearer to: “teammates” is sports in a sports thread and people in a family thread.
+Words that sit in two rings resolve by highest topic activation, then highest member weight, then stable topic ID: “teammates” is sports in a sports thread and people in a family thread. Matching prefers the longest available phrase and consumes it once, so “morning routine” does not also count “routine” as a separate hit.
 
 ## Choosing the next move
 

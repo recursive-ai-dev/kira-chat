@@ -16,7 +16,7 @@
 <a class="skip-link" href="#message-input">Skip to the conversation</a>
 <div id="app">
   <aside class="sidebar">
-    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.4.0</span></a>
+    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.6.0</span></a>
     <div class="side-caption">A LITTLE CONTINUITY</div>
     <nav aria-label="Main navigation">
       <button class="nav-item active" data-screen="conversation" aria-current="page"><span aria-hidden="true">◌</span> Conversation <span class="nav-arrow">↗</span></button>
@@ -85,7 +85,7 @@
     </section>
   </main>
 </div>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2>Settings &amp; data</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
+<dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2 id="settings-title">Settings &amp; data</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
   <form id="settings-form"><div class="settings-body"><label class="field-label" for="persona-select">Kira’s personality</label><select id="persona-select"><option value="warm">Warm</option><option value="playful">Playful</option><option value="thoughtful">Thoughtful</option><option value="direct">Direct</option></select><p id="persona-description" class="tiny"></p>
     <label class="field-label" for="register-range">Wording register <output id="register-output">Neutral</output></label><input id="register-range" type="range" min="-2000" max="2000" step="500"><div class="range-labels"><span>Casual</span><span>Formal</span></div><p class="tiny">Selects approved variants inside the same meaning. It never turns “like” into “love”.</p>
     <label class="field-label" for="boundary-select">Conversation boundary</label><select id="boundary-select"><option value="platonic">Platonic company</option><option value="flirty">Light fictional flirting</option></select>
@@ -94,8 +94,8 @@
   </div></form>
   <div class="settings-data"><h3>Your conversation belongs to you.</h3><p class="tiny">Browser data can be cleared. Export a session to keep a portable backup. Images are stored as opaque attachments; Kira has no image recognition.</p><p class="tiny" id="session-size"></p><div class="button-row"><button class="secondary" id="export-button">Export session ↓</button><button class="secondary" id="import-button">Import session ↑</button></div><button class="text-button" id="export-raw">Export saved bytes for recovery</button><p class="tiny">Old Kira v3 JSON can be imported as a transcript archive. Old inferred memories and learned weights are not treated as verified facts.</p><button class="danger" id="reset-button">Reset conversation</button></div>
 </dialog>
-<dialog id="inspect-dialog" class="inspect-dialog"><div class="dialog-heading"><div><span class="eyebrow">A REPLY, OPENED UP</span><h2>Sources &amp; reasoning</h2></div><button class="icon-button" data-close="inspect-dialog" aria-label="Close reply details">×</button></div><div id="inspect-content" class="inspect-content"></div></dialog>
-<dialog id="image-dialog" class="image-dialog"><button class="icon-button" data-close="image-dialog" aria-label="Close image">×</button><img id="zoom-image" alt="Shared image"></dialog>
+<dialog id="inspect-dialog" class="inspect-dialog" aria-labelledby="inspect-title"><div class="dialog-heading"><div><span class="eyebrow">A REPLY, OPENED UP</span><h2 id="inspect-title">Sources &amp; reasoning</h2></div><button class="icon-button" data-close="inspect-dialog" aria-label="Close reply details">×</button></div><div id="inspect-content" class="inspect-content"></div></dialog>
+<dialog id="image-dialog" class="image-dialog" aria-label="Shared image"><button class="icon-button" data-close="image-dialog" aria-label="Close image">×</button><img id="zoom-image" alt="Shared image"></dialog>
 <input type="file" id="import-file" accept=".json,application/json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp" hidden><input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp" hidden>
 <noscript>Kira needs JavaScript enabled. This file works offline.</noscript>
 <script>{{KIRA_MODEL}}</script>

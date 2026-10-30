@@ -1,6 +1,8 @@
 package dev.kira.chat;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
@@ -24,9 +26,13 @@ import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
 import java.io.IOException;
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.json.JSONObject;
 
 /**
  * Hosts the single-file Kira app in a WebView. Everything runs on the device:
@@ -40,6 +46,10 @@ public class MainActivity extends Activity {
     private static final int REQ_SAVE = 2;
     private static final int NIGHT_BG = 0xFF0D1517;
     private static final int DAWN_BG = 0xFFF7F5EF;
+    // All export storage and provider I/O is serialized, including across activity recreation.
+    private static final ExecutorService EXPORT_IO = Executors.newSingleThreadExecutor();
+    private static final String SAVE_PICKER_OPEN = "kira.savePickerOpen";
+    private static final String SAVE_PICKER_ID = "kira.savePickerId";
     // Closes an open dialog, or leaves a secondary screen; reports whether it did.
     private static final String BACK_SCRIPT =
         "(function(){var d=document.querySelector('dialog[open]');if(d){d.close();return true;}"
@@ -51,13 +61,19 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private WebView web;
     private ValueCallback<Uri[]> filePicker;
-    private String pendingName;
-    private String pendingText;
+    private PendingExportStore exports;
+    private boolean exportBusy;
+    private boolean savePickerOpen;
+    private String savePickerId;
     private OnBackInvokedCallback backCallback;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        exports = new PendingExportStore(new File(getNoBackupFilesDir(), "exports"));
+        savePickerId = state != null ? state.getString(SAVE_PICKER_ID) : null;
+        savePickerOpen = state != null && state.getBoolean(SAVE_PICKER_OPEN, false) && savePickerId != null;
+        exportBusy = savePickerOpen;
         root = new FrameLayout(this);
         root.setBackgroundColor(NIGHT_BG);
         web = new WebView(this);
@@ -112,9 +128,9 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (state != null) web.restoreState(state);
-        else web.loadUrl(APP_URL);
+        if (state == null || web.restoreState(state) == null) web.loadUrl(APP_URL);
         registerBack();
+        if (!savePickerOpen) recoverExport();
     }
 
     private WebResourceResponse page() {
@@ -149,7 +165,8 @@ public class MainActivity extends Activity {
                 r = insets.getSystemWindowInsetRight(); b = insets.getSystemWindowInsetBottom();
             }
             v.setPadding(l, t, r, b);
-            return WindowInsets.CONSUMED;
+            return Build.VERSION.SDK_INT >= 30
+                ? WindowInsets.CONSUMED : insets.consumeSystemWindowInsets();
         });
         if (Build.VERSION.SDK_INT < 30) {
             root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -170,7 +187,8 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 30) {
             int mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
                 | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-            decor.getWindowInsetsController().setSystemBarsAppearance(dawn ? mask : 0, mask);
+            android.view.WindowInsetsController controller = decor.getWindowInsetsController();
+            if (controller != null) controller.setSystemBarsAppearance(dawn ? mask : 0, mask);
         } else {
             int f = decor.getSystemUiVisibility();
             int light = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -194,6 +212,8 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    // API 33+ uses the registered OnBackInvokedCallback; this override only handles older OSes.
+    @SuppressLint("GestureBackNavigation")
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
         if (Build.VERSION.SDK_INT >= 33) super.onBackPressed();
@@ -206,16 +226,19 @@ public class MainActivity extends Activity {
             filePicker.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             filePicker = null;
         } else if (req == REQ_SAVE) {
-            String text = pendingText;
-            pendingText = null;
-            if (result == RESULT_OK && data != null && data.getData() != null && text != null) {
-                try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
-                    out.write(text.getBytes(StandardCharsets.UTF_8));
-                    Toast.makeText(this, "Saved " + pendingName, Toast.LENGTH_SHORT).show();
-                } catch (IOException | RuntimeException e) {
-                    Toast.makeText(this, "Could not save the file", Toast.LENGTH_LONG).show();
-                }
+            // A result belongs to the export that opened this picker, even if another
+            // activity has since discarded it and staged a different pending export.
+            if (!savePickerOpen || savePickerId == null) return;
+            String expectedId = savePickerId;
+            savePickerOpen = false;
+            savePickerId = null;
+            exportBusy = true;
+            Uri destination = result == RESULT_OK && data != null ? data.getData() : null;
+            if (result == RESULT_OK && destination == null) {
+                exportResult("error", "export", "The document picker returned no file. The pending export is retained.");
+                return;
             }
+            EXPORT_IO.execute(() -> completeExport(destination, expectedId));
         } else {
             super.onActivityResult(req, result, data);
         }
@@ -224,6 +247,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
+        out.putBoolean(SAVE_PICKER_OPEN, savePickerOpen);
+        out.putString(SAVE_PICKER_ID, savePickerId);
         web.saveState(out);
     }
 
@@ -244,8 +269,111 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null) {
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
         }
+        if (filePicker != null) {
+            filePicker.onReceiveValue(null);
+            filePicker = null;
+        }
+        web.removeJavascriptInterface("KiraHost");
+        root.removeView(web);
         web.destroy();
         super.onDestroy();
+    }
+
+    private void openSavePicker(PendingExportStore.Entry entry) {
+        if (isDestroyed() || isFinishing()) return; // durable staging is recovered on the next launch
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/json")
+            .putExtra(Intent.EXTRA_TITLE, entry.name);
+        savePickerOpen = true;
+        savePickerId = entry.id;
+        exportBusy = true;
+        try {
+            startActivityForResult(intent, REQ_SAVE);
+        } catch (ActivityNotFoundException | SecurityException e) {
+            savePickerOpen = false;
+            savePickerId = null;
+            exportBusy = false;
+            exportResult("error", entry.name, "No app can save files here. The export remains available to retry.");
+        }
+    }
+
+    private void completeExport(Uri destination, String expectedId) {
+        String name = "export";
+        try {
+            // Check identity before opening/truncating the document provider's file.
+            // EXPORT_IO serializes this check, the write, and all staging/discards.
+            PendingExportStore.Entry entry = exports.requireEntry(expectedId);
+            name = entry.name;
+            if (destination == null) {
+                exports.discard(expectedId);
+                exportResult("cancelled", name, "Export cancelled");
+                return;
+            }
+            try (OutputStream out = getContentResolver().openOutputStream(destination, "wt")) {
+                exports.writeTo(expectedId, out);
+            }
+            // Clear only after the provider has successfully closed the destination.
+            try {
+                exports.discard(expectedId);
+                exportResult("saved", name, "Saved " + name);
+            } catch (IOException e) {
+                exportResult("saved", name, "Saved " + name + ". A pending local copy remains available.");
+            }
+        } catch (IOException | RuntimeException e) {
+            exportResult("error", name, "Could not save the file. The pending export is retained; retry Export to recover it.");
+        }
+    }
+
+    private void exportResult(String status, String name, String message) {
+        runOnUiThread(() -> {
+            if (isDestroyed() || isFinishing()) return;
+            exportBusy = false;
+            Toast.makeText(this, message, "error".equals(status) ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
+            String detail = "{status:" + JSONObject.quote(status) + ",name:" + JSONObject.quote(name)
+                + ",message:" + JSONObject.quote(message) + "}";
+            web.evaluateJavascript("window.dispatchEvent(new CustomEvent('kira-export-result',{detail:"
+                + detail + "}));", null);
+        });
+    }
+
+    private void recoverExport() {
+        exportBusy = true;
+        EXPORT_IO.execute(() -> {
+            try {
+                PendingExportStore.Entry entry = exports.peek();
+                runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
+                    if (entry == null) { exportBusy = false; return; }
+                    new AlertDialog.Builder(this)
+                        .setTitle("Finish pending export")
+                        .setMessage("A saved copy of " + entry.name + " is waiting for a destination.")
+                        .setPositiveButton("Save", (dialog, which) -> openSavePicker(entry))
+                        .setNegativeButton("Discard", (dialog, which) ->
+                            EXPORT_IO.execute(() -> completeExport(null, entry.id)))
+                        .setOnCancelListener(dialog -> exportBusy = false)
+                        .show();
+                });
+            } catch (IOException | RuntimeException e) {
+                runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
+                    new AlertDialog.Builder(this)
+                        .setTitle("Damaged pending export")
+                        .setMessage("This unfinished export cannot be read. Your conversation is still saved in Kira. Discard the damaged copy to export again.")
+                        .setPositiveButton("Discard", (dialog, which) -> EXPORT_IO.execute(() -> {
+                            try {
+                                exports.discardDamaged();
+                                exportResult("cancelled", "export", "Damaged pending export discarded");
+                            } catch (IOException | RuntimeException failure) {
+                                exportResult("error", "export", "Could not discard the pending export");
+                            }
+                        }))
+                        .setNegativeButton("Keep", (dialog, which) -> exportBusy = false)
+                        .setOnCancelListener(dialog -> exportBusy = false)
+                        .show();
+                });
+            }
+        });
     }
 
     /** Called by the page as window.KiraHost. */
@@ -253,24 +381,33 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void saveFile(String name, String text) {
             runOnUiThread(() -> {
-                pendingName = name;
-                pendingText = text;
-                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("application/json")
-                    .putExtra(Intent.EXTRA_TITLE, name);
-                try {
-                    startActivityForResult(i, REQ_SAVE);
-                } catch (ActivityNotFoundException e) {
-                    pendingText = null;
-                    Toast.makeText(MainActivity.this, "No app can save files here", Toast.LENGTH_LONG).show();
+                if (isDestroyed() || isFinishing()) return;
+                if (exportBusy) {
+                    Toast.makeText(MainActivity.this, "Finish or cancel the current export first", Toast.LENGTH_LONG).show();
+                    return;
                 }
+                exportBusy = true;
+                EXPORT_IO.execute(() -> {
+                    try {
+                        try {
+                            if (exports.peek() != null) { runOnUiThread(MainActivity.this::recoverExport); return; }
+                        } catch (IOException damaged) {
+                            runOnUiThread(MainActivity.this::recoverExport);
+                            return;
+                        }
+                        PendingExportStore.Entry entry = exports.stage(name, text);
+                        runOnUiThread(() -> openSavePicker(entry));
+                    } catch (IOException | RuntimeException e) {
+                        exportResult("error", name, "Could not prepare the export. Your conversation has not changed.");
+                    }
+                });
             });
         }
 
         @JavascriptInterface
         public void setTheme(String theme) {
-            runOnUiThread(() -> applyTheme("dawn".equals(theme)));
+            runOnUiThread(() -> { if (!isDestroyed()) applyTheme("dawn".equals(theme)); });
         }
+
     }
 }

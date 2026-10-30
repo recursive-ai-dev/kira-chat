@@ -1,6 +1,6 @@
 {
   "name": "kira-chat",
-  "version": "4.5.0",
+  "version": "4.6.0",
   "private": true,
   "description": "Offline dialogue and a deterministic multi-character narrative SDK with attributed memory, knowledge, and replay.",
   "license": "Apache-2.0",
@@ -17,9 +17,12 @@
     "demo": "python3 -m http.server 8042 --bind 127.0.0.1",
     "example": "node examples/station.cjs",
     "compile:narrative": "node tools/narrative.cjs",
-    "apk": "cd android && gradle --no-daemon assembleRelease",
+    "apk": "cd android && ./gradlew --no-daemon assembleRelease",
     "themes": "node tools/build-themes.cjs",
-    "vocab": "node tools/extend-artifact.cjs && python3 tools/build.py --pin"
+    "vocab": "node tools/extend-artifact.cjs && python3 tools/build.py --pin",
+    "android:verify": "cd android && ./gradlew --no-daemon lintRelease testReleaseUnitTest assembleRelease bundleRelease",
+    "dist": "python3 tools/package-release.py",
+    "test:browser": "node tools/browser-smoke.cjs"
   },
   "files": [
     "Kira.html",
@@ -33,5 +36,8 @@
     "android",
     "themes"
   ],
-  "main": "KiraSDK.js"
+  "main": "KiraSDK.js",
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
 }

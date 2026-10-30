@@ -59,8 +59,8 @@ main{order:1}
 .topbar .pill{display:none}
 .icon-button{width:44px;height:44px}
 .jump-latest{bottom:168px}
-body:has(.composer textarea:focus) .sidebar,body:has(.composer textarea:focus) .quick-prompts{display:none}
-body:has(.composer textarea:focus) .jump-latest{bottom:122px}
+body:has(.composer:focus-within) .sidebar,body:has(.composer:focus-within) .quick-prompts{display:none}
+body:has(.composer:focus-within) .jump-latest{bottom:122px}
 }
 </style>
 </head>
@@ -68,7 +68,7 @@ body:has(.composer textarea:focus) .jump-latest{bottom:122px}
 <a class="skip-link" href="#message-input">Skip to the conversation</a>
 <div id="app">
   <aside class="sidebar">
-    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.4.0</span></a>
+    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.6.0</span></a>
     <div class="side-caption">A LITTLE CONTINUITY</div>
     <nav aria-label="Main navigation">
       <button class="nav-item active" data-screen="conversation" aria-current="page"><span aria-hidden="true">◌</span> Conversation <span class="nav-arrow">↗</span></button>
@@ -137,7 +137,7 @@ body:has(.composer textarea:focus) .jump-latest{bottom:122px}
     </section>
   </main>
 </div>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2>Settings &amp; data</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
+<dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2 id="settings-title">Settings &amp; data</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">×</button></div>
   <form id="settings-form"><div class="settings-body"><label class="field-label" for="persona-select">Kira’s personality</label><select id="persona-select"><option value="warm">Warm</option><option value="playful">Playful</option><option value="thoughtful">Thoughtful</option><option value="direct">Direct</option></select><p id="persona-description" class="tiny"></p>
     <label class="field-label" for="register-range">Wording register <output id="register-output">Neutral</output></label><input id="register-range" type="range" min="-2000" max="2000" step="500"><div class="range-labels"><span>Casual</span><span>Formal</span></div><p class="tiny">Selects approved variants inside the same meaning. It never turns “like” into “love”.</p>
     <label class="field-label" for="boundary-select">Conversation boundary</label><select id="boundary-select"><option value="platonic">Platonic company</option><option value="flirty">Light fictional flirting</option></select>
@@ -146,8 +146,8 @@ body:has(.composer textarea:focus) .jump-latest{bottom:122px}
   </div></form>
   <div class="settings-data"><h3>Your conversation belongs to you.</h3><p class="tiny">Browser data can be cleared. Export a session to keep a portable backup. Images are stored as opaque attachments; Kira has no image recognition.</p><p class="tiny" id="session-size"></p><div class="button-row"><button class="secondary" id="export-button">Export session ↓</button><button class="secondary" id="import-button">Import session ↑</button></div><button class="text-button" id="export-raw">Export saved bytes for recovery</button><p class="tiny">Old Kira v3 JSON can be imported as a transcript archive. Old inferred memories and learned weights are not treated as verified facts.</p><button class="danger" id="reset-button">Reset conversation</button></div>
 </dialog>
-<dialog id="inspect-dialog" class="inspect-dialog"><div class="dialog-heading"><div><span class="eyebrow">A REPLY, OPENED UP</span><h2>Sources &amp; reasoning</h2></div><button class="icon-button" data-close="inspect-dialog" aria-label="Close reply details">×</button></div><div id="inspect-content" class="inspect-content"></div></dialog>
-<dialog id="image-dialog" class="image-dialog"><button class="icon-button" data-close="image-dialog" aria-label="Close image">×</button><img id="zoom-image" alt="Shared image"></dialog>
+<dialog id="inspect-dialog" class="inspect-dialog" aria-labelledby="inspect-title"><div class="dialog-heading"><div><span class="eyebrow">A REPLY, OPENED UP</span><h2 id="inspect-title">Sources &amp; reasoning</h2></div><button class="icon-button" data-close="inspect-dialog" aria-label="Close reply details">×</button></div><div id="inspect-content" class="inspect-content"></div></dialog>
+<dialog id="image-dialog" class="image-dialog" aria-label="Shared image"><button class="icon-button" data-close="image-dialog" aria-label="Close image">×</button><img id="zoom-image" alt="Shared image"></dialog>
 <input type="file" id="import-file" accept=".json,application/json" hidden><input type="file" id="image-file" accept="image/png,image/jpeg,image/webp" hidden><input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp" hidden>
 <noscript>Kira needs JavaScript enabled. This file works offline.</noscript>
 <script>'use strict';
@@ -179,7 +179,19 @@ globalThis.Kira = globalThis.Kira || {};
         if (typeof v === 'number' && !Number.isSafeInteger(v)) throw Error('Canonical numbers must be exact integers');
         const n = BigInt(v); head(n < 0n ? 1 : 0, n < 0n ? -1n - n : n); return;
       }
-      if (typeof v === 'string') { const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return; }
+      if (typeof v === 'string') {
+        // TextEncoder replaces lone UTF-16 surrogates with U+FFFD. Reject them
+        // first: canonical encodings must distinguish every admitted string,
+        // including object keys, instead of silently repairing their contents.
+        for (let i = 0; i < v.length; i++) {
+          const unit = v.charCodeAt(i);
+          if (unit >= 0xd800 && unit <= 0xdbff) {
+            const next = v.charCodeAt(++i);
+            if (!(next >= 0xdc00 && next <= 0xdfff)) throw Error('Unpaired Unicode surrogate');
+          } else if (unit >= 0xdc00 && unit <= 0xdfff) throw Error('Unpaired Unicode surrogate');
+        }
+        const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return;
+      }
       if (Array.isArray(v)) { head(4, v.length); for (const x of v) write(x); return; }
       if (typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
         const entries = Object.keys(v).map(k => [canonical(k), k]).sort((a,b) => bytesCmp(a[0], b[0]));
@@ -220,6 +232,9 @@ globalThis.Kira = globalThis.Kira || {};
   // Range reduction gives 1 <= m < 2. All divisions round outwards; tail is geometric.
   const ceilDiv = (a,b) => (a+b-1n)/b;
   function logInterval(n, p) {
+    assert((typeof n==='number'&&Number.isSafeInteger(n)&&n>=1)||
+      (typeof n==='bigint'&&n>=1n&&n<=BigInt(Number.MAX_SAFE_INTEGER)),'Logarithm input must be a positive safe integer');
+    assert(Number.isSafeInteger(p)&&p>=1&&p<=512,'Logarithm precision must be an integer in 1..512');
     n=BigInt(n); const Q=1n<<BigInt(p); let k=0n,t=n;
     while(t>=2n){t>>=1n;k++;}
     function series(num,den) {
@@ -239,7 +254,7 @@ globalThis.Kira = globalThis.Kira || {};
     return [a+k*c,b+k*d];
   }
   function phi(hypo,N) {
-    assert(Number.isInteger(hypo)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
+    assert(Number.isSafeInteger(hypo)&&Number.isSafeInteger(N)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
     if(hypo===0)return 4294967296;if(hypo===N-1)return 0;
     for(let p=64;p<=512;p*=2) {
       const [a,b]=logInterval(hypo+1,p),[c,d]=logInterval(N,p), Q=4294967296n;
@@ -386,7 +401,9 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   const bad=m=>{throw new QueryError('InvalidQuery',m);};
   const allowed=['subsumes','existential','relation','entails','shift','realize','route','path_cost'];
   function validateQuery(a,q){
-    try{K.canonical(q);}catch{bad('Query is not canonical JSON data');}
+    // The canonical encoder also supports CBOR integers outside JSON's domain.
+    // Every accepted query must survive the JSON cloning used by certificates.
+    try{K.canonical(q);K.clone(q);}catch{bad('Query is not canonical JSON data');}
     if(!q||typeof q!=='object'||Array.isArray(q)||typeof q.op!=='string')bad('Query object required');
     if(q.artifactHash&&q.artifactHash!==a.hash)throw new QueryError('ArtifactMismatch','Query references another artifact');
     if(!allowed.includes(q.op))throw new QueryError('UnsupportedOperator','Unsupported operation: '+q.op);
@@ -418,7 +435,12 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     return {...base,digest:K.hash({artifact:a.hash,query:q,result:{outcome,value},evidenceRoot:evidence.root})};
   }
   function failure(a,q,e){
-    let query;try{K.canonical(q);query=K.clone(q);}catch{query={op:typeof q?.op==='string'?q.op:'invalid',invalidEncoding:true};}
+    let query;try{K.canonical(q);query=K.clone(q);}catch{
+      // Never copy malformed Unicode (or invoke a throwing property getter)
+      // into the very error certificate reporting that encoding failure.
+      let op='invalid';try{if(typeof q?.op==='string'&&/^[a-z_]{1,64}$/.test(q.op))op=q.op;}catch{}
+      query={op,invalidEncoding:true};
+    }
     return {artifactHash:a.hash,query,outcome:e.outcome||'InvalidQuery',value:{reason:e.message},evidence:null,digest:K.hash({artifact:a.hash,query,outcome:e.outcome||'InvalidQuery',reason:e.message})};
   }
   const distance=(s,target)=>Number(s.lin.reduce((v,x,i)=>v+BigInt(Math.abs(x-target[i])),0n));
@@ -1179,7 +1201,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
 // Every topic is a ring of weighted members: curated concepts (1.0), theme-pack words (0.9), declared
 // overlap words (0.8) and the taxonomic neighbours of members (about 0.5). Two rings overlap by the
 // members they share; those shared members are the bridges between them. Ring centres are laid out in
-// the plane by classical MDS on 1 - overlap, and a conversation carries a per-topic activation that
+// the plane by a normalized spectral projection of 1 - overlap, and a conversation carries a per-topic activation that
 // decays each turn and spreads to neighbouring rings in proportion to overlap. Its weighted centroid
 // is the conversation's position in the field.
 //
@@ -1241,6 +1263,8 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       // ring too, which is what makes neighbouring rings overlap.
       for(const [t,ids] of core)for(const id of ids)for(const [n,w] of this.neighbours(id))this.put(t,label(engine.concepts.get(n).label),w);
       this.topics=[...this.rings.keys()].sort(cmpLabel);
+      this.memberMaxWords=1;
+      for(const ring of this.rings.values())for(const word of ring.keys())this.memberMaxWords=Math.max(this.memberMaxWords,word.split(/\s+/).length);
     }
     /** Weighted Jaccard overlap of two rings, in permille. */
     overlap(a,b){
@@ -1262,9 +1286,13 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       for(const [w,x] of ra)if(rb.has(w))out.push({word:w,weight:Math.min(x,rb.get(w))});
       return out.sort((p,q)=>q.weight-p.weight||cmpLabel(p.word,q.word));
     }
-    /** Classical MDS on 1 - overlap, by power iteration. Integer coordinates in [-1000, 1000]. */
+    /** Normalized spectral layout of double-centered squared distances.
+     * Each axis is scaled independently, without eigenvalue scaling; this is
+     * a bounded policy layout, not a distance-preserving classical MDS embedding.
+     */
     layout(){
       const T=this.topics,n=T.length,D=[];
+      if(n<=1){this.centre=new Map(T.map(t=>[t,{x:0,y:0}]));return;}
       for(let i=0;i<n;i++){D.push([]);for(let j=0;j<n;j++){const d=1-this.overlap(T[i],T[j])/1000;D[i].push(d*d);}}
       const rowMean=D.map(r=>r.reduce((s,x)=>s+x,0)/n),total=rowMean.reduce((s,x)=>s+x,0)/n,B=[];
       for(let i=0;i<n;i++){B.push([]);for(let j=0;j<n;j++)B[i].push(-0.5*(D[i][j]-rowMean[i]-rowMean[j]+total));}
@@ -1273,7 +1301,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         let v=T.map((_,i)=>((i*37+k*11)%n)-n/2+0.5);
         for(let iter=0;iter<300;iter++){
           let w=B.map(row=>row.reduce((s,x,j)=>s+x*v[j],0));
-          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
+          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);if(norm>0)for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
           const top=w.reduce((m,x)=>Math.max(m,Math.abs(x)),0)||1;
           v=w.map(x=>x/top);
         }
@@ -1289,11 +1317,15 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       const words=K.fold(text).replace(/[^a-z0-9' -]+/g,' ').split(/\s+/).filter(Boolean).slice(0,60),out=[];
       const topicsFor=w=>this.topics.filter(t=>(this.rings.get(t).get(w)||0)>=800);
       for(let i=0;i<words.length;i++){
-        const candidates=(i+1<words.length&&topicsFor(words[i]+' '+words[i+1]))||[];
-        const found=candidates.length?candidates:topicsFor(words[i]);
+        let found=[],member='',length=0;
+        for(let size=Math.min(this.memberMaxWords,words.length-i);size>=1;size--){
+          const phrase=words.slice(i,i+size).join(' '),matches=topicsFor(phrase);
+          if(matches.length){found=matches;member=phrase;length=size;break;}
+        }
         if(!found.length)continue;
-        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(words[i])-this.rings.get(a).get(words[i])||cmpLabel(a,b))[0];
+        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(member)-this.rings.get(a).get(member)||cmpLabel(a,b))[0];
         if(!out.includes(pick))out.push(pick);
+        i+=length-1;
       }
       return out;
     }
@@ -2180,11 +2212,23 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     const memory={...K.clone(frame),id,sourceMessage,resolutionMessage:resolutionMessage||null,turn:state.turn,status:'active',supersedes,supersededBy:null};
     state.memories.push(memory);return {memory,created:true};
   }
-  const supportedImage=s=>typeof s==='string'&&s.length<=MAX_IMAGE&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s);
+  const supportedImage=s=>{
+    if(typeof s!=='string'||s.length>MAX_IMAGE)return false;
+    const match=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(s);
+    if(!match||match[0].length!==s.length)return false;
+    const data=match[1];
+    if(data.length%4!==0)return false;
+    // Canonical padding includes zero unused bits in the final sextet.
+    if(data.endsWith('=='))return /[AQgw]==$/.test(data);
+    if(data.endsWith('='))return /[AEIMQUYcgkosw048]=$/.test(data);
+    return true;
+  };
   function validateEvent(state,e){
-    K.assert(e&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
+    K.assert(e&&typeof e==='object'&&!Array.isArray(e)&&Number.isSafeInteger(e.seq)&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
     K.assert(Number.isSafeInteger(e.time)&&e.time>=0&&e.time<=8640000000000000,'Explicit timestamp required');
     K.assert(['message','settings','retire','image','legacy'].includes(e.type),'Unknown event type');
+    const fields={message:['text'],settings:['settings'],retire:['memoryId'],image:['data'],legacy:['messages']};
+    K.assert(Object.keys(e).every(key=>['seq','time','type'].includes(key)||fields[e.type].includes(key)),'Event has unknown or mismatched fields');
     if(e.type==='message')K.assert(typeof e.text==='string'&&e.text.trim().length&&e.text.length<=2000,'Message must contain 1–2000 characters');
     if(e.type==='settings'){
       const s=e.settings;K.assert(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['persona','register','theme','avatar','boundary'].includes(k)),'Unknown setting');
@@ -2196,7 +2240,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     }
     if(e.type==='image')K.assert(supportedImage(e.data),'Invalid or oversized image');
     if(e.type==='retire')K.assert(typeof e.memoryId==='string'&&state.memories.some(m=>m.id===e.memoryId&&m.status==='active'),'Memory is not active');
-    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&e.messages.every(m=>['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
+    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&Array.from(e.messages).every(m=>m&&typeof m==='object'&&!Array.isArray(m)&&['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
   }
   function choose(state,name,persona){
     const items=K.DIALOGUE.responses[name];K.assert(items?.length,'Missing response family '+name);
@@ -2523,7 +2567,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"bbc697c38b97e93d6e16f4f1242ddbfcf8b89a105df7587f2032ea6e68df9d9e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f00b34d4e4d0682f6e2dd506b76ef55a7f688f146ce3bf29b3b7f9ec6f1933b6","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -2554,7 +2598,19 @@ globalThis.Kira = globalThis.Kira || {};
         if (typeof v === 'number' && !Number.isSafeInteger(v)) throw Error('Canonical numbers must be exact integers');
         const n = BigInt(v); head(n < 0n ? 1 : 0, n < 0n ? -1n - n : n); return;
       }
-      if (typeof v === 'string') { const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return; }
+      if (typeof v === 'string') {
+        // TextEncoder replaces lone UTF-16 surrogates with U+FFFD. Reject them
+        // first: canonical encodings must distinguish every admitted string,
+        // including object keys, instead of silently repairing their contents.
+        for (let i = 0; i < v.length; i++) {
+          const unit = v.charCodeAt(i);
+          if (unit >= 0xd800 && unit <= 0xdbff) {
+            const next = v.charCodeAt(++i);
+            if (!(next >= 0xdc00 && next <= 0xdfff)) throw Error('Unpaired Unicode surrogate');
+          } else if (unit >= 0xdc00 && unit <= 0xdfff) throw Error('Unpaired Unicode surrogate');
+        }
+        const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return;
+      }
       if (Array.isArray(v)) { head(4, v.length); for (const x of v) write(x); return; }
       if (typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
         const entries = Object.keys(v).map(k => [canonical(k), k]).sort((a,b) => bytesCmp(a[0], b[0]));
@@ -2595,6 +2651,9 @@ globalThis.Kira = globalThis.Kira || {};
   // Range reduction gives 1 <= m < 2. All divisions round outwards; tail is geometric.
   const ceilDiv = (a,b) => (a+b-1n)/b;
   function logInterval(n, p) {
+    assert((typeof n==='number'&&Number.isSafeInteger(n)&&n>=1)||
+      (typeof n==='bigint'&&n>=1n&&n<=BigInt(Number.MAX_SAFE_INTEGER)),'Logarithm input must be a positive safe integer');
+    assert(Number.isSafeInteger(p)&&p>=1&&p<=512,'Logarithm precision must be an integer in 1..512');
     n=BigInt(n); const Q=1n<<BigInt(p); let k=0n,t=n;
     while(t>=2n){t>>=1n;k++;}
     function series(num,den) {
@@ -2614,7 +2673,7 @@ globalThis.Kira = globalThis.Kira || {};
     return [a+k*c,b+k*d];
   }
   function phi(hypo,N) {
-    assert(Number.isInteger(hypo)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
+    assert(Number.isSafeInteger(hypo)&&Number.isSafeInteger(N)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
     if(hypo===0)return 4294967296;if(hypo===N-1)return 0;
     for(let p=64;p<=512;p*=2) {
       const [a,b]=logInterval(hypo+1,p),[c,d]=logInterval(N,p), Q=4294967296n;
@@ -2761,7 +2820,9 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   const bad=m=>{throw new QueryError('InvalidQuery',m);};
   const allowed=['subsumes','existential','relation','entails','shift','realize','route','path_cost'];
   function validateQuery(a,q){
-    try{K.canonical(q);}catch{bad('Query is not canonical JSON data');}
+    // The canonical encoder also supports CBOR integers outside JSON's domain.
+    // Every accepted query must survive the JSON cloning used by certificates.
+    try{K.canonical(q);K.clone(q);}catch{bad('Query is not canonical JSON data');}
     if(!q||typeof q!=='object'||Array.isArray(q)||typeof q.op!=='string')bad('Query object required');
     if(q.artifactHash&&q.artifactHash!==a.hash)throw new QueryError('ArtifactMismatch','Query references another artifact');
     if(!allowed.includes(q.op))throw new QueryError('UnsupportedOperator','Unsupported operation: '+q.op);
@@ -2793,7 +2854,12 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     return {...base,digest:K.hash({artifact:a.hash,query:q,result:{outcome,value},evidenceRoot:evidence.root})};
   }
   function failure(a,q,e){
-    let query;try{K.canonical(q);query=K.clone(q);}catch{query={op:typeof q?.op==='string'?q.op:'invalid',invalidEncoding:true};}
+    let query;try{K.canonical(q);query=K.clone(q);}catch{
+      // Never copy malformed Unicode (or invoke a throwing property getter)
+      // into the very error certificate reporting that encoding failure.
+      let op='invalid';try{if(typeof q?.op==='string'&&/^[a-z_]{1,64}$/.test(q.op))op=q.op;}catch{}
+      query={op,invalidEncoding:true};
+    }
     return {artifactHash:a.hash,query,outcome:e.outcome||'InvalidQuery',value:{reason:e.message},evidence:null,digest:K.hash({artifact:a.hash,query,outcome:e.outcome||'InvalidQuery',reason:e.message})};
   }
   const distance=(s,target)=>Number(s.lin.reduce((v,x,i)=>v+BigInt(Math.abs(x-target[i])),0n));
@@ -3554,7 +3620,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
 // Every topic is a ring of weighted members: curated concepts (1.0), theme-pack words (0.9), declared
 // overlap words (0.8) and the taxonomic neighbours of members (about 0.5). Two rings overlap by the
 // members they share; those shared members are the bridges between them. Ring centres are laid out in
-// the plane by classical MDS on 1 - overlap, and a conversation carries a per-topic activation that
+// the plane by a normalized spectral projection of 1 - overlap, and a conversation carries a per-topic activation that
 // decays each turn and spreads to neighbouring rings in proportion to overlap. Its weighted centroid
 // is the conversation's position in the field.
 //
@@ -3616,6 +3682,8 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       // ring too, which is what makes neighbouring rings overlap.
       for(const [t,ids] of core)for(const id of ids)for(const [n,w] of this.neighbours(id))this.put(t,label(engine.concepts.get(n).label),w);
       this.topics=[...this.rings.keys()].sort(cmpLabel);
+      this.memberMaxWords=1;
+      for(const ring of this.rings.values())for(const word of ring.keys())this.memberMaxWords=Math.max(this.memberMaxWords,word.split(/\s+/).length);
     }
     /** Weighted Jaccard overlap of two rings, in permille. */
     overlap(a,b){
@@ -3637,9 +3705,13 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       for(const [w,x] of ra)if(rb.has(w))out.push({word:w,weight:Math.min(x,rb.get(w))});
       return out.sort((p,q)=>q.weight-p.weight||cmpLabel(p.word,q.word));
     }
-    /** Classical MDS on 1 - overlap, by power iteration. Integer coordinates in [-1000, 1000]. */
+    /** Normalized spectral layout of double-centered squared distances.
+     * Each axis is scaled independently, without eigenvalue scaling; this is
+     * a bounded policy layout, not a distance-preserving classical MDS embedding.
+     */
     layout(){
       const T=this.topics,n=T.length,D=[];
+      if(n<=1){this.centre=new Map(T.map(t=>[t,{x:0,y:0}]));return;}
       for(let i=0;i<n;i++){D.push([]);for(let j=0;j<n;j++){const d=1-this.overlap(T[i],T[j])/1000;D[i].push(d*d);}}
       const rowMean=D.map(r=>r.reduce((s,x)=>s+x,0)/n),total=rowMean.reduce((s,x)=>s+x,0)/n,B=[];
       for(let i=0;i<n;i++){B.push([]);for(let j=0;j<n;j++)B[i].push(-0.5*(D[i][j]-rowMean[i]-rowMean[j]+total));}
@@ -3648,7 +3720,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         let v=T.map((_,i)=>((i*37+k*11)%n)-n/2+0.5);
         for(let iter=0;iter<300;iter++){
           let w=B.map(row=>row.reduce((s,x,j)=>s+x*v[j],0));
-          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
+          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);if(norm>0)for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
           const top=w.reduce((m,x)=>Math.max(m,Math.abs(x)),0)||1;
           v=w.map(x=>x/top);
         }
@@ -3664,11 +3736,15 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       const words=K.fold(text).replace(/[^a-z0-9' -]+/g,' ').split(/\s+/).filter(Boolean).slice(0,60),out=[];
       const topicsFor=w=>this.topics.filter(t=>(this.rings.get(t).get(w)||0)>=800);
       for(let i=0;i<words.length;i++){
-        const candidates=(i+1<words.length&&topicsFor(words[i]+' '+words[i+1]))||[];
-        const found=candidates.length?candidates:topicsFor(words[i]);
+        let found=[],member='',length=0;
+        for(let size=Math.min(this.memberMaxWords,words.length-i);size>=1;size--){
+          const phrase=words.slice(i,i+size).join(' '),matches=topicsFor(phrase);
+          if(matches.length){found=matches;member=phrase;length=size;break;}
+        }
         if(!found.length)continue;
-        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(words[i])-this.rings.get(a).get(words[i])||cmpLabel(a,b))[0];
+        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(member)-this.rings.get(a).get(member)||cmpLabel(a,b))[0];
         if(!out.includes(pick))out.push(pick);
+        i+=length-1;
       }
       return out;
     }
@@ -4555,11 +4631,23 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     const memory={...K.clone(frame),id,sourceMessage,resolutionMessage:resolutionMessage||null,turn:state.turn,status:'active',supersedes,supersededBy:null};
     state.memories.push(memory);return {memory,created:true};
   }
-  const supportedImage=s=>typeof s==='string'&&s.length<=MAX_IMAGE&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s);
+  const supportedImage=s=>{
+    if(typeof s!=='string'||s.length>MAX_IMAGE)return false;
+    const match=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(s);
+    if(!match||match[0].length!==s.length)return false;
+    const data=match[1];
+    if(data.length%4!==0)return false;
+    // Canonical padding includes zero unused bits in the final sextet.
+    if(data.endsWith('=='))return /[AQgw]==$/.test(data);
+    if(data.endsWith('='))return /[AEIMQUYcgkosw048]=$/.test(data);
+    return true;
+  };
   function validateEvent(state,e){
-    K.assert(e&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
+    K.assert(e&&typeof e==='object'&&!Array.isArray(e)&&Number.isSafeInteger(e.seq)&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
     K.assert(Number.isSafeInteger(e.time)&&e.time>=0&&e.time<=8640000000000000,'Explicit timestamp required');
     K.assert(['message','settings','retire','image','legacy'].includes(e.type),'Unknown event type');
+    const fields={message:['text'],settings:['settings'],retire:['memoryId'],image:['data'],legacy:['messages']};
+    K.assert(Object.keys(e).every(key=>['seq','time','type'].includes(key)||fields[e.type].includes(key)),'Event has unknown or mismatched fields');
     if(e.type==='message')K.assert(typeof e.text==='string'&&e.text.trim().length&&e.text.length<=2000,'Message must contain 1–2000 characters');
     if(e.type==='settings'){
       const s=e.settings;K.assert(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['persona','register','theme','avatar','boundary'].includes(k)),'Unknown setting');
@@ -4571,7 +4659,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     }
     if(e.type==='image')K.assert(supportedImage(e.data),'Invalid or oversized image');
     if(e.type==='retire')K.assert(typeof e.memoryId==='string'&&state.memories.some(m=>m.id===e.memoryId&&m.status==='active'),'Memory is not active');
-    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&e.messages.every(m=>['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
+    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&Array.from(e.messages).every(m=>m&&typeof m==='object'&&!Array.isArray(m)&&['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
   }
   function choose(state,name,persona){
     const items=K.DIALOGUE.responses[name];K.assert(items?.length,'Missing response family '+name);
@@ -4898,7 +4986,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"bbc697c38b97e93d6e16f4f1242ddbfcf8b89a105df7587f2032ea6e68df9d9e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f00b34d4e4d0682f6e2dd506b76ef55a7f688f146ce3bf29b3b7f9ec6f1933b6","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);
@@ -4920,44 +5008,57 @@ self.onmessage=event=>{
 <script>'use strict';
 // Adapter: one atomic localStorage value holds the complete version-pinned event log.
 (function(K){
-  const KEY='kira_rse_4_4_0';
+  const KEY='kira_rse_4_6_0',MAX_SESSION_BYTES=4500000;
+  const sessionBytes=text=>new TextEncoder().encode(text).length;
+  function encodeSession(envelope){const encoded=JSON.stringify(envelope);K.assert(sessionBytes(encoded)<MAX_SESSION_BYTES,'Session is approaching the storage limit. Export it and begin a new conversation.');return encoded;}
   function pack(events,state,meta){const payload={format:'kira-session/4.1',assets:meta,events,stateDigest:K.hash(state)};return {...payload,checksum:K.hash(payload)};}
   function inspectEnvelope(value,meta){
     K.assert(value&&value.format==='kira-session/4.1','Unsupported save format');
+    K.assert(Array.isArray(value.events)&&value.events.length<=K.MAX_EVENTS,'Invalid event log');
+    encodeSession(value);
     const payload={format:value.format,assets:value.assets,events:value.events,stateDigest:value.stateDigest};
     K.assert(value.checksum===K.hash(payload),'Save checksum mismatch');
     K.assert(K.hash(value.assets)===K.hash(meta),'This save requires a different version of Kira. Open it with its original app; the current session has not been changed.');
-    K.assert(Array.isArray(value.events)&&value.events.length<=K.MAX_EVENTS,'Invalid event log');return value;
+    return value;
   }
   class SessionStore{
     constructor(storage){this.storage=storage;this.raw=null;this.temporary=!storage;this.key=KEY;}
     read(){this.raw=this.storage?this.storage.getItem(KEY):null;return this.raw?JSON.parse(this.raw):null;}
     commit(envelope){
-      const encoded=JSON.stringify(envelope);K.assert(encoded.length<4500000,'Session is approaching the storage limit. Export it and begin a new conversation.');
+      const encoded=encodeSession(envelope);
       if(this.storage){K.assert(this.storage.getItem(KEY)===this.raw,'Another tab changed this conversation. Reload before sending again.');this.storage.setItem(KEY,encoded);}
       this.raw=encoded;return envelope;
     }
     clear(){if(this.storage){K.assert(this.storage.getItem(KEY)===this.raw,'Another tab changed this conversation. Reload before resetting.');this.storage.removeItem(KEY);}this.raw=null;}
     rawExport(){return this.raw||'';}
   }
-  Object.assign(K,{SessionStore,packSession:pack,inspectEnvelope,STORE_KEY:KEY});
+  Object.assign(K,{SessionStore,packSession:pack,inspectEnvelope,encodeSession,sessionBytes,MAX_SESSION_BYTES,STORE_KEY:KEY});
 })(Kira);
 'use strict';
 (function(K){
   class ModelBridge{
-    constructor(source){this.source=source;this.worker=null;this.pending=new Map();this.serial=0;this.fallback=null;}
-    async start(){
+    constructor(source){this.source=source;this.worker=null;this.workerUrl=null;this.pending=new Map();this.serial=0;this.fallback=null;this.startPromise=null;}
+    start(){if(!this.startPromise)this.startPromise=this.startWorker();return this.startPromise;}
+    releaseUrl(){if(this.workerUrl){URL.revokeObjectURL(this.workerUrl);this.workerUrl=null;}}
+    failWorker(error){
+      const failure=Error(error?.message||String(error));failure.workerFailure=true;
+      if(this.worker){this.worker.onmessage=this.worker.onerror=this.worker.onmessageerror=null;this.worker.terminate();this.worker=null;}
+      this.releaseUrl();
+      for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(failure);}this.pending.clear();
+    }
+    async startWorker(){
       try{
-        const url=URL.createObjectURL(new Blob([this.source],{type:'text/javascript'}));this.worker=new Worker(url);this.workerUrl=url;
-        this.worker.onmessage=e=>{const r=e.data,p=this.pending.get(r.id);if(!p)return;clearTimeout(p.timer);this.pending.delete(r.id);r.ok?p.resolve(r.value):p.reject(Error(r.error));};
-        this.worker.onerror=e=>{e.preventDefault();for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(Error('The model worker could not run.'));}this.pending.clear();};
-        await Promise.race([this.request('ready',{}),new Promise((_,no)=>setTimeout(()=>no(Error('The model worker did not start.')),4000))]);URL.revokeObjectURL(url);return 'worker';
-      }catch(e){console.warn('Kira: worker unavailable, running inline.',e);if(this.worker)this.worker.terminate();this.worker=null;for(const p of this.pending.values())clearTimeout(p.timer);this.pending.clear();if(this.workerUrl)URL.revokeObjectURL(this.workerUrl);this.makeFallback();return 'inline';}
+        this.workerUrl=URL.createObjectURL(new Blob([this.source],{type:'text/javascript'}));this.worker=new Worker(this.workerUrl);
+        this.worker.onmessage=e=>{const r=e.data;if(!r||!Number.isSafeInteger(r.id)||typeof r.ok!=='boolean'){this.failWorker(Error('The model worker returned an invalid response.'));return;}const p=this.pending.get(r.id);if(!p)return;clearTimeout(p.timer);this.pending.delete(r.id);r.ok?p.resolve(r.value):p.reject(Error(typeof r.error==='string'?r.error:'The model request failed.'));};
+        this.worker.onerror=e=>{e.preventDefault?.();this.failWorker(Error('The model worker could not run. Retry to continue with the inline model.'));};
+        this.worker.onmessageerror=()=>this.failWorker(Error('The model worker response could not be read. Retry to continue with the inline model.'));
+        await this.request('ready',{},4000);this.releaseUrl();return 'worker';
+      }catch(e){console.warn('Kira: worker unavailable, running inline.',e);this.failWorker(e);this.makeFallback();return 'inline';}
     }
     makeFallback(){if(!this.fallback){const engine=new K.SemanticEngine(K.ARTIFACT);this.fallback={engine,dialogue:new K.DialogueModel(engine,K.APP_META)};}}
-    request(op,payload){
-      if(!this.worker){this.makeFallback();try{const {engine,dialogue}=this.fallback;return Promise.resolve(op==='step'?dialogue.step(payload.state,payload.event):op==='replay'?dialogue.replay(payload.events):op==='query'?engine.query(payload.query):op==='lexicon'?engine.lexicon(payload):{artifact:engine.verification});}catch(e){return Promise.reject(e);}}
-      return new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>{this.pending.delete(id);reject(Error('The model timed out. Your previous save is unchanged.'));},30000);this.pending.set(id,{resolve,reject,timer});this.worker.postMessage({id,op,payload});});
+    request(op,payload,timeout=30000){
+      if(!this.worker){try{this.makeFallback();const {engine,dialogue}=this.fallback;let value;if(op==='step')value=dialogue.step(payload.state,payload.event);else if(op==='replay')value=dialogue.replay(payload.events);else if(op==='query')value=engine.query(payload.query);else if(op==='lexicon')value=engine.lexicon(payload);else if(op==='ready')value={artifact:engine.verification};else throw Error('Unknown worker command');return Promise.resolve(value);}catch(e){return Promise.reject(e);}}
+      return new Promise((resolve,reject)=>{const id=++this.serial,timer=setTimeout(()=>this.failWorker(Error('The model timed out. Your previous save is unchanged. Retry to continue with the inline model.')),timeout);this.pending.set(id,{resolve,reject,timer});try{this.worker.postMessage({id,op,payload});}catch(e){this.failWorker(e);}});
     }
   }
   class Presenter{
@@ -4966,10 +5067,15 @@ self.onmessage=event=>{
       this.view.setBusy(true,'Checking the semantic artifact…');
       try{
         this.mode=await this.bridge.start();this.view.setBusy(true,'Model ready ('+this.mode+'). Restoring conversation…');const envelope=this.store.read();
-        if(envelope){K.inspectEnvelope(envelope,K.APP_META);const restored=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(restored)===envelope.stateDigest,'Saved conversation did not replay exactly');this.state=restored;this.events=envelope.events;}
+        if(envelope){
+          K.inspectEnvelope(envelope,K.APP_META);let restored;
+          try{restored=await this.bridge.request('replay',{events:envelope.events});}
+          catch(e){if(!e.workerFailure||this.bridge.worker)throw e;this.mode='inline';restored=await this.bridge.request('replay',{events:envelope.events});}
+          K.assert(K.hash(restored)===envelope.stateDigest,'Saved conversation did not replay exactly');this.state=restored;this.events=envelope.events;
+        }
         this.view.render(this.state);this.savedStatus();
         // First run only: follow the system color preference so the default theme feels native.
-        if(!envelope&&globalThis.matchMedia?.('(prefers-color-scheme: light)')?.matches)await this.withLock(()=>this.step({type:'settings',settings:{theme:'dawn'}}));
+        if(!envelope&&globalThis.matchMedia?.('(prefers-color-scheme: light)')?.matches){try{await this.withLock(()=>this.step({type:'settings',settings:{theme:'dawn'}}));}catch(e){this.view.error('The default theme could not be saved. '+e.message+' You can keep using this conversation and retry saving.');}}
       }catch(e){console.error('Kira boot failed',e);this.blocked=true;this.view.render(this.state);this.view.error('Could not open the saved conversation. '+e.message+' You can export the saved bytes or reset in Settings.');}
       finally{this.view.setBusy(false);}
     });}
@@ -4986,7 +5092,7 @@ self.onmessage=event=>{
         this.store.commit(envelope);this.events=events;this.state=next.state;this.view.render(this.state);this.savedStatus();return next;
       }finally{this.view.setBusy(false);}
     }
-    transact(eventData){return this.enqueue(()=>this.withLock(()=>this.step(eventData)));}
+    transact(eventData){let snapshot;try{K.canonical(eventData);snapshot=K.clone(eventData);}catch(e){return Promise.reject(e);}return this.enqueue(()=>this.withLock(()=>this.step(snapshot)));}
     message(text){return this.transact({type:'message',text});}
     settings(settings){return this.transact({type:'settings',settings});}
     retire(memoryId){return this.transact({type:'retire',memoryId});}
@@ -4994,12 +5100,12 @@ self.onmessage=event=>{
     query(query){return this.bridge.request('query',{query});}
     lexicon(payload){return this.bridge.request('lexicon',payload);}
     replay(){return this.enqueue(async()=>{const state=await this.bridge.request('replay',{events:this.events});K.assert(K.hash(state)===K.hash(this.state),'Replay mismatch');return {events:this.events.length,turns:state.turn,digest:K.hash(state),matched:true};});}
-    export(){return JSON.stringify(K.packSession(this.events,this.state,K.APP_META),null,2);}
-    importSession(envelope){return this.enqueue(()=>this.withLock(async()=>{
+    export(){return K.encodeSession(K.packSession(this.events,this.state,K.APP_META));}
+    importSession(envelope){let snapshot;try{K.canonical(envelope);snapshot=K.clone(envelope);}catch(e){return Promise.reject(e);}return this.enqueue(()=>this.withLock(async()=>{
       this.view.setBusy(true,'Checking the imported conversation…');
       try{
-        K.inspectEnvelope(envelope,K.APP_META);const candidate=await this.bridge.request('replay',{events:envelope.events});K.assert(K.hash(candidate)===envelope.stateDigest,'Imported snapshot does not replay');
-        this.store.commit(K.packSession(envelope.events,candidate,K.APP_META));this.state=candidate;this.events=envelope.events;this.blocked=false;this.view.render(this.state);this.savedStatus();return candidate;
+        K.inspectEnvelope(snapshot,K.APP_META);const candidate=await this.bridge.request('replay',{events:snapshot.events});K.assert(K.hash(candidate)===snapshot.stateDigest,'Imported snapshot does not replay');
+        this.store.commit(K.packSession(snapshot.events,candidate,K.APP_META));this.state=candidate;this.events=snapshot.events;this.blocked=false;this.view.render(this.state);this.savedStatus();return candidate;
       }finally{this.view.setBusy(false);}
     }));}
     reset(){return this.enqueue(()=>this.withLock(async()=>{this.store.clear();this.events=[];this.state=K.initialState();this.blocked=false;this.view.render(this.state);this.savedStatus();}));}
@@ -5013,20 +5119,20 @@ self.onmessage=event=>{
   const button=(text,cls,fn)=>{const b=el('button',cls,text);b.type='button';b.addEventListener('click',fn);return b;};
   const clear=n=>n.replaceChildren();
   const labels={conversation:['YOUR OWN PACE','Conversation'],memories:['A LITTLE CONTINUITY','Memory notebook'],lab:['MEANING YOU CAN FOLLOW','Engine lab']};
-  function download(name,text){if(window.KiraHost&&KiraHost.saveFile){KiraHost.saveFile(name,text);return;}const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  function download(name,text){if(window.KiraHost&&KiraHost.saveFile){KiraHost.saveFile(name,text);return false;}const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}
   function detail(label,data){const d=el('details');d.append(el('summary','',label),el('pre','',typeof data==='string'?data:JSON.stringify(data,null,2)));return d;}
   const KIND_HELP={subsumes:'Checks whether the first concept is provably a kind of the second, using the bundled axioms and their closure.',existential:'Checks a typed part or role relation between two concepts.',relation:'Computes the set of possible basic lexical relations between two word senses.',entails:'Projects lexical edits through an extensional context and reports the surviving relations.',shift:'Finds an approved wording in the same meaning that moves register and affect in the requested directions.',realize:'Chooses the approved wording closest to an absolute register and affect target.'};
-  const DRAFT_KEY='kira_rse_draft_4_4_0';
-  function startOfDay(t){const d=new Date(t);d.setHours(0,0,0,0);return d.getTime();}
-  function timeLabel(time){try{const d=new Date(time),now=Date.now();if(startOfDay(now)!==startOfDay(time))return (startOfDay(now)-startOfDay(time))/864e5===1?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric'});return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return '';}}
+  const DRAFT_KEY='kira_rse_draft_4_6_0';
+  function yesterdayKey(now){const d=new Date(now);d.setDate(d.getDate()-1);return dayKey(d);}
+  function timeLabel(time){try{const d=new Date(time),now=Date.now();if(!Number.isFinite(d.getTime()))return '';if(dayKey(now)!==dayKey(time))return yesterdayKey(now)===dayKey(time)?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric'});return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return '';}}
   function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
-  function dayName(t){try{const now=Date.now();if(startOfDay(now)===startOfDay(t))return 'Today';if(startOfDay(now)-startOfDay(t)===864e5)return 'Yesterday';return new Date(t).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});}catch{return '';}}
+  function dayName(t){try{const now=Date.now();if(!Number.isFinite(new Date(t).getTime()))return '';if(dayKey(now)===dayKey(t))return 'Today';if(yesterdayKey(now)===dayKey(t))return 'Yesterday';return new Date(t).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});}catch{return '';}}
   function table(headers,rows){const t=el('table','proof-table'),h=el('thead'),tr=el('tr');headers.forEach(x=>tr.append(el('th','',x)));h.append(tr);t.append(h);const body=el('tbody');rows.forEach(row=>{const r=el('tr');row.forEach(v=>r.append(el('td','',String(v))));body.append(r);});t.append(body);return t;}
   class View{
-    constructor(){this.state=K.initialState();this.presenter=null;this.busy=false;this.screen='conversation';this.visible=80;this.rendered=[];this.lastResult=null;this.avatarDraft=null;this.lastCount=0;this.memoryFilter='all';this.lexiconFirst=null;this.lastDay=null;this.dialogOpener=null;this.noticeTimer=0;this.titleBase=document.title;}
+    constructor(){this.state=K.initialState();this.presenter=null;this.busy=false;this.screen='conversation';this.visible=80;this.rendered=[];this.lastResult=null;this.avatarDraft=null;this.lastCount=0;this.memoryFilter='all';this.lexiconFirst=null;this.lastDay=null;this.dialogOpener=null;this.noticeTimer=0;this.copyTimers=new WeakMap();this.titleBase=document.title;}
     attach(presenter){this.presenter=presenter;this.bind();this.queryFields();}
-    error(message){$('notice-text').textContent=message;$('notice').className='notice error';$('notice').setAttribute('role','alert');$('notice').hidden=false;}
-    status(message,kind){$('save-status').textContent=message;if(kind==='ok')$('notice').hidden=true;else{this.error(message);$('notice').className='notice';$('notice').setAttribute('role','status');}}
+    error(message){clearTimeout(this.noticeTimer);this.noticeTimer=0;$('notice-text').textContent=message;$('notice').className='notice error';$('notice').setAttribute('role','alert');$('notice').hidden=false;}
+    status(message,kind){clearTimeout(this.noticeTimer);this.noticeTimer=0;$('save-status').textContent=message;if(kind==='ok')$('notice').hidden=true;else{this.error(message);$('notice').className='notice';$('notice').setAttribute('role','status');}}
     ok(message){$('notice-text').textContent=message;$('notice').className='notice ok';$('notice').setAttribute('role','status');$('notice').hidden=false;clearTimeout(this.noticeTimer);this.noticeTimer=setTimeout(()=>$('notice').hidden=true,5000);}
     setBusy(value,label){this.busy=value;$('thinking').hidden=!value;if(label)$('thinking-label').textContent=label;$('messages').setAttribute('aria-busy',String(value));this.inputMeta();}
     autosize(){const t=$('message-input');t.style.height='auto';t.style.height=Math.min(140,t.scrollHeight)+'px';}
@@ -5062,14 +5168,17 @@ self.onmessage=event=>{
     messageNode(m){
       const n=el('article','message '+m.role);n.id='msg-'+m.id;const label=el('div','message-label',m.role==='assistant'?'Kira':'You');const time=el('span','',timeLabel(m.time));try{time.title=new Date(m.time).toLocaleString();}catch{}label.append(time);n.append(label);
       if(m.legacy)label.append(el('span','legacy-badge','Legacy archive · unverified'));
-      const bubble=el('div','bubble',m.image?'':m.text);if(m.image){const img=el('img','message-image');img.src=m.image;img.alt='Image shared in the conversation';img.title='Open image';img.tabIndex=0;img.setAttribute('role','button');const open=()=>{$('zoom-image').src=m.image;this.dialogOpener=document.activeElement;$('image-dialog').showModal();};img.addEventListener('click',open);img.addEventListener('keydown',e=>{if(e.key==='Enter')open();});bubble.append(img);}n.append(bubble);
+      const bubble=el('div','bubble',m.image?'':m.text);if(m.image){const img=el('img','message-image');img.src=m.image;img.alt='Image shared in the conversation';img.title='Open image';img.tabIndex=0;img.setAttribute('role','button');const open=()=>{$('zoom-image').src=m.image;this.dialogOpener=document.activeElement;$('image-dialog').showModal();};img.addEventListener('click',open);img.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});bubble.append(img);}n.append(bubble);
       const tools=el('div','message-tools');tools.append(button('Copy','inspect-button copy-button',e=>this.copyText(m.text||'Shared an image',e.currentTarget)));
       if(m.plan){tools.append(button('Sources & reasoning ↗','inspect-button',()=>this.inspect(m.plan)));if(m.plan.claims.length)tools.append(el('span','',m.plan.claims.length+' attributed record'+(m.plan.claims.length===1?'':'s')));}
       n.append(tools);return n;
     }
-    copyText(text,b){const done=()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);};
-      const fallback=()=>{const t=el('textarea');t.value=text;t.setAttribute('readonly','');t.style.cssText='position:fixed;opacity:0';document.body.append(t);t.select();try{document.execCommand('copy');done();}catch{}t.remove();};
-      if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(done,fallback);else fallback();}
+    async copyText(text,b){
+      const previous=this.copyTimers.get(b),label=previous?.label||b.textContent,operation={label,timer:null};clearTimeout(previous?.timer);this.copyTimers.set(b,operation);b.textContent=label;
+      const fallback=()=>{const active=document.activeElement,start=active?.selectionStart,end=active?.selectionEnd,direction=active?.selectionDirection,t=el('textarea');t.value=text;t.setAttribute('readonly','');t.style.cssText='position:fixed;opacity:0';document.body.append(t);try{t.select();if(!document.execCommand('copy'))throw Error('Clipboard access was denied.');}finally{t.remove();active?.focus?.({preventScroll:true});if(typeof start==='number'&&typeof end==='number')active.setSelectionRange?.(start,end,direction);}};
+      try{if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);}catch{fallback();}}else fallback();if(this.copyTimers.get(b)!==operation)return;b.textContent='Copied';operation.timer=setTimeout(()=>{b.textContent=label;this.copyTimers.delete(b);},1500);}
+      catch{if(this.copyTimers.get(b)===operation){this.copyTimers.delete(b);this.error('Could not copy to the clipboard. Select the text and copy it manually.');}}
+    }
     quickPrompts(){const box=$('quick-prompts');clear(box);const pending=this.state.context.pending;let prompts=this.state.turn?['What do you remember about me?','What can you do?','Tell me a joke','Give me a writing prompt']:['My name is…','I like music','How are you?'];if(pending?.choices)prompts=pending.choices.map(c=>c.aliases[0]||c.label);else if(pending?.kind==='confirmName')prompts=['Yes','No'];else if(pending?.kind==='name')prompts=['My name is…','Tell me about yourself'];else if(pending?.topic==='support')prompts=['Yes','Not really','Tell me a joke'];for(const s of prompts)box.append(button(s,'',()=>{$('message-input').value=s==='My name is…'?'My name is ':s;$('message-input').focus();this.inputMeta();}));}
     async searchLexicon(){
       const ticket=this.lexiconTicket=(this.lexiconTicket||0)+1,r=await this.presenter.lexicon({text:$('lexicon-search').value});if(ticket!==this.lexiconTicket)return;
@@ -5087,7 +5196,7 @@ self.onmessage=event=>{
       const h=box.querySelector('h3');h.tabIndex=-1;h.focus();
     }
     renderMemories(){
-      const chips=$('memory-kind-chips');clear(chips);for(const [kind,label] of [['all','All'],['name','Names'],['preference','Preferences'],['mood','Feelings'],['note','Notes']]){const c=button(label,'chip'+(this.memoryFilter===kind?' active':''),()=>{this.memoryFilter=kind;this.renderMemories();});c.setAttribute('aria-pressed',String(this.memoryFilter===kind));chips.append(c);}
+      const chips=$('memory-kind-chips'),focusedKind=document.activeElement?.dataset?.memoryKind;clear(chips);for(const [kind,label] of [['all','All'],['name','Names'],['preference','Preferences'],['mood','Feelings'],['note','Notes']]){const c=button(label,'chip'+(this.memoryFilter===kind?' active':''),()=>{this.memoryFilter=kind;this.renderMemories();});c.dataset.memoryKind=kind;c.setAttribute('aria-pressed',String(this.memoryFilter===kind));chips.append(c);if(focusedKind===kind)c.focus({preventScroll:true});}
       const box=$('memory-list');clear(box);const term=K.fold($('memory-search').value),all=$('show-retired').checked;
       const pool=this.state.memories.filter(m=>(all||m.status==='active')&&(this.memoryFilter==='all'||m.kind===this.memoryFilter));
       const records=pool.filter(m=>K.fold(K.describeMemory(m)).includes(term)).slice().reverse();
@@ -5174,6 +5283,7 @@ self.onmessage=event=>{
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.title!==this.titleBase)document.title=this.titleBase;});
       window.addEventListener('error',e=>this.error('Something went wrong: '+(e.message||'an unexpected error')));
       window.addEventListener('unhandledrejection',e=>this.error('A background task failed: '+(e.reason?.message||'unknown reason')));
+      window.addEventListener('kira-export-result',e=>{const result=e.detail;if(result?.status==='saved')this.ok('Saved '+result.name);else if(result?.status==='cancelled')this.ok('Export cancelled. Your conversation is unchanged.');else if(result?.status==='error')this.error(result.message||'The export could not be saved. Please try again.');});
       window.addEventListener('beforeunload',e=>{if(this.presenter.store.temporary&&this.state.messages.length){e.preventDefault();e.returnValue='';}});
       document.addEventListener('keydown',e=>{
         if(e.ctrlKey||e.metaKey||e.altKey)return;
@@ -5194,18 +5304,19 @@ self.onmessage=event=>{
       $('memory-search').addEventListener('input',()=>this.renderMemories());$('show-retired').addEventListener('change',()=>this.renderMemories());
       $('persona-select').addEventListener('change',()=>{$('register-range').value=K.DIALOGUE.personas[$('persona-select').value].target[0];this.settingsLabels();});$('register-range').addEventListener('input',()=>this.settingsLabels());
       $('settings-form').addEventListener('submit',e=>{e.preventDefault();this.run(async()=>{await this.presenter.settings({persona:$('persona-select').value,register:Number($('register-range').value),boundary:$('boundary-select').value,avatar:this.avatarDraft});$('settings-dialog').close();});});
-      for(const id of ['export-button','export-memory'])$(id).addEventListener('click',()=>this.run(()=>{download('kira-session.json',this.presenter.export());this.ok('Session exported as kira-session.json');}));
-      $('export-raw').addEventListener('click',()=>this.run(()=>{download('kira-saved-recovery.json',this.presenter.store.rawExport()||this.presenter.export());this.ok('Saved bytes exported for recovery');}));
-      $('import-button').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',()=>this.run(async()=>{const file=$('import-file').files[0];$('import-file').value='';if(!file)return;K.assert(file.size<5000000,'Import must be under 5 MB');
+      for(const id of ['export-button','export-memory'])$(id).addEventListener('click',()=>this.run(()=>{if(download('kira-session.json',this.presenter.export()))this.ok('Session exported as kira-session.json');}));
+      $('export-raw').addEventListener('click',()=>this.run(()=>{if(download('kira-saved-recovery.json',this.presenter.store.rawExport()||this.presenter.export()))this.ok('Saved bytes exported for recovery');}));
+      $('import-button').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',()=>this.run(async()=>{const file=$('import-file').files[0];$('import-file').value='';if(!file)return;K.assert(file.size<K.MAX_SESSION_BYTES,'Import must be under '+(K.MAX_SESSION_BYTES/1000000)+' MB');
         let data;try{data=JSON.parse(await file.text());}catch{throw Error('That file is not valid JSON. Use a file exported from Kira’s export buttons.');}
+        K.assert(data&&typeof data==='object'&&!Array.isArray(data),'Not a Kira session or supported legacy transcript');
         if(data.format==='kira-session/4.1'){if(!confirm('Replace this conversation with the imported session? Export the current one first if you want to keep it.'))return;await this.presenter.importSession(data);this.ok('Session imported · '+this.presenter.events.length+' events');}
-        else{const messages=data.chatHistory||data.messages;K.assert(Array.isArray(messages),'Not a Kira session or supported legacy transcript');if(!confirm('Append up to 200 old messages as an unverified archive? No inferred memories or neural weights will be imported.'))return;await this.presenter.legacy(messages.filter(m=>typeof m.text==='string').slice(-200).map(m=>({role:m.role,text:m.text})));this.ok('Legacy transcript imported as an unverified archive');}
+        else{const messages=data.chatHistory||data.messages;K.assert(Array.isArray(messages),'Not a Kira session or supported legacy transcript');if(!confirm('Append up to 200 old messages as an unverified archive? No inferred memories or neural weights will be imported.'))return;await this.presenter.legacy(messages.filter(m=>m&&typeof m.text==='string').slice(-200).map(m=>({role:m.role,text:m.text})));this.ok('Legacy transcript imported as an unverified archive');}
         $('settings-dialog').close();}));
       $('reset-button').addEventListener('click',()=>this.run(async()=>{if(!confirm('Remove this app’s saved conversation, memories, settings, and images? Export a backup first if you want to keep them.'))return;await this.presenter.reset();this.rendered=[];this.renderMessages();$('settings-dialog').close();this.ok('Conversation reset. A fresh start.');$('message-input').focus();}));
       $('query-kind').addEventListener('change',()=>this.queryFields());$('run-query').addEventListener('click',()=>this.runQuery());document.querySelectorAll('[data-example]').forEach(b=>b.addEventListener('click',()=>this.example(b.dataset.example)));
       $('lexicon-search').addEventListener('input',()=>{this.lexiconTicket=(this.lexiconTicket||0)+1;clearTimeout(this.lexiconTimer);this.lexiconTimer=setTimeout(()=>this.run(()=>this.searchLexicon()),150);});
       $('lexicon-search').addEventListener('keydown',e=>{if(e.key==='Enter'&&this.lexiconFirst){e.preventDefault();this.run(()=>this.openLexicon(this.lexiconFirst));}});
-      $('export-proof').addEventListener('click',()=>{if(this.lastResult){download('kira-semantic-proof.json',JSON.stringify({artifact:K.ARTIFACT,result:this.lastResult},null,2));this.ok('Proof exported as kira-semantic-proof.json');}});
+      $('export-proof').addEventListener('click',()=>{if(this.lastResult&&download('kira-semantic-proof.json',JSON.stringify({artifact:K.ARTIFACT,result:this.lastResult},null,2)))this.ok('Proof exported as kira-semantic-proof.json');});
       $('replay-button').addEventListener('click',()=>this.run(async()=>{const b=$('replay-button');b.disabled=true;const old=b.textContent;b.textContent='Verifying…';try{const r=await this.presenter.replay();const out=$('replay-result');out.textContent='Exact match · '+r.events+' events · '+r.turns+' turns\n'+r.digest;const copy=button('Copy digest','text-button',e=>this.copyText(r.digest,e.currentTarget));out.append(el('br'),copy);}finally{b.disabled=false;b.textContent=old;}}));
       $('attach-button').addEventListener('click',()=>$('image-file').click());$('avatar-upload').addEventListener('click',()=>$('avatar-file').click());$('avatar-remove').addEventListener('click',()=>{this.avatarDraft=null;$('avatar-upload').textContent='Choose image';$('avatar-preview').hidden=true;});
       $('image-file').addEventListener('change',()=>this.run(async()=>{const file=$('image-file').files[0];$('image-file').value='';if(file)await this.presenter.image(await imageData(file));}));
@@ -5217,7 +5328,7 @@ self.onmessage=event=>{
     K.assert(['image/png','image/jpeg','image/webp'].includes(file.type),'Choose a PNG, JPEG, or WebP image');K.assert(file.size<=5000000,'Image must be under 5 MB');
     const url=URL.createObjectURL(file);try{const image=new Image();image.src=url;await image.decode();K.assert(image.width<=8192&&image.height<=8192,'Image dimensions are too large');const scale=Math.min(1,768/image.width,768/image.height),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));const context=canvas.getContext('2d');context.fillStyle='#152124';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);for(const quality of [.82,.6,.4,.25]){const data=canvas.toDataURL('image/jpeg',quality);if(K.supportedImage(data))return data;}throw Error('Image is too large after resizing');}finally{URL.revokeObjectURL(url);}
   }
-  K.View=View;
+  Object.assign(K,{View,timeLabel,dayName});
   let storage;try{storage=window.localStorage;storage.getItem(K.STORE_KEY);}catch{storage=null;}
   const view=new View(),store=new K.SessionStore(storage),bridge=new K.ModelBridge($('worker-source').textContent),presenter=new K.Presenter(view,store,bridge);view.attach(presenter);
   globalThis.KiraApp=Object.freeze({snapshot:()=>K.clone(presenter.state),exportSession:()=>presenter.export(),query:q=>presenter.query(q),replay:()=>presenter.replay(),version:K.APP_META});

@@ -4,7 +4,7 @@
 
 Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and structured sentence plans to carry a conversation. Controlled grammars compose memory replies, social dialogue, general topic questions, fictional jokes, and writing prompts.
 
-The platform release is **4.5.0**: the **4.4.0 companion app**, plus **Narrative SDK 0.3.0** for independent game characters. Neither requires an account, API key, model download, backend, or LLM.
+The platform release is **4.6.0**: the **4.6.0 companion app**, plus **Narrative SDK 0.4.0** for independent game characters. Neither requires an account, API key, model download, backend, or LLM.
 
 Kira also provides **NPC dialogue shaped by what characters know, remember, and want**. The new SDK shares one semantic engine across independent characters, keeps private conversations separate, delivers witnessed events and attributed rumours, composes authored phrases, and replays complete world sessions. The host game controls time and actions. See the [Narrative SDK guide](docs/narrative-sdk.md).
 
@@ -21,15 +21,19 @@ The station example demonstrates different voices, information held by only one 
 
 ## Android app
 
-`android/` wraps the unchanged `Kira.html` in a small native WebView shell (no network permission, no dependencies beyond the Android Gradle plugin). The page is served from an internal `https://` origin so saving, the Web Worker and replay behave exactly as in a desktop browser. The shell adds a file picker for imports and images, a system save dialog for exports, the back button, and system-bar colours that follow the theme. Phones get a bottom tab bar.
+`android/` wraps `Kira.html` in a small native WebView shell with no network permission or third-party runtime dependencies. The page is served from an internal `https://` origin so saving, the Web Worker and replay use the same application logic as a desktop browser. The shell adds a file picker for imports and images, a system save dialog for exports, the back button, and system-bar colours that follow the theme. Phones get a bottom tab bar.
 
 ```sh
 npm run build                    # regenerate Kira.html first
-cd android && gradle assembleRelease
+cd android && ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-Requires JDK 17 and an Android SDK (platform 36); set `sdk.dir` in `android/local.properties`. The release APK is signed with the debug key so it can be sideloaded; supply your own signing config before publishing. Data lives in the app's private storage, so use **Settings → Export** before uninstalling.
+Requires JDK 17 and an Android SDK (platform and build tools 36); set `sdk.dir` in `android/local.properties` or configure `ANDROID_HOME`. The checked-in wrapper pins Gradle 8.13 and verifies the distribution checksum. Every Android build first checks that the generated HTML and SDK match their source. Android 7.0/API 24 is the minimum supported OS.
+
+The release APK uses the maintained sideloading key. Keep that key for upgrades; builds on a new machine or CI use a different debug key unless configured otherwise. An App Bundle is also produced, but store publishing requires an appropriate signing configuration. Data lives in the app's private storage, so use **Settings → Export** before uninstalling.
+
+Exports are staged in app-private storage before opening the document picker. Writing the selected file happens on a background thread, and success is reported only after the destination closes successfully. An unfinished or failed export can be retried after restarting the app; cancellation discards that staged export without changing the conversation.
 
 ## Vocabulary, themes and variety
 
@@ -41,7 +45,7 @@ Kira's topics and wording grow through four layers, all deterministic and replay
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The bundled application version is **4.4.0**.
+The bundled application version is **4.6.0**.
 
 If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
@@ -176,7 +180,7 @@ The lexicon is **experimental and independently unreviewed**. The checker is han
 
 ## Development
 
-Use **Python 3.9 or newer** to rebuild the standalone file and **Node.js 20 or newer** to run the tests. Browser-only use needs no development tools. There are no runtime or test dependencies to install.
+Use **Python 3.9 or newer** to rebuild the standalone file and **Node.js 20 or newer** to run the tests. Browser-only use needs no development tools. The application and Node regression suite require no installed packages. Browser smoke tests use the pinned Playwright development dependency; Android's export-store unit tests use JUnit 4.
 
 Run these commands from the repository root:
 
@@ -203,6 +207,29 @@ npm run verify    # check + test, the same pair CI runs
 
 Every push to `main` and every pull request runs the build checks and tests on Node 20 and Node 24 with the documented Python floor.
 
+Run the browser smoke test after changes to the interface or browser adapters:
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:browser
+```
+
+It starts its own local server and exercises mobile Send, memory corrections, semantic queries, exact replay, saved-state reload, export/reset/import, and worker recovery, including a forced inline fallback. CI runs it with Chromium. Android lint and tests check additional native paths; physical-device and other-browser coverage remains separate.
+
+### Distribution and release
+
+```sh
+npm run verify
+npm run test:browser
+python3 -m unittest discover -s tests -p 'test_*.py'
+npm run android:verify
+npm run dist
+cd dist && sha256sum --check SHA256SUMS
+```
+
+Packaging requires a Git checkout and produces versioned standalone HTML, JavaScript SDK, Android APK, Android App Bundle, source ZIP, and `SHA256SUMS` in ignored `dist/`. It refuses missing binaries, stale embedded HTML, and mismatched release versions. The source archive has stable ordering, timestamps, and file modes, and excludes local configuration and signing material. APK/AAB reproducibility also depends on the signing key and Android toolchain. CI retains review artifacts signed with its temporary key; official releases use the maintained key.
+
 `Kira.html` is the generated offline application. The build concatenates the model modules in a fixed order for both the page and the worker, then inserts the browser code, style, and HTML shell. `--check` verifies the generated file byte for byte. The build also checks that the pinned model hash matches the model source; dialogue changes require a new release version and storage key.
 
 ### Test layout
@@ -213,6 +240,9 @@ Every push to `main` and every pull request runs the build checks and tests on N
 | `tests/canonical.test.cjs` | SHA-256 vectors, canonical encoding, NFC, merkle roots, potentials, artifact verification and tamper rejection, optimizer against the reference checker |
 | `tests/persistence.test.cjs` | Session envelopes, checksum and version pinning, multi-tab conflicts, event validation |
 | `tests/presenter.test.cjs` | Startup and replay ordering, save failures, import/reset locking, corrupt-save recovery, temporary sessions |
+| `tests/bridge.test.cjs`, `tests/browser-view.test.cjs` | Worker transport failures, resource cleanup, notifications, clipboard results, keyboard controls, and daylight-saving calendar labels |
+| `tools/browser-smoke.cjs` | Real Chromium interaction with shipped HTML, mobile focus stability, worker and inline paths, persistence and replay |
+| `tests/test_package_release.py`, Android `PendingExportStoreTest` | Reproducible archives, stale artifact/version refusal, durable export recovery, and failed document writes |
 | `tests/narrative.test.cjs` | Compiler validation, character/speaker isolation, beliefs, rumours, goals, phrase composition, SDK loading, and world replay |
 | `tests/adversarial-*.test.cjs` | Refusals and question pauses, repair feedback, tense and pronouns, literal notes, exact displayed follow-ups, grounded report slots, and phrase-combination coverage |
 | `tests/realization.test.cjs` | Grammar and morphology, novel combinations, correction provenance, literal quoting, tamper rejection, and expansion bounds |
@@ -265,7 +295,7 @@ Use **Settings & data → Export session** to keep a portable backup. If the app
 
 Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
 
-Version 4.4.0 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+Version 4.6.0 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Keep the previous HTML alongside its exported sessions; the [4.4.0 companion source](https://github.com/recursive-ai-dev/kira-chat/blob/81da0bbda085942de7b205210f313eefc84491b5/Kira.html) remains available. Open the original app at its original browser origin to access its local save. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
 
 Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
 
@@ -277,7 +307,7 @@ Current practical limits:
 
 - 1,000 recorded events per session, including settings and other state changes.
 - 2,000 characters per message.
-- An encoded-save guard below 4.5 million characters; browser quota may be smaller.
+- A compact UTF-8 save, export, and import limit below 4.5 million bytes; browser storage quota may be smaller. Every accepted session export fits the import limit. Export remains available for temporary sessions.
 - Up to 200 legacy messages per import, with bounded image payloads.
 - A bounded input parser and controlled generation grammars, with explicit lists of supported paraphrases, speech acts, and fictional frames. Quoted, uncertain, attributed, malformed, and oversized report batches remain uncommitted.
 - Authored theme openers and specialized cues, crisis wording, fictional flirting, semantic explanations, and operational messages remain available. Only marked generated spans carry grammar derivations.

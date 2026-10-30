@@ -105,3 +105,40 @@ test('wording phase drifts with the conversation position and stays inside [0, 1
   assert.notEqual(field.phase(a, 1), field.phase(b, 1));
   assert.equal(field.phase(a, 5), field.phase(a, 5));
 });
+
+test('empty, singleton and coincident ring layouts have finite bounded coordinates', () => {
+  for (const size of [0, 1, 2, 5]) {
+    for (const overlap of [0, 1000]) {
+      const tiny = Object.create(K.RingField.prototype);
+      tiny.topics = Array.from({length: size}, (_, i) => 'topic-' + i);
+      tiny.overlap = (a, b) => a === b ? 1000 : overlap;
+      tiny.layout();
+      assert.equal(tiny.centre.size, size);
+      for (const {x, y} of tiny.centre.values()) {
+        assert.ok(Number.isInteger(x) && Number.isInteger(y));
+        assert.ok(Math.abs(x) <= 1000 && Math.abs(y) <= 1000);
+        if (size === 1 || overlap === 1000) assert.ok(x === 0 && y === 0);
+      }
+      const first = JSON.stringify([...tiny.centre]);
+      tiny.layout();
+      assert.equal(JSON.stringify([...tiny.centre]), first);
+    }
+  }
+});
+
+test('phrase resolution uses longest member weights without treating its suffix as another hit', () => {
+  const tiny = Object.create(K.RingField.prototype);
+  tiny.topics = ['a', 'b', 'suffix'];
+  tiny.rings = new Map([
+    ['a', new Map([['quiet morning routine', 800], ['morning routine', 800]])],
+    ['b', new Map([['quiet morning routine', 900], ['morning routine', 900]])],
+    ['suffix', new Map([['routine', 1000]])],
+  ]);
+  tiny.memberMaxWords = 3;
+  assert.deepEqual([...tiny.resolve('quiet morning routine', null)], ['b']);
+  assert.deepEqual([...tiny.resolve('morning routine', null)], ['b']);
+  assert.deepEqual([...tiny.resolve('quiet morning routine', {act: {a: 1}})], ['a']);
+  assert.deepEqual([...tiny.resolve('quiet morning routine and routine', null)], ['b', 'suffix']);
+  tiny.rings.get('a').set('quiet morning routine', 900);
+  assert.deepEqual([...tiny.resolve('quiet morning routine', null)], ['a']);
+});

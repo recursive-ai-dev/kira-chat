@@ -10,7 +10,12 @@
     check(value&&Object.getPrototypeOf(value)===Object.prototype,label+' must be a plain object');
     check(Object.keys(value).every(key=>keys.includes(key)),label+' has an unknown field');
   }
-  function text(value,label,max=2000){check(typeof value==='string'&&value.trim().length>0&&value.length<=max,label+' must be nonempty text (max '+max+')');return K.nfc(value);}
+  function text(value,label,max=2000){
+    check(typeof value==='string'&&value.length<=max,label+' must be nonempty text (max '+max+')');
+    const normalized=K.nfc(value);
+    check(normalized.trim().length>0&&normalized.length<=max,label+' must be nonempty text (max '+max+')');
+    return normalized;
+  }
   function id(value,label){check(typeof value==='string'&&ID.test(value)&&!['constructor','prototype','__proto__'].includes(value),label+' is not a safe identifier');return value;}
   function integer(value,label,min,max){check(Number.isSafeInteger(value)&&value>=min&&value<=max,label+' must be an integer in '+min+'..'+max);return value;}
   function array(value,label,max=2000){check(Array.isArray(value)&&value.length<=max,label+' must be an array (max '+max+')');return value;}
@@ -109,5 +114,5 @@
     const rebuilt=compile(pkg.definition);
     check(pkg.hash===rebuilt.hash&&K.hash(pkg)===K.hash(rebuilt),'compiled package does not match its definition');return rebuilt;
   }
-  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.3.0'};
+  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.4.0'};
 })(Kira);

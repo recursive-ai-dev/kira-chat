@@ -36,11 +36,23 @@
     const memory={...K.clone(frame),id,sourceMessage,resolutionMessage:resolutionMessage||null,turn:state.turn,status:'active',supersedes,supersededBy:null};
     state.memories.push(memory);return {memory,created:true};
   }
-  const supportedImage=s=>typeof s==='string'&&s.length<=MAX_IMAGE&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s);
+  const supportedImage=s=>{
+    if(typeof s!=='string'||s.length>MAX_IMAGE)return false;
+    const match=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(s);
+    if(!match||match[0].length!==s.length)return false;
+    const data=match[1];
+    if(data.length%4!==0)return false;
+    // Canonical padding includes zero unused bits in the final sextet.
+    if(data.endsWith('=='))return /[AQgw]==$/.test(data);
+    if(data.endsWith('='))return /[AEIMQUYcgkosw048]=$/.test(data);
+    return true;
+  };
   function validateEvent(state,e){
-    K.assert(e&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
+    K.assert(e&&typeof e==='object'&&!Array.isArray(e)&&Number.isSafeInteger(e.seq)&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
     K.assert(Number.isSafeInteger(e.time)&&e.time>=0&&e.time<=8640000000000000,'Explicit timestamp required');
     K.assert(['message','settings','retire','image','legacy'].includes(e.type),'Unknown event type');
+    const fields={message:['text'],settings:['settings'],retire:['memoryId'],image:['data'],legacy:['messages']};
+    K.assert(Object.keys(e).every(key=>['seq','time','type'].includes(key)||fields[e.type].includes(key)),'Event has unknown or mismatched fields');
     if(e.type==='message')K.assert(typeof e.text==='string'&&e.text.trim().length&&e.text.length<=2000,'Message must contain 1–2000 characters');
     if(e.type==='settings'){
       const s=e.settings;K.assert(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['persona','register','theme','avatar','boundary'].includes(k)),'Unknown setting');
@@ -52,7 +64,7 @@
     }
     if(e.type==='image')K.assert(supportedImage(e.data),'Invalid or oversized image');
     if(e.type==='retire')K.assert(typeof e.memoryId==='string'&&state.memories.some(m=>m.id===e.memoryId&&m.status==='active'),'Memory is not active');
-    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&e.messages.every(m=>['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
+    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&Array.from(e.messages).every(m=>m&&typeof m==='object'&&!Array.isArray(m)&&['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
   }
   function choose(state,name,persona){
     const items=K.DIALOGUE.responses[name];K.assert(items?.length,'Missing response family '+name);
@@ -379,4 +391,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"bbc697c38b97e93d6e16f4f1242ddbfcf8b89a105df7587f2032ea6e68df9d9e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f00b34d4e4d0682f6e2dd506b76ef55a7f688f146ce3bf29b3b7f9ec6f1933b6","unicode":"15.0.0","profile":"EXPERIMENTAL"};

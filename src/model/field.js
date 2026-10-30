@@ -4,7 +4,7 @@
 // Every topic is a ring of weighted members: curated concepts (1.0), theme-pack words (0.9), declared
 // overlap words (0.8) and the taxonomic neighbours of members (about 0.5). Two rings overlap by the
 // members they share; those shared members are the bridges between them. Ring centres are laid out in
-// the plane by classical MDS on 1 - overlap, and a conversation carries a per-topic activation that
+// the plane by a normalized spectral projection of 1 - overlap, and a conversation carries a per-topic activation that
 // decays each turn and spreads to neighbouring rings in proportion to overlap. Its weighted centroid
 // is the conversation's position in the field.
 //
@@ -66,6 +66,8 @@
       // ring too, which is what makes neighbouring rings overlap.
       for(const [t,ids] of core)for(const id of ids)for(const [n,w] of this.neighbours(id))this.put(t,label(engine.concepts.get(n).label),w);
       this.topics=[...this.rings.keys()].sort(cmpLabel);
+      this.memberMaxWords=1;
+      for(const ring of this.rings.values())for(const word of ring.keys())this.memberMaxWords=Math.max(this.memberMaxWords,word.split(/\s+/).length);
     }
     /** Weighted Jaccard overlap of two rings, in permille. */
     overlap(a,b){
@@ -87,9 +89,13 @@
       for(const [w,x] of ra)if(rb.has(w))out.push({word:w,weight:Math.min(x,rb.get(w))});
       return out.sort((p,q)=>q.weight-p.weight||cmpLabel(p.word,q.word));
     }
-    /** Classical MDS on 1 - overlap, by power iteration. Integer coordinates in [-1000, 1000]. */
+    /** Normalized spectral layout of double-centered squared distances.
+     * Each axis is scaled independently, without eigenvalue scaling; this is
+     * a bounded policy layout, not a distance-preserving classical MDS embedding.
+     */
     layout(){
       const T=this.topics,n=T.length,D=[];
+      if(n<=1){this.centre=new Map(T.map(t=>[t,{x:0,y:0}]));return;}
       for(let i=0;i<n;i++){D.push([]);for(let j=0;j<n;j++){const d=1-this.overlap(T[i],T[j])/1000;D[i].push(d*d);}}
       const rowMean=D.map(r=>r.reduce((s,x)=>s+x,0)/n),total=rowMean.reduce((s,x)=>s+x,0)/n,B=[];
       for(let i=0;i<n;i++){B.push([]);for(let j=0;j<n;j++)B[i].push(-0.5*(D[i][j]-rowMean[i]-rowMean[j]+total));}
@@ -98,7 +104,7 @@
         let v=T.map((_,i)=>((i*37+k*11)%n)-n/2+0.5);
         for(let iter=0;iter<300;iter++){
           let w=B.map(row=>row.reduce((s,x,j)=>s+x*v[j],0));
-          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
+          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);if(norm>0)for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
           const top=w.reduce((m,x)=>Math.max(m,Math.abs(x)),0)||1;
           v=w.map(x=>x/top);
         }
@@ -114,11 +120,15 @@
       const words=K.fold(text).replace(/[^a-z0-9' -]+/g,' ').split(/\s+/).filter(Boolean).slice(0,60),out=[];
       const topicsFor=w=>this.topics.filter(t=>(this.rings.get(t).get(w)||0)>=800);
       for(let i=0;i<words.length;i++){
-        const candidates=(i+1<words.length&&topicsFor(words[i]+' '+words[i+1]))||[];
-        const found=candidates.length?candidates:topicsFor(words[i]);
+        let found=[],member='',length=0;
+        for(let size=Math.min(this.memberMaxWords,words.length-i);size>=1;size--){
+          const phrase=words.slice(i,i+size).join(' '),matches=topicsFor(phrase);
+          if(matches.length){found=matches;member=phrase;length=size;break;}
+        }
         if(!found.length)continue;
-        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(words[i])-this.rings.get(a).get(words[i])||cmpLabel(a,b))[0];
+        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(member)-this.rings.get(a).get(member)||cmpLabel(a,b))[0];
         if(!out.includes(pick))out.push(pick);
+        i+=length-1;
       }
       return out;
     }

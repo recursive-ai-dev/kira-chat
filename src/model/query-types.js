@@ -4,7 +4,9 @@
   const bad=m=>{throw new QueryError('InvalidQuery',m);};
   const allowed=['subsumes','existential','relation','entails','shift','realize','route','path_cost'];
   function validateQuery(a,q){
-    try{K.canonical(q);}catch{bad('Query is not canonical JSON data');}
+    // The canonical encoder also supports CBOR integers outside JSON's domain.
+    // Every accepted query must survive the JSON cloning used by certificates.
+    try{K.canonical(q);K.clone(q);}catch{bad('Query is not canonical JSON data');}
     if(!q||typeof q!=='object'||Array.isArray(q)||typeof q.op!=='string')bad('Query object required');
     if(q.artifactHash&&q.artifactHash!==a.hash)throw new QueryError('ArtifactMismatch','Query references another artifact');
     if(!allowed.includes(q.op))throw new QueryError('UnsupportedOperator','Unsupported operation: '+q.op);
@@ -36,7 +38,12 @@
     return {...base,digest:K.hash({artifact:a.hash,query:q,result:{outcome,value},evidenceRoot:evidence.root})};
   }
   function failure(a,q,e){
-    let query;try{K.canonical(q);query=K.clone(q);}catch{query={op:typeof q?.op==='string'?q.op:'invalid',invalidEncoding:true};}
+    let query;try{K.canonical(q);query=K.clone(q);}catch{
+      // Never copy malformed Unicode (or invoke a throwing property getter)
+      // into the very error certificate reporting that encoding failure.
+      let op='invalid';try{if(typeof q?.op==='string'&&/^[a-z_]{1,64}$/.test(q.op))op=q.op;}catch{}
+      query={op,invalidEncoding:true};
+    }
     return {artifactHash:a.hash,query,outcome:e.outcome||'InvalidQuery',value:{reason:e.message},evidence:null,digest:K.hash({artifact:a.hash,query,outcome:e.outcome||'InvalidQuery',reason:e.message})};
   }
   const distance=(s,target)=>Number(s.lin.reduce((v,x,i)=>v+BigInt(Math.abs(x-target[i])),0n));

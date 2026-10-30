@@ -10,8 +10,8 @@ android {
         applicationId 'dev.kira.chat'
         minSdk 24
         targetSdk 36
-        versionCode 4
-        versionName '4.5.0'
+        versionCode 5
+        versionName '4.6.0'
     }
 
     buildTypes {
@@ -27,12 +27,23 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     lint {
-        abortOnError false
+        abortOnError true
     }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
+
+// Fail before packaging if either generated deliverable differs from its source.
+tasks.register('verifyKira', Exec) {
+    workingDir rootProject.file('..')
+    commandLine 'python3', 'tools/build.py', '--check'
 }
 
 // The app is the single generated Kira.html; it is copied in, never edited here.
 tasks.register('copyKira', Copy) {
+    dependsOn 'verifyKira'
     from rootProject.file('../Kira.html')
     into layout.projectDirectory.dir('src/main/assets')
 }

@@ -149,3 +149,25 @@ test('settings events only accept known keys and ranges', () => {
   assert.throws(() => K.validateEvent(state, {seq: 1, time: 1, type: 'settings', settings: {theme: 'neon'}}), /theme/);
   assert.throws(() => K.validateEvent(state, {seq: 1, time: 1, type: 'settings', settings: {boundary: 'explicit'}}), /boundary/);
 });
+
+test('save limits count UTF-8 bytes and reject the exact boundary without replacing saved data', () => {
+  const out = scenario(['Hello'], `
+    const store = new Kira.SessionStore(null);
+    store.commit(Kira.packSession(events, state, Kira.APP_META));
+    const before = store.raw;
+    const tooLarge = {text: '漢'.repeat(Math.ceil(Kira.MAX_SESSION_BYTES / 3))};
+    out.smallEnoughInCharacters = JSON.stringify(tooLarge).length < Kira.MAX_SESSION_BYTES;
+    out.multibyte = capture(() => store.commit(tooLarge));
+    out.unchanged = store.raw === before;
+    const exact = {text: 'x'.repeat(Kira.MAX_SESSION_BYTES - 11)};
+    out.exactBytes = Kira.sessionBytes(JSON.stringify(exact));
+    out.boundary = capture(() => Kira.encodeSession(exact));
+    out.belowBytes = Kira.sessionBytes(Kira.encodeSession({text: exact.text.slice(1)}));
+  `);
+  assert.equal(out.smallEnoughInCharacters, true);
+  assert.match(out.multibyte, /storage limit/);
+  assert.equal(out.unchanged, true);
+  assert.equal(out.exactBytes, K.MAX_SESSION_BYTES);
+  assert.match(out.boundary, /storage limit/);
+  assert.equal(out.belowBytes, K.MAX_SESSION_BYTES - 1);
+});

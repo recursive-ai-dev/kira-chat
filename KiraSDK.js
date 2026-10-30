@@ -34,7 +34,19 @@ globalThis.Kira = globalThis.Kira || {};
         if (typeof v === 'number' && !Number.isSafeInteger(v)) throw Error('Canonical numbers must be exact integers');
         const n = BigInt(v); head(n < 0n ? 1 : 0, n < 0n ? -1n - n : n); return;
       }
-      if (typeof v === 'string') { const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return; }
+      if (typeof v === 'string') {
+        // TextEncoder replaces lone UTF-16 surrogates with U+FFFD. Reject them
+        // first: canonical encodings must distinguish every admitted string,
+        // including object keys, instead of silently repairing their contents.
+        for (let i = 0; i < v.length; i++) {
+          const unit = v.charCodeAt(i);
+          if (unit >= 0xd800 && unit <= 0xdbff) {
+            const next = v.charCodeAt(++i);
+            if (!(next >= 0xdc00 && next <= 0xdfff)) throw Error('Unpaired Unicode surrogate');
+          } else if (unit >= 0xdc00 && unit <= 0xdfff) throw Error('Unpaired Unicode surrogate');
+        }
+        const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return;
+      }
       if (Array.isArray(v)) { head(4, v.length); for (const x of v) write(x); return; }
       if (typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
         const entries = Object.keys(v).map(k => [canonical(k), k]).sort((a,b) => bytesCmp(a[0], b[0]));
@@ -75,6 +87,9 @@ globalThis.Kira = globalThis.Kira || {};
   // Range reduction gives 1 <= m < 2. All divisions round outwards; tail is geometric.
   const ceilDiv = (a,b) => (a+b-1n)/b;
   function logInterval(n, p) {
+    assert((typeof n==='number'&&Number.isSafeInteger(n)&&n>=1)||
+      (typeof n==='bigint'&&n>=1n&&n<=BigInt(Number.MAX_SAFE_INTEGER)),'Logarithm input must be a positive safe integer');
+    assert(Number.isSafeInteger(p)&&p>=1&&p<=512,'Logarithm precision must be an integer in 1..512');
     n=BigInt(n); const Q=1n<<BigInt(p); let k=0n,t=n;
     while(t>=2n){t>>=1n;k++;}
     function series(num,den) {
@@ -94,7 +109,7 @@ globalThis.Kira = globalThis.Kira || {};
     return [a+k*c,b+k*d];
   }
   function phi(hypo,N) {
-    assert(Number.isInteger(hypo)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
+    assert(Number.isSafeInteger(hypo)&&Number.isSafeInteger(N)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
     if(hypo===0)return 4294967296;if(hypo===N-1)return 0;
     for(let p=64;p<=512;p*=2) {
       const [a,b]=logInterval(hypo+1,p),[c,d]=logInterval(N,p), Q=4294967296n;
@@ -241,7 +256,9 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
   const bad=m=>{throw new QueryError('InvalidQuery',m);};
   const allowed=['subsumes','existential','relation','entails','shift','realize','route','path_cost'];
   function validateQuery(a,q){
-    try{K.canonical(q);}catch{bad('Query is not canonical JSON data');}
+    // The canonical encoder also supports CBOR integers outside JSON's domain.
+    // Every accepted query must survive the JSON cloning used by certificates.
+    try{K.canonical(q);K.clone(q);}catch{bad('Query is not canonical JSON data');}
     if(!q||typeof q!=='object'||Array.isArray(q)||typeof q.op!=='string')bad('Query object required');
     if(q.artifactHash&&q.artifactHash!==a.hash)throw new QueryError('ArtifactMismatch','Query references another artifact');
     if(!allowed.includes(q.op))throw new QueryError('UnsupportedOperator','Unsupported operation: '+q.op);
@@ -273,7 +290,12 @@ Kira.ARTIFACT={"schema":"rse-kira/4.1.0","profile":"EXPERIMENTAL","unicode":"15.
     return {...base,digest:K.hash({artifact:a.hash,query:q,result:{outcome,value},evidenceRoot:evidence.root})};
   }
   function failure(a,q,e){
-    let query;try{K.canonical(q);query=K.clone(q);}catch{query={op:typeof q?.op==='string'?q.op:'invalid',invalidEncoding:true};}
+    let query;try{K.canonical(q);query=K.clone(q);}catch{
+      // Never copy malformed Unicode (or invoke a throwing property getter)
+      // into the very error certificate reporting that encoding failure.
+      let op='invalid';try{if(typeof q?.op==='string'&&/^[a-z_]{1,64}$/.test(q.op))op=q.op;}catch{}
+      query={op,invalidEncoding:true};
+    }
     return {artifactHash:a.hash,query,outcome:e.outcome||'InvalidQuery',value:{reason:e.message},evidence:null,digest:K.hash({artifact:a.hash,query,outcome:e.outcome||'InvalidQuery',reason:e.message})};
   }
   const distance=(s,target)=>Number(s.lin.reduce((v,x,i)=>v+BigInt(Math.abs(x-target[i])),0n));
@@ -1034,7 +1056,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
 // Every topic is a ring of weighted members: curated concepts (1.0), theme-pack words (0.9), declared
 // overlap words (0.8) and the taxonomic neighbours of members (about 0.5). Two rings overlap by the
 // members they share; those shared members are the bridges between them. Ring centres are laid out in
-// the plane by classical MDS on 1 - overlap, and a conversation carries a per-topic activation that
+// the plane by a normalized spectral projection of 1 - overlap, and a conversation carries a per-topic activation that
 // decays each turn and spreads to neighbouring rings in proportion to overlap. Its weighted centroid
 // is the conversation's position in the field.
 //
@@ -1096,6 +1118,8 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       // ring too, which is what makes neighbouring rings overlap.
       for(const [t,ids] of core)for(const id of ids)for(const [n,w] of this.neighbours(id))this.put(t,label(engine.concepts.get(n).label),w);
       this.topics=[...this.rings.keys()].sort(cmpLabel);
+      this.memberMaxWords=1;
+      for(const ring of this.rings.values())for(const word of ring.keys())this.memberMaxWords=Math.max(this.memberMaxWords,word.split(/\s+/).length);
     }
     /** Weighted Jaccard overlap of two rings, in permille. */
     overlap(a,b){
@@ -1117,9 +1141,13 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       for(const [w,x] of ra)if(rb.has(w))out.push({word:w,weight:Math.min(x,rb.get(w))});
       return out.sort((p,q)=>q.weight-p.weight||cmpLabel(p.word,q.word));
     }
-    /** Classical MDS on 1 - overlap, by power iteration. Integer coordinates in [-1000, 1000]. */
+    /** Normalized spectral layout of double-centered squared distances.
+     * Each axis is scaled independently, without eigenvalue scaling; this is
+     * a bounded policy layout, not a distance-preserving classical MDS embedding.
+     */
     layout(){
       const T=this.topics,n=T.length,D=[];
+      if(n<=1){this.centre=new Map(T.map(t=>[t,{x:0,y:0}]));return;}
       for(let i=0;i<n;i++){D.push([]);for(let j=0;j<n;j++){const d=1-this.overlap(T[i],T[j])/1000;D[i].push(d*d);}}
       const rowMean=D.map(r=>r.reduce((s,x)=>s+x,0)/n),total=rowMean.reduce((s,x)=>s+x,0)/n,B=[];
       for(let i=0;i<n;i++){B.push([]);for(let j=0;j<n;j++)B[i].push(-0.5*(D[i][j]-rowMean[i]-rowMean[j]+total));}
@@ -1128,7 +1156,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         let v=T.map((_,i)=>((i*37+k*11)%n)-n/2+0.5);
         for(let iter=0;iter<300;iter++){
           let w=B.map(row=>row.reduce((s,x,j)=>s+x*v[j],0));
-          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
+          for(const u of axes){const dot=w.reduce((s,x,i)=>s+x*u[i],0),norm=u.reduce((s,x)=>s+x*x,0);if(norm>0)for(let i=0;i<n;i++)w[i]-=dot/norm*u[i];}
           const top=w.reduce((m,x)=>Math.max(m,Math.abs(x)),0)||1;
           v=w.map(x=>x/top);
         }
@@ -1144,11 +1172,15 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       const words=K.fold(text).replace(/[^a-z0-9' -]+/g,' ').split(/\s+/).filter(Boolean).slice(0,60),out=[];
       const topicsFor=w=>this.topics.filter(t=>(this.rings.get(t).get(w)||0)>=800);
       for(let i=0;i<words.length;i++){
-        const candidates=(i+1<words.length&&topicsFor(words[i]+' '+words[i+1]))||[];
-        const found=candidates.length?candidates:topicsFor(words[i]);
+        let found=[],member='',length=0;
+        for(let size=Math.min(this.memberMaxWords,words.length-i);size>=1;size--){
+          const phrase=words.slice(i,i+size).join(' '),matches=topicsFor(phrase);
+          if(matches.length){found=matches;member=phrase;length=size;break;}
+        }
         if(!found.length)continue;
-        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(words[i])-this.rings.get(a).get(words[i])||cmpLabel(a,b))[0];
+        const pick=found.slice().sort((a,b)=>(ctx?.act?.[b]||0)-(ctx?.act?.[a]||0)||this.rings.get(b).get(member)-this.rings.get(a).get(member)||cmpLabel(a,b))[0];
         if(!out.includes(pick))out.push(pick);
+        i+=length-1;
       }
       return out;
     }
@@ -2035,11 +2067,23 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     const memory={...K.clone(frame),id,sourceMessage,resolutionMessage:resolutionMessage||null,turn:state.turn,status:'active',supersedes,supersededBy:null};
     state.memories.push(memory);return {memory,created:true};
   }
-  const supportedImage=s=>typeof s==='string'&&s.length<=MAX_IMAGE&&/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(s);
+  const supportedImage=s=>{
+    if(typeof s!=='string'||s.length>MAX_IMAGE)return false;
+    const match=/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(s);
+    if(!match||match[0].length!==s.length)return false;
+    const data=match[1];
+    if(data.length%4!==0)return false;
+    // Canonical padding includes zero unused bits in the final sextet.
+    if(data.endsWith('=='))return /[AQgw]==$/.test(data);
+    if(data.endsWith('='))return /[AEIMQUYcgkosw048]=$/.test(data);
+    return true;
+  };
   function validateEvent(state,e){
-    K.assert(e&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
+    K.assert(e&&typeof e==='object'&&!Array.isArray(e)&&Number.isSafeInteger(e.seq)&&e.seq===state.revision+1&&e.seq<=MAX_EVENTS,'Event sequence or session limit');
     K.assert(Number.isSafeInteger(e.time)&&e.time>=0&&e.time<=8640000000000000,'Explicit timestamp required');
     K.assert(['message','settings','retire','image','legacy'].includes(e.type),'Unknown event type');
+    const fields={message:['text'],settings:['settings'],retire:['memoryId'],image:['data'],legacy:['messages']};
+    K.assert(Object.keys(e).every(key=>['seq','time','type'].includes(key)||fields[e.type].includes(key)),'Event has unknown or mismatched fields');
     if(e.type==='message')K.assert(typeof e.text==='string'&&e.text.trim().length&&e.text.length<=2000,'Message must contain 1–2000 characters');
     if(e.type==='settings'){
       const s=e.settings;K.assert(s&&typeof s==='object'&&!Array.isArray(s)&&Object.keys(s).every(k=>['persona','register','theme','avatar','boundary'].includes(k)),'Unknown setting');
@@ -2051,7 +2095,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     }
     if(e.type==='image')K.assert(supportedImage(e.data),'Invalid or oversized image');
     if(e.type==='retire')K.assert(typeof e.memoryId==='string'&&state.memories.some(m=>m.id===e.memoryId&&m.status==='active'),'Memory is not active');
-    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&e.messages.every(m=>['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
+    if(e.type==='legacy')K.assert(Array.isArray(e.messages)&&e.messages.length<=200&&Array.from(e.messages).every(m=>m&&typeof m==='object'&&!Array.isArray(m)&&['you','her','user','assistant'].includes(m.role)&&typeof m.text==='string'&&m.text.length<=4000),'Invalid legacy archive');
   }
   function choose(state,name,persona){
     const items=K.DIALOGUE.responses[name];K.assert(items?.length,'Missing response family '+name);
@@ -2378,7 +2422,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"bbc697c38b97e93d6e16f4f1242ddbfcf8b89a105df7587f2032ea6e68df9d9e","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f00b34d4e4d0682f6e2dd506b76ef55a7f688f146ce3bf29b3b7f9ec6f1933b6","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 'use strict';
 // A narrative authoring compiler. This does not alter the pinned RSE ontology.
 (function(K){
@@ -2391,7 +2435,12 @@ Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce7
     check(value&&Object.getPrototypeOf(value)===Object.prototype,label+' must be a plain object');
     check(Object.keys(value).every(key=>keys.includes(key)),label+' has an unknown field');
   }
-  function text(value,label,max=2000){check(typeof value==='string'&&value.trim().length>0&&value.length<=max,label+' must be nonempty text (max '+max+')');return K.nfc(value);}
+  function text(value,label,max=2000){
+    check(typeof value==='string'&&value.length<=max,label+' must be nonempty text (max '+max+')');
+    const normalized=K.nfc(value);
+    check(normalized.trim().length>0&&normalized.length<=max,label+' must be nonempty text (max '+max+')');
+    return normalized;
+  }
   function id(value,label){check(typeof value==='string'&&ID.test(value)&&!['constructor','prototype','__proto__'].includes(value),label+' is not a safe identifier');return value;}
   function integer(value,label,min,max){check(Number.isSafeInteger(value)&&value>=min&&value<=max,label+' must be an integer in '+min+'..'+max);return value;}
   function array(value,label,max=2000){check(Array.isArray(value)&&value.length<=max,label+' must be an array (max '+max+')');return value;}
@@ -2490,7 +2539,7 @@ Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce7
     const rebuilt=compile(pkg.definition);
     check(pkg.hash===rebuilt.hash&&K.hash(pkg)===K.hash(rebuilt),'compiled package does not match its definition');return rebuilt;
   }
-  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.3.0'};
+  K.Narrative={compile,verify,terms,check,object,text,id,integer,array,version:'0.4.0'};
 })(Kira);
 'use strict';
 // Pure multi-character host model. World truth and character beliefs are kept
@@ -2701,6 +2750,6 @@ Kira.APP_META={"version":"4.4.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce7
   }
   Object.assign(N,{WorldModel,MAX_EVENTS,MAX_EXPORT});
 })(Kira);
-Kira.NARRATIVE_META={"version":"0.3.0","sdkHash":"96cafd833adff8e500a0a383128e5730f3e17363ea96734dc620bba72fa10cd5"};
+Kira.NARRATIVE_META={"version":"0.4.0","sdkHash":"5e582398d21775f7abdab8f0f7fd0519d8bfbeb86ac45377ea4fab93425b7528"};
 return Kira;
 });

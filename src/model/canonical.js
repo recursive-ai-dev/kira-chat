@@ -27,7 +27,19 @@ globalThis.Kira = globalThis.Kira || {};
         if (typeof v === 'number' && !Number.isSafeInteger(v)) throw Error('Canonical numbers must be exact integers');
         const n = BigInt(v); head(n < 0n ? 1 : 0, n < 0n ? -1n - n : n); return;
       }
-      if (typeof v === 'string') { const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return; }
+      if (typeof v === 'string') {
+        // TextEncoder replaces lone UTF-16 surrogates with U+FFFD. Reject them
+        // first: canonical encodings must distinguish every admitted string,
+        // including object keys, instead of silently repairing their contents.
+        for (let i = 0; i < v.length; i++) {
+          const unit = v.charCodeAt(i);
+          if (unit >= 0xd800 && unit <= 0xdbff) {
+            const next = v.charCodeAt(++i);
+            if (!(next >= 0xdc00 && next <= 0xdfff)) throw Error('Unpaired Unicode surrogate');
+          } else if (unit >= 0xdc00 && unit <= 0xdfff) throw Error('Unpaired Unicode surrogate');
+        }
+        const b = utf8.encode(v); head(3, b.length); for (const x of b) out.push(x); return;
+      }
       if (Array.isArray(v)) { head(4, v.length); for (const x of v) write(x); return; }
       if (typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
         const entries = Object.keys(v).map(k => [canonical(k), k]).sort((a,b) => bytesCmp(a[0], b[0]));
@@ -68,6 +80,9 @@ globalThis.Kira = globalThis.Kira || {};
   // Range reduction gives 1 <= m < 2. All divisions round outwards; tail is geometric.
   const ceilDiv = (a,b) => (a+b-1n)/b;
   function logInterval(n, p) {
+    assert((typeof n==='number'&&Number.isSafeInteger(n)&&n>=1)||
+      (typeof n==='bigint'&&n>=1n&&n<=BigInt(Number.MAX_SAFE_INTEGER)),'Logarithm input must be a positive safe integer');
+    assert(Number.isSafeInteger(p)&&p>=1&&p<=512,'Logarithm precision must be an integer in 1..512');
     n=BigInt(n); const Q=1n<<BigInt(p); let k=0n,t=n;
     while(t>=2n){t>>=1n;k++;}
     function series(num,den) {
@@ -87,7 +102,7 @@ globalThis.Kira = globalThis.Kira || {};
     return [a+k*c,b+k*d];
   }
   function phi(hypo,N) {
-    assert(Number.isInteger(hypo)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
+    assert(Number.isSafeInteger(hypo)&&Number.isSafeInteger(N)&&hypo>=0&&hypo<N&&N>=2,'Invalid potential counts');
     if(hypo===0)return 4294967296;if(hypo===N-1)return 0;
     for(let p=64;p<=512;p*=2) {
       const [a,b]=logInterval(hypo+1,p),[c,d]=logInterval(N,p), Q=4294967296n;

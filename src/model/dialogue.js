@@ -99,6 +99,33 @@
       if(conflictingPreferenceFrames(parsed.frames))parsed={...parsed,intent:'c:clarify',speechAct:'clarification',frames:[],supported:false,reasonCode:'conflicting_reports',reason:'Those reports conflict. Please send the current preference on its own so I can remember it correctly.'};
       else if(exclusiveReportFrames(parsed.frames))parsed={...parsed,intent:'c:clarify',speechAct:'clarification',frames:[],supported:false,reasonCode:'exclusive_reports',reason:'I can keep one name or feeling report for each time period. Please send those reports separately. I haven’t saved any part of that message.'};
       state.messages.push({id:uid,role:'user',text:parsed.text,time:event.time,turn:state.turn});
+      if(K.NLU?.extractEpisodic&&!/\?\s*$/.test(parsed.text)&&parsed.nlu?.act?.kind!=='episodic_recall'&&parsed.intent!=='c:forget'&&parsed.intent!=='c:recall'){
+        const ep=K.NLU.extractEpisodic(parsed.text,parsed.nlu?.normalized||parsed.text,state,state.turn,uid);
+        const ents=(state.context.entities||[]).slice(),evs=(state.context.episodic||[]).slice();
+        for(const ent of ep.entities){
+          const normName=K.fold(ent.name);
+          const idx=ents.findIndex(e=>K.fold(e.name)===normName||(ent.category==='pet'&&e.category==='pet'&&ent.name.startsWith('your ')&&!e.name.startsWith('your ')));
+          if(idx>=0){
+            const prev=ents[idx];
+            const mergedAttrs=[...new Set([...(prev.attributes||[]),...(ent.attributes||[])])].slice(-8);
+            ents[idx]={...prev,attributes:mergedAttrs,lastTurn:state.turn};
+            state.context.activeEntity=ents[idx];
+          }else if(ent.refOnly&&state.context.activeEntity){
+            const ai=ents.findIndex(e=>K.fold(e.name)===K.fold(state.context.activeEntity.name));
+            if(ai>=0){
+              ents[ai]={...ents[ai],attributes:[...new Set([...(ents[ai].attributes||[]),...(ent.attributes||[])])].slice(-8),lastTurn:state.turn};
+              state.context.activeEntity=ents[ai];
+            }
+          }else{
+            const rec={...ent,attributes:[...new Set(ent.attributes||[])],lastTurn:state.turn};
+            ents.push(rec);
+            state.context.activeEntity=rec;
+          }
+        }
+        for(const ev of [...ep.events,...ep.facts])evs.push(ev);
+        state.context.entities=ents.slice(-16);
+        state.context.episodic=evs.slice(-24);
+      }
       const routing=this.engine.query({op:'route',intent:parsed.intent,artifactHash:this.engine.a.hash});
       K.assert(routing.outcome==='Computed','Dialogue intent was not admitted');
       const intent=routing.value.pick.slice('handler:'.length),persona=state.settings.persona;
@@ -186,9 +213,22 @@
         const match=plan.text.match(/(?:^|[.!?]\s+)([^.!?]*\?)\s*$/u);K.assert(match,'Reply must end in a question');return ask(topic,step,match[1]);
       };
       const discourse=(text,questionMessage)=>{plan.policy.discourse={kind:'quoted_conversation',sourceMessage:uid,questionMessage:questionMessage||null,text};state.context.thread=(state.context.thread||[]).concat({sourceMessage:uid,questionMessage:questionMessage||null,text}).slice(-8);};
+      const appendAbout=(act,prefix='')=>{
+        const kind=act.aboutKind,o=act.object;
+        if(kind==='capabilities'||kind==='honest'){plan.text+=prefix+generic(kind);askLastQuestion('general',0);}
+        else if(kind==='taste'||kind==='favorite'){
+          const topic=o?.candidates?.length===1?this.engine.topicFor(o.concept):null;
+          const taste=K.Responder?.respondKiraTaste
+            ?K.Responder.respondKiraTaste({kind,target:o?.label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
+            :{text:generic('honest',{questionsPaused:true}),topic:null};
+          const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(o?.label||'',this.engine):null)||'general';
+          plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,o?.label)).trim();
+        }else plan.text+=prefix+generic('about');
+      };
       state.context.pending=null;
       // Where this message lands in the ring field; the field also decides how a topic thread continues.
       const prevField=previous.context.field,hits=K.conversationTopics(parsed.text,this.engine);
+      for(const [t,w] of (parsed.nlu?.topicScores||[]))if(w>=5&&!hits.includes(t))hits.push(t);
       for(const t of this.field.resolve(parsed.text,prevField))if(!hits.includes(t))hits.push(t);
       state.context.field=this.field.advance(prevField,hits,state.turn);
       if(parsed.supported&&!['social','greet','thanks','how','about','stay','joke','prompt'].includes(intent))state.context.declinedTopics=(state.context.declinedTopics||[]).filter(topic=>!hits.includes(topic));
@@ -201,16 +241,22 @@
           else if(first.kind==='note')plan.text=generate(report(first));
           else if(first.kind==='mood'){
             const statement=generate(K.Realization.attributed(report(first)));
-            if(first.polarity==='negative')plan.text=statement+' I won’t assume a different feeling from that. '+ask('general',0,{purpose:'detail'});
-            else if(parsed.negativeMood&&['tired','exhausted'].includes(first.object.label)&&first.temporal==='present')plan.text=statement+' '+ask('support',1,{purpose:'detail'});
-            else if(parsed.negativeMood){plan.text=statement+' '+generic('support');askLastQuestion('support',0);}
-            else if(first.temporal==='present'&&upbeat.has(first.object.label))plan.text=statement+' '+ask('general',0,{purpose:'detail'});
-            else plan.text=statement+' '+ask('general',0,{purpose:first.object.label==='bored'?'alternative':'detail'});
+            const wrapped=K.Responder?.wrapGroundedMood?K.Responder.wrapGroundedMood({realizedText:statement,state,nlu:parsed.nlu}):null;
+            if(wrapped?.key)state.usage[wrapped.key]=(state.usage[wrapped.key]||0)+1;
+            const moody=wrapped?wrapped.text:statement;
+            if(first.polarity==='negative')plan.text=moody+' I won’t assume otherwise. '+ask('general',0,{purpose:'detail'});
+            else if(parsed.negativeMood&&['tired','exhausted','wiped','drained','burnt out','burned out'].includes(first.object.label)&&first.temporal==='present')plan.text=moody+' '+ask('support',1,{purpose:'detail'});
+            else if(parsed.negativeMood){plan.text=moody+' '+generic('support');askLastQuestion('support',0);}
+            else if(first.temporal==='present'&&upbeat.has(first.object.label))plan.text=moody+' '+ask('general',0,{purpose:'detail'});
+            else plan.text=moody+' '+ask('general',0,{purpose:first.object.label==='bored'?'alternative':'detail'});
           }else{
             const changed=records[0].created&&first.supersedes.length>0,past=first.temporal==='past';
             const before=changed?state.memories.find(m=>m.id===first.supersedes.at(-1)):null;
             const tree=before&&before.temporal==='present'&&!past&&before.object.key===first.object.key&&before.object.label===first.object.label?K.Realization.correction(report(before),report(first)):report(first);
-            plan.text=(changed?'⟦@updated⟧. ':records[0].created?'⟦@remember⟧. ':'⟦@saved⟧. ')+generate(tree);
+            const realizedText=generate(tree);
+            const wrapped=K.Responder?.wrapGroundedPreference?K.Responder.wrapGroundedPreference({realizedText,changed,created:records[0].created,records,nlu:parsed.nlu,state}):null;
+            if(wrapped?.key)state.usage[wrapped.key]=(state.usage[wrapped.key]||0)+1;
+            plan.text=wrapped?wrapped.text:(changed?'⟦@updated⟧. ':records[0].created?'⟦@remember⟧. ':'⟦@saved⟧. ')+realizedText;
             if(!past&&first.polarity==='positive'&&records[0].created){
               const topic=this.engine.topicFor(first.object.concept)||K.conversationTopic(first.object.label,this.engine)||'general';
               plan.text+=' '+ask(topic,0,undefined,first.object.label,[],['hate','dislike'].includes(first.predicate)?'averse':'neutral',true);
@@ -220,6 +266,10 @@
           break;
         }
         case 'recall':{
+          if(parsed.nluAct?.kind==='episodic_recall'&&K.Responder?.respondEpisodicRecall){
+            plan.text=K.Responder.respondEpisodicRecall({target:parsed.nluAct.target,state,questionsPaused:state.context.questionsPaused||!allowQuestions});
+            break;
+          }
           let records=state.memories.filter(m=>m.status==='active');
           if(parsed.nameOnly)records=records.filter(m=>m.kind==='name');
           else if(parsed.preferencesOnly)records=records.filter(m=>m.kind==='preference'&&m.temporal==='present');
@@ -239,11 +289,31 @@
           const noteTargets=[parsed.rawObjectLabel,parsed.rawObjectLabel.replace(/[.!?]+$/,'')].map(K.fold);
           const records=state.memories.filter(m=>m.status==='active'&&(m.object.key===parsed.object.key||parsed.object.candidates.includes(m.object.key)||K.fold(m.object.label)===K.fold(parsed.object.label)||m.kind==='note'&&noteTargets.includes(K.fold(m.object.label))));
           const ids=records.map(m=>m.id);state.memories=state.memories.map(m=>ids.includes(m.id)?{...m,status:'retired',retiredAt:event.seq}:m);
+          const fk=K.fold(parsed.object.label);
+          const prevEntCount=(state.context.entities||[]).length,prevEvCount=(state.context.episodic||[]).length;
+          if(fk){
+            state.context.entities=(state.context.entities||[]).filter(e=>!noteTargets.some(t=>K.fold(e.name).includes(t)||K.fold(e.subtype||'').includes(t)));
+            state.context.episodic=(state.context.episodic||[]).filter(ev=>!noteTargets.some(t=>K.fold([ev.object,ev.value,ev.actor,ev.detail].filter(Boolean).join(' ')).includes(t)));
+            if(state.context.activeEntity&&noteTargets.some(t=>K.fold(state.context.activeEntity.name).includes(t)))state.context.activeEntity=null;
+          }
+          const removedEp=(prevEntCount-(state.context.entities||[]).length)+(prevEvCount-(state.context.episodic||[]).length);
           if(records.length)state.context.focus=null;
-          plan.text=records.length?'I’ll stop using '+(records.length===1?'that memory':'those memories')+'. The original messages and retired records remain in the history; “Reset conversation” removes this app’s saved session.':'I don’t have an active memory matching that.';
+          plan.text=(records.length||removedEp)?'I’ll stop using '+(records.length+removedEp===1?'that memory':'those memories')+'. The original messages and retired records remain in the history; “Reset conversation” removes this app’s saved session.':'I don’t have an active memory matching that.';
           plan.policy.retired=ids;break;
         }
         case 'clarify':{
+          if(parsed.nluAct?.kind==='clarify_last'){
+            const prev=previous.lastPlan,ptopic=previous.context.pending?.topic||previous.context.field?.topic;
+            const ent=state.context.activeEntity;
+            if(prev&&prev.act==='topic'&&ptopic&&ptopic!=='general'){
+              plan.text=`Just following up on the ${ptopic} thread${ent?` (and ${ent.name})`:''} — I liked where that was going and wanted to hear more of your take.${state.context.questionsPaused?'':' Feel like keeping on that or pivoting somewhere else?'}`;
+            }else if(prev){
+              plan.text=`I was picking up on "${prev.text.slice(0,80)}${prev.text.length>80?'…':''}" to keep our thread moving. Tell me which angle you want to run with.`;
+            }else{
+              plan.text='Always happy to clarify — start wherever you want and I’ll follow your lead.';
+            }
+            break;
+          }
           if(parsed.control){
             plan.policy.conversationControl=parsed.control;
             if(['decline','change_subject'].includes(parsed.control)){
@@ -266,14 +336,21 @@
             let topicCue=null;
             const misses=(previous.context.misses||0)+1;state.context.misses=misses;
             const name=state.memories.find(m=>m.kind==='name'&&m.status==='active');
-            if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
-            else if(!/\?\s*$/.test(parsed.text)&&(topicCue=K.conversationTopic(parsed.text,this.engine))){
+            const topNluTopic=parsed.nlu?.topicScores?.[0]?.[0];
+            if(!name&&K.isConversationName(parsed.text)&&/^\p{Lu}/u.test(parsed.text)&&!(K.Knowledge?.lookupEntry?.(parsed.text))){plan.text='Is “'+parsed.text+'” the name you’d like me to use? Please say “My name is '+parsed.text+'” to confirm.';state.context.pending={kind:'name',questionMessage:aid};}
+            else if(!/\?\s*$/.test(parsed.text)&&(topicCue=K.conversationTopic(parsed.text,this.engine)||topNluTopic)){
               // A statement the grammar cannot store, but whose words name a known concept: keep the conversation on that topic.
               state.context.misses=0;discourse(parsed.text);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic:topicCue,fallback:'unparsed statement'};
-              plan.text=interact('social',{questionsPaused:true})+' '+ask(topicCue,0,undefined,parsed.text,[]);
+              const lead=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:parsed.text,state,topic:topicCue,isTopicShift:false,questionsPaused:state.context.questionsPaused}):null;
+              if(lead?.key)state.usage[lead.key]=(state.usage[lead.key]||0)+1;
+              const startStep=parsed.nlu?.affect?.valence==='negative'?3:0;
+              plan.text=((lead?lead.text:interact('social',{questionsPaused:true}))+' '+ask(topicCue,startStep,undefined,parsed.text,[])).trim();
             }
-            else if(misses===1)plan.text=/\?\s*$/.test(parsed.text)?'I can’t answer that one. I can answer things like “What do you remember about me?”, “What is a guitar?”, or “Is a violin an instrument?”.':/^i(?:'m| am|'ve| have| want| need| think| wish| would| had| was| got| went| work| play| make| write)\b/i.test(parsed.text)?'I couldn’t read that as something to remember. Could you say it as “I like …”, “I feel …”, or “I love …”, or keep it as a note with “Remember this: …”?':'I didn’t quite catch that. Could you put it another way? Short sentences like “I like …”, “I feel …”, or “My name is …” work best.';
-            else plan.text='I’m still not following, sorry—my grammar is fairly small. Ask “What can you do?” to see what I understand, or keep this as a note with “Remember this: …”.';
+            else if(K.Responder?.respondNovelFallback){
+              plan.text=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+            }
+            else if(misses===1)plan.text='I caught the drift of that, even if it sits outside my structured memory commands — tell me a little more about what you mean?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
+            else plan.text='Let me make sure I follow where you want to go — what part of that matters most to you right now?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
           }else plan.text=parsed.reason;
           break;
         }
@@ -285,18 +362,83 @@
           break;
         }
         case 'topic':{
+          if(parsed.nluAct){
+            const na=parsed.nluAct,paused=state.context.questionsPaused||!allowQuestions;
+            const stripQ=s=>paused?withoutFinalQuestion(s).replace(/\?/g,'.'):s;
+            if(na.kind==='riddle_answer'){
+              const res=K.Knowledge?.evaluateRiddleAnswer?.(na.answer,previous.context.pending);
+              if(res){
+                plan.text=stripQ(res.text);
+                if((res.status==='wrong'||res.status==='hint')&&!paused)state.context.pending={...K.clone(previous.context.pending),question:plan.text};
+              }else plan.text='Let me pick a fresh riddle whenever you are ready!';
+              break;
+            }
+            if(na.kind==='dilemma_answer'){
+              const reply=K.Knowledge?.evaluateDilemmaAnswer?.(na.answer,previous.context.pending);
+              plan.text=stripQ(reply||'Good pick — both sides definitely have a real pull.');
+              break;
+            }
+            if(na.kind==='story'){
+              const picked=K.Knowledge.pickStory(state);state.usage[picked.key]=(state.usage[picked.key]||0)+1;
+              plan.text=picked.item+(paused?'':' Did that scene click with you, or want another story or riddle?');
+              break;
+            }
+            if(na.kind==='fun_fact'){
+              const topTopic=parsed.nlu?.topicScores?.[0]?.[0]||previous.context.field?.topic;
+              const picked=K.Knowledge.pickFunFact(topTopic,state);state.usage[picked.key]=(state.usage[picked.key]||0)+1;
+              plan.text=picked.item.fact+(paused?'':' Kind of wild, right?');
+              break;
+            }
+            if(na.kind==='riddle'){
+              const picked=K.Knowledge.pickRiddle(state);state.usage[picked.key]=(state.usage[picked.key]||0)+1;
+              if(paused){plan.text='Here is a puzzle to chew on: '+picked.item.question.replace(/\?/g,'.');}
+              else{plan.text=picked.item.question;state.context.pending={kind:'riddle',riddleId:picked.item.id,question:picked.item.question,questionMessage:aid};}
+              break;
+            }
+            if(na.kind==='dilemma'){
+              const picked=K.Knowledge.pickDilemma(state);state.usage[picked.key]=(state.usage[picked.key]||0)+1;
+              if(paused){plan.text=picked.item.prompt.replace(/\?/g,'.');}
+              else{plan.text=picked.item.prompt;state.context.pending={kind:'dilemma',dilemmaId:picked.item.id,question:picked.item.prompt,questionMessage:aid};}
+              break;
+            }
+            if(na.kind==='recommend'){
+              const rec=K.Knowledge.recommend(na.target,state);state.usage[rec.key]=(state.usage[rec.key]||0)+1;
+              plan.text=rec.text+(paused?'':` Want another option in a different mood, or does ${rec.topic} sound right tonight?`);
+              break;
+            }
+            if(na.kind==='decide'){
+              plan.text=stripQ(K.Knowledge.decide(na.a,na.b,state));
+              break;
+            }
+            if(na.kind==='compare'){
+              const cmp=K.Knowledge.compare(na.a,na.b,this.engine,state);
+              plan.policy.topicSelection={rule:'comparison lookup',topic:cmp.topic};
+              plan.text=paused?cmp.text:cmp.text+' '+cmp.followUp;
+              break;
+            }
+            if(na.kind==='knowledge'||na.kind==='knowledge_candidate'){
+              const exp=K.Knowledge.explain(na.target,this.engine,state);
+              plan.policy.topicSelection={rule:'knowledge lookup',topic:exp.topic};
+              plan.text=paused?exp.text:exp.text+' '+exp.followUp;
+              break;
+            }
+          }
           if(parsed.followUp||parsed.activity){
             const f=parsed.followUp,answer=f?f.answer:parsed.activity,found=K.conversationTopic(answer,this.engine);
-            // A thread stays on its topic unless the answer is only a short phrase or says outright that the subject has changed.
-            // Returning to a topic that was in play a moment ago, or landing near a ring that is still warm, also counts as a move.
+            // A thread stays on its topic unless a strong new subject emerges, the answer is short, or the user pivots.
             const back=f?hits.find(t=>t!==f.topic&&((prevField?.visited||[]).slice(-4).includes(t)||this.field.warm(prevField,t,f.topic,state.turn))):null;
-            const settled=f&&f.topic&&f.topic!=='general',moves=!settled||!!back||/^(?:actually|anyway|by the way|speaking of|on another note|how about|what about)\b/i.test(answer)||answer.trim().split(/\s+/).length<=2;
-            const cue=moves?(back||found):null,topic=cue||f?.topic||'general',step=f?(cue&&cue!==f.topic?0:f.step+1):0;
+            const topPair=parsed.nlu?.topicScores?.[0];
+            const curScore=parsed.nlu?.topicScores?.find(([t])=>t===f?.topic)?.[1]||0;
+            const strongShift=!!(f&&topPair&&topPair[0]!==f.topic&&curScore===0&&(topPair[1]>=6||(/\b(?:actually|anyway|by the way|speaking of|lately|these days)\b/i.test(answer)&&topPair[1]>=4)));
+            const settled=f&&f.topic&&f.topic!=='general',moves=!settled||!!back||strongShift||/^(?:actually|anyway|by the way|speaking of|on another note|how about|what about)\b/i.test(answer)||answer.trim().split(/\s+/).length<=2;
+            const cue=strongShift?topPair[0]:(moves?(back||found):null),topic=cue||f?.topic||'general',step=f?(cue&&cue!==f.topic?0:f.step+1):0;
             discourse(answer,f?.questionMessage);plan.policy.topicSelection={rule:'lexical cue for question selection only',topic};
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,{purpose:'start'});}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,{purpose:'detail'});}
             else{
-              const lead=interact('social',{questionsPaused:true}),asked=cue&&cue!==f?.topic?[]:f?.asked;
+              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(cue&&cue!==f?.topic),questionsPaused:state.context.questionsPaused}):null;
+              if(reflection?.key)state.usage[reflection.key]=(state.usage[reflection.key]||0)+1;
+              const lead=reflection?reflection.text:interact('social',{questionsPaused:true}),asked=cue&&cue!==f?.topic?[]:f?.asked;
               const move=f?this.field.nextMove({ctx:state.context.field,topic,step,ladderLength:(K.conversationQuestions[topic]||[]).length,answer,memories:state.memories.filter(m=>!(state.context.declinedTopics||[]).includes(memoryTopic(m))),turn:state.turn}):{kind:'ladder'};
               if(move.kind==='remind'){claims([move.memory]);plan.text=lead+' '+generate(K.Realization.attributed(report(move.memory)))+' '+ask(topic,step,'Does that connect with this at all?',answer,asked);}
               else if(move.kind==='bridge'){plan.text=lead+' '+ask(move.topic,1,move.question,answer,[]);}
@@ -316,15 +458,39 @@
         }
         case 'support':plan.text=parsed.answer==='no'?'That’s okay. We could try a joke or a writing prompt, or leave it there.':generic(parsed.loss?'loss':'support');if(parsed.answer!=='no')askLastQuestion('support',0);break;
         case 'about':{
-          const kind=parsed.aboutKind,o=parsed.object;
-          if(kind==='capabilities'||kind==='honest'){plan.text=generic(kind);askLastQuestion('general',0);}
-          else if(kind==='taste'||kind==='favorite'){
-            const topic=o.candidates.length===1?this.engine.topicFor(o.concept):null;
-            plan.text=generic('honest',{questionsPaused:true})+' '+ask(topic||'general',0,undefined,o.label);
-          }else plan.text=generic('about');
+          const na=parsed.nluAct,paused=state.context.questionsPaused||!allowQuestions;
+          if(na?.kind==='kira_persona'&&K.Responder?.respondKiraPersona){
+            const res=K.Responder.respondKiraPersona({topic:na.topic,state,questionsPaused:paused});
+            if(res.key)state.usage[res.key]=(state.usage[res.key]||0)+1;
+            plan.text=res.text;
+          }else if(na?.kind==='kira_taste'&&K.Responder?.respondKiraTaste){
+            const taste=K.Responder.respondKiraTaste({kind:'taste',target:na.target,state,engine:this.engine,questionsPaused:paused});
+            plan.text=(taste.text+' '+ask(taste.topic||'general',0,undefined,na.target)).trim();
+          }else if(na?.kind==='live_world'){
+            const msg=na.subject==='time'
+              ?'I live completely offline inside this page with no system clock or live clock feed'
+              :na.subject==='news'
+                ?'I stay completely offline with no live news feed or web access'
+                :'I don’t have a live weather sensor since I run strictly offline here';
+            plan.text=msg+(paused?'.':' — so what is it like on your side of the window right now?');
+          }else appendAbout(parsed);
           break;
         }
         case 'social':{
+          const paused=state.context.questionsPaused||!allowQuestions;
+          if(parsed.nluAct?.kind==='reaction'&&K.Responder?.respondReaction){
+            const topic=previous.context.pending?.topic||previous.context.field?.topic;
+            const res=K.Responder.respondReaction({reaction:parsed.nluAct.reaction,topic,state,questionsPaused:paused});
+            if(res.key)state.usage[res.key]=(state.usage[res.key]||0)+1;
+            plan.text=res.followUp?res.text+' '+res.followUp:res.text;
+            break;
+          }
+          if(parsed.nluAct?.kind==='cheer_up'){
+            const picked=K.Knowledge.pickFunFact(previous.context.field?.topic,state);state.usage[picked.key]=(state.usage[picked.key]||0)+1;
+            const lead='Here is a pocket-sized bright spot for your evening: ';
+            plan.text=lead+picked.item.fact+(paused?'':' Want a quick riddle, a warm micro-story, or just someone to vent to?');
+            break;
+          }
           const kind=parsed.socialKind,priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
           if(kind==='laugh'&&['joke','prompt'].includes(priorAct)){plan.text=generic('laugh');if(!state.context.questionsPaused)state.context.pending={kind:'offer',act:priorAct};}
           else{const hook=kind==='ack'||kind==='decline'?recallHook():null;if(hook){plan.text=hook.text+' '+ask(hook.topic,0);}else{plan.text=generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}}
@@ -340,7 +506,7 @@
         default:plan.text=generic(K.DIALOGUE.responses[intent]?intent:'about');
       }
       if(parsed.elaboration){elaborating=true;discourse(parsed.elaboration);plan.text=plan.text+' You gave this reason: “'+parsed.elaboration+'”. '+ask(K.conversationTopic(parsed.text,this.engine)||'general',1);}
-      for(const [index,act] of (parsed.afterActs||[]).entries()){allowQuestions=index===parsed.afterActs.length-1;const r=this.engine.query({op:'route',intent:act.intent});K.assert(r.outcome==='Computed','Secondary act was not admitted');plan.semantics.push(r);const kind=act.intent.slice(2);plan.text+='\n\n'+generic(kind);plan.policy.secondaryActs=(plan.policy.secondaryActs||[]).concat(kind);state.context.pending=null;}
+      for(const [index,act] of (parsed.afterActs||[]).entries()){allowQuestions=index===parsed.afterActs.length-1;const r=this.engine.query({op:'route',intent:act.intent});K.assert(r.outcome==='Computed','Secondary act was not admitted');plan.semantics.push(r);const kind=act.intent.slice(2);state.context.pending=null;if(kind==='about')appendAbout(act,'\n\n');else plan.text+='\n\n'+generic(kind);plan.policy.secondaryActs=(plan.policy.secondaryActs||[]).concat(kind);}
       if(!state.context.pending&&!state.context.questionsPaused)for(const result of generated.slice().reverse())if(result.tree.type==='interaction'){
         const question=K.Interaction.realize(result.tree).questions.at(-1);
         if(question&&plan.text.endsWith(question)){ask('general',0,question);break;}
@@ -391,4 +557,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f00b34d4e4d0682f6e2dd506b76ef55a7f688f146ce3bf29b3b7f9ec6f1933b6","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"143ec67a775f4fd1ceabaed889b5fc5a20ced0824c366793f4870c7d48938cc3","unicode":"15.0.0","profile":"EXPERIMENTAL"};

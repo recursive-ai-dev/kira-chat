@@ -94,23 +94,23 @@
     }
     if(frame==='learn'){
       shape(move,['type','frame','verb','target'],'learning question');check(['learn','understand','discover'].includes(move.verb),'unknown learning action');
-      return 'What would you like to '+move.verb+' about '+np(move.target)+'?';
+      return 'What draws you to '+move.verb+' more about '+np(move.target)+'?';
     }
     if(frame==='experience'){
-      shape(move,['type','frame','target'],'experience question');return 'What is your experience with '+np(move.target)+'?';
+      shape(move,['type','frame','target'],'experience question');return 'How have things been going with '+np(move.target)+' lately?';
     }
     if(frame==='time'){
       shape(move,['type','frame','target'],'time question');return 'When did '+np(move.target)+' first catch your attention?';
     }
     if(frame==='part'){
       shape(move,['type','frame','target','action'],'part question');check(['explore','understand'].includes(move.action),'unknown part action');
-      return 'Which part of '+np(move.target)+' would you like to '+move.action+'?';
+      return 'Which side of '+np(move.target)+' do you like to '+move.action+' most?';
     }
     if(frame==='connection'){
-      shape(move,['type','frame','target'],'connection question');return 'Is there a memory you connect with '+np(move.target)+'?';
+      shape(move,['type','frame','target'],'connection question');return 'Is there a favorite memory you connect with '+np(move.target)+'?';
     }
     if(frame==='change'){
-      shape(move,['type','frame','target'],'hypothetical change question');return 'What would you change about '+np(move.target)+'?';
+      shape(move,['type','frame','target'],'hypothetical change question');return 'If you could change one thing about '+np(move.target)+', what would it be?';
     }
     if(frame==='describe'){
       shape(move,['type','frame','target'],'description question');return 'How would you describe '+np(move.target)+'?';

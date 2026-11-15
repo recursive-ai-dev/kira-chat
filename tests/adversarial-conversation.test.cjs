@@ -107,3 +107,31 @@ test('a short place, reason, or time fragment is not spliced into a noun-phrase 
   assert.equal(K.focusPhrase('Pixel platformers'), 'pixel platformers');
   assert.equal(K.focusPhrase('Godot'), 'Godot');
 });
+
+test('multi-sentence answers to pending detail questions continue without compound rejection', () => {
+  const {replies, state} = conversation(['I like coffee', 'Mostly dark roast. Usually pour-over in a V60.']);
+  assert.equal(replies[1].interpretation.intent, 'c:topic');
+  assert.notEqual(replies[1].interpretation.reasonCode, 'compound');
+  assert.ok(state.context.pending);
+
+  const mixed = conversation(['I like coffee', 'Mostly dark roast. I love espresso.']);
+  assert.equal(mixed.replies[1].interpretation.reasonCode, 'compound');
+  assert.equal(mixed.state.memories.filter(m => m.object.label === 'espresso').length, 0);
+
+  const feedback = conversation(['I like coffee', "Your reply sounds too generic. Can you rephrase that?"]);
+  assert.notEqual(feedback.replies[1].interpretation.intent, 'c:topic');
+});
+
+test('secondary c:about acts preserve aboutKind, object, and follow-up pending state', () => {
+  for (const question of ['What can you do?', 'Are you real?']) {
+    const standalone = conversation([question]);
+    const compound = conversation(['I like coffee. ' + question]);
+    assert.deepEqual([...compound.replies[0].policy.secondaryActs], ['about']);
+    assert.equal(compound.replies[0].text.split('\n\n').at(-1), standalone.replies[0].text);
+    assert.ok(compound.state.context.pending);
+  }
+  const taste = conversation(['I like coffee. Do you like jazz?']);
+  assert.deepEqual([...taste.replies[0].policy.secondaryActs], ['about']);
+  assert.equal(taste.state.context.pending?.kind, 'detail');
+  assert.equal(taste.state.context.pending?.topic, 'music');
+});

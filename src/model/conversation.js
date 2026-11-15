@@ -57,8 +57,29 @@
   };
   function parseConversation(input,state,engine){
     const raw=K.nfc(input).trim(),text=raw.replace(/[’‘]/g,"'"),pending=state.context.pending;
-    const base=(s=text)=>K.parseInput(s,state,engine);
-    const finish=r=>({...r,text:raw,version:'conversation-parser/4.4.0'});
+    const nlu=K.NLU?.analyze?K.NLU.analyze(raw,state,engine):null;
+    const base=(s=text)=>{
+      const r=K.parseInput(s,state,engine);
+      if(!r.supported&&!r.ambiguity&&r.reasonCode==='unparsed'&&s===text&&K.NLU?.normalize){
+        const norm=K.NLU.normalize(s);
+        if(norm&&K.fold(norm)!==K.fold(s)){
+          const nr=K.parseInput(norm,state,engine);
+          if(nr.supported||nr.ambiguity){
+            // Remap spans from normalized string back onto raw offsets so provenance stays exact.
+            let mapped=true;
+            for(const f of new Set([...(nr.frames||[]),...(nr.candidateFrames||[]),nr.ambiguity].filter(Boolean))){
+              const sub=norm.slice(f.span.start,f.span.end);
+              const idx=s.toLowerCase().indexOf(sub.toLowerCase());
+              if(idx<0){mapped=false;break;}
+              f.span={start:idx,end:idx+sub.length};
+            }
+            if(mapped)return nr;
+          }
+        }
+      }
+      return r;
+    };
+    const finish=r=>({...r,text:raw,nlu,version:'conversation-parser/4.4.0'});
     const relocate=(r,offset)=>{
       // Pending sense resolution retains spans in the original source message. Fresh parses use
       // offsets into this raw message, including uncommitted candidate frames awaiting a choice.
@@ -71,8 +92,17 @@
     const protectedText=/["“”]|^(?:if|suppose|imagine|maybe|perhaps)\b/i.test(text);
     // Conversation controls take precedence over a pending answer. Otherwise a refusal is echoed as
     // if it supplied a detail, and the next question continues the subject the user just declined.
+    const isRepairFeedback=(sample)=>{
+      const feedback=sample.replace(/[.!?]+$/,'').trim().replace(/^kira[, :]\s*/i,'').replace(/^please\s+/i,'').replace(/,?\s+please$/i,'');
+      const bare=/^(?:(?:i )?(?:don't|do not) understand(?: (?:you|that|this|it))?|(?:(?:that|this|it) )?(?:doesn't|does not) work|not listening|generic|robotic|templated|template)$/i;
+      const reply=/^(?:(?:your|these|those|the|that|this)(?: last)? (?:repl(?:y|ies)|responses?|questions?|answers?|wording|conversation)|you)(?: (?:are|is|sound|sounds|seem|seems|feel|feels)(?: too| very| so)? (?:generic|robotic|templated)| (?:don't|do not|doesn't|does not) (?:work|make sense|listen)|(?:'re| are) not listening)$/i;
+      const understanding=/^i (?:don't|do not) understand (?:your|the|that|this)(?: last)? (?:reply|response|question|answer|wording|conversation)$/i;
+      const correction=/^(?:(?:you )?already asked(?: me)?(?: that| this)?|(?:that|this) (?:is not|isn't|was not|wasn't) what i said|i (?:didn't|did not) say that|(?:(?:can|could|would) you )?rephrase(?: (?:that|this|it|(?:your|the)(?: last)? (?:reply|response|question|answer)))?)$/i;
+      return [bare,reply,understanding,correction].some(pattern=>pattern.test(feedback));
+    };
+    const isDetailAnswerText=(sample)=>!/\?$/.test(sample)&&!/^\s*(?:i (?:might|think|wish)|do i|what|who|why|how|can you|could you)\b/i.test(sample);
     if(!protectedText){
-      const command=K.fold(text).replace(/[.!?]+$/,'').trim().replace(/^please\s+/,'').replace(/,?\s+please$/,'');
+      const command=K.fold(nlu?.normalized||text).replace(/[.!?]+$/,'').trim().replace(/^please\s+/,'').replace(/,?\s+please$/,'');
       const control=(kind,reason)=>finish({intent:'c:clarify',speechAct:'request',supported:false,frames:[],quoted:[],control:kind,reasonCode:'conversation_control',reason});
       if(/^(?:stop asking(?: me)?(?: any| more)? questions|no more questions|(?:don't|do not) ask(?: me)?(?: any)?(?: more)? questions)$/.test(command))return control('stop_questions','Okay. I’ll leave the questions there. You can lead the conversation.');
       if(/^(?:ask me (?:a|another) question|you can ask(?: me)? questions(?: again)?|(?:start|resume) asking(?: me)? questions(?: again)?)$/.test(command))return control('resume_questions','Okay. What would you like to talk about?');
@@ -97,8 +127,16 @@
           const primary=frames.length?parsed.find(r=>r.frames.length):parsed.find(r=>r.intent!=='c:greet')||parsed[0];
           return finish({...primary,frames,negativeMood:parsed.some(r=>r.negativeMood),greeted:!!salutation||parsed.some(r=>r.intent==='c:greet'),afterActs:frames.length?acts:acts.filter(r=>r!==primary),parts:parsed});
         }
-        // Never fall through to pending-answer handling and commit partial reports.
-        return finish({...base(),reasonCode:'compound',reason:'There are a few parts there. Could we take the first one on its own? I haven’t saved any of those reports.'});
+        // Allow multi-sentence unparsed prose when answering a pending follow-up question,
+        // without committing partial reports or swallowing ambiguities, questions, or repair feedback.
+        if(pending?.kind==='detail'&&isDetailAnswerText(text)&&parts.every(p=>!/\?$/.test(p.text))&&parsed.every(r=>!r.supported&&!r.ambiguity&&!r.frames.length&&r.reasonCode==='unparsed')&&!isRepairFeedback(text)&&!parts.some(p=>isRepairFeedback(p.text))){
+          return questionReply(raw,pending);
+        }
+        // Only refuse compound batches when they mix partial structured reports or non-unparsed errors;
+        // ordinary multi-sentence narrative prose flows smoothly to NLU conversational handling.
+        if(parsed.some(r=>r.frames.length||r.supported||r.ambiguity||(r.reasonCode&&r.reasonCode!=='unparsed'))){
+          return finish({...base(),reasonCode:'compound',reason:'There are a few parts there. Could we take the first one on its own? I haven’t saved any of those reports.'});
+        }
       }
       // A reason is kept as a conversational quote, separately from the asserted report.
       const because=body.match(/^(.+?)\s+because\s+(.+)$/i);
@@ -107,6 +145,12 @@
     }
     const parsed=base();
     if(parsed.supported||parsed.ambiguity)return finish(parsed);
+    if(!protectedText&&pending?.kind==='riddle'&&!isRepairFeedback(text)){
+      return finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],nluAct:{kind:'riddle_answer',answer:raw},reason:null});
+    }
+    if(!protectedText&&pending?.kind==='dilemma'&&!isRepairFeedback(text)&&!/\?$/.test(text)){
+      return finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],nluAct:{kind:'dilemma_answer',answer:raw},reason:null});
+    }
     if(pending?.kind==='confirmName'&&/^(?:yes|yeah|yep|correct)[.!]*$/i.test(text)){const r=base('My name is '+pending.name);r.frames[0].span=K.clone(pending.span);return finish({...r,sourceMessage:pending.sourceMessage,questionMessage:pending.questionMessage,confirmedName:true});}
     if(pending?.kind==='confirmName'&&/^(?:no|nope)[.!]*$/i.test(text))return finish({...parsed,askName:true,reason:'Thanks for correcting me. What name would you like me to use?'});
     if(pending?.kind==='name'&&!protectedText&&K.isConversationName(text.replace(/[.!]+$/,''))){
@@ -118,18 +162,27 @@
     // Feedback concerns the conversation itself, rather than the detail we happened to ask for.
     // Match complete feedback or an explicit reply reference: "generic types", a "template renderer"
     // and "I do not understand recursion" are substantive answers, not requests to repair this chat.
-    if(!protectedText&&parsed.reasonCode==='unparsed'){
-      const feedback=text.replace(/[.!?]+$/,'').trim().replace(/^kira[, :]\s*/i,'').replace(/^please\s+/i,'').replace(/,?\s+please$/i,'');
-      const bare=/^(?:(?:i )?(?:don't|do not) understand(?: (?:you|that|this|it))?|(?:(?:that|this|it) )?(?:doesn't|does not) work|not listening|generic|robotic|templated|template)$/i;
-      const reply=/^(?:(?:your|these|those|the|that|this)(?: last)? (?:repl(?:y|ies)|responses?|questions?|answers?|wording|conversation)|you)(?: (?:are|is|sound|sounds|seem|seems|feel|feels)(?: too| very| so)? (?:generic|robotic|templated)| (?:don't|do not|doesn't|does not) (?:work|make sense|listen)|(?:'re| are) not listening)$/i;
-      const understanding=/^i (?:don't|do not) understand (?:your|the|that|this)(?: last)? (?:reply|response|question|answer|wording|conversation)$/i;
-      const correction=/^(?:(?:you )?already asked(?: me)?(?: that| this)?|(?:that|this) (?:is not|isn't|was not|wasn't) what i said|i (?:didn't|did not) say that|(?:(?:can|could|would) you )?rephrase(?: (?:that|this|it|(?:your|the)(?: last)? (?:reply|response|question|answer)))?)$/i;
-      if([bare,reply,understanding,correction].some(pattern=>pattern.test(feedback)))return finish({...parsed,repair:true});
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&isRepairFeedback(text))return finish({...parsed,repair:true});
+    const yesNo=/^(?:yes|yeah|yep|yup|sure|no|nope|not really|okay|ok)[.!]*$/i.test(text);
+    // Route rich conversational acts before generic unparsed, while keeping bare yes/no replies
+    // on pending detail questions intact.
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&nlu){
+      const ak=nlu.act?.kind;
+      const route=(intent,speechAct='statement')=>finish({intent,speechAct,supported:true,frames:[],quoted:[],nluAct:nlu.act,reason:null});
+      if(ak==='reaction'&&!(pending?.kind==='detail'&&yesNo))return route('c:social','reaction');
+      if(ak==='clarify_last')return route('c:clarify','question');
+      if(ak==='episodic_recall')return route('c:recall','question');
+      if(ak==='kira_persona'||ak==='kira_taste'||ak==='live_world')return route('c:about','question');
+      if(ak==='story'||ak==='fun_fact'||ak==='riddle'||ak==='dilemma'||ak==='recommend'||ak==='decide')return route('c:topic','request');
+      if(ak==='cheer_up')return route('c:social','request');
+      if(ak==='compare'||ak==='knowledge')return route('c:topic','question');
+      if(ak==='knowledge_candidate'&&(K.Knowledge?.lookupEntry?.(nlu.act.target)||engine.lookup(K.fold(nlu.act.target)).length===1||/\bwhat(?:'s|s| is)\b/i.test(text))){
+        return route('c:topic','question');
+      }
     }
     // Questions always beat a pending answer; safety/negation/attribution failures stay failures.
-    const yesNo=/^(?:yes|yeah|yep|sure|no|nope|not really|okay|ok)[.!]*$/i.test(text);
-    if(pending?.kind==='detail'&&!protectedText&&!/\?$/.test(text)&&(parsed.reasonCode==='unparsed'||yesNo)&&!/^\s*(?:i (?:might|think|wish)|do i|what|who|why|how|can you|could you)\b/i.test(text))return questionReply(raw,pending);
-    if(!protectedText&&parsed.reasonCode==='unparsed'&&/^i(?:'m| am)\s+(?:building|working on|writing|making|coding|creating)\s+.+/i.test(text))return finish({intent:'c:topic',speechAct:'statement',supported:true,frames:[],quoted:[],activity:raw,topicHint:topicCue(raw),reason:null});
+    if(pending?.kind==='detail'&&!protectedText&&isDetailAnswerText(text)&&(parsed.reasonCode==='unparsed'||yesNo))return questionReply(raw,pending);
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&/^i(?:'m|m| am)\s+(?:building|working on|writing|making|coding|creating)\s+.+/i.test(text))return finish({intent:'c:topic',speechAct:'statement',supported:true,frames:[],quoted:[],activity:raw,topicHint:topicCue(raw),reason:null});
     return finish(parsed);
   }
   const questions={
@@ -162,15 +215,19 @@
   // question can name it. Returns null unless the result is short and plainly a phrase.
   function focusPhrase(answer){
     if(typeof answer!=='string')return null;
+    if(K.NLU?.classifyReaction?.(answer))return null;
     let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    if(K.NLU?.classifyReaction?.(t))return null;
     t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
     t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
     const words=t.split(/\s+/).filter(Boolean);
     if(words.length<1||words.length>4||t.length>32)return null;
-    // Places, reasons and time/frequency answers are useful discourse, but cannot fill a noun slot.
+    // Places, reasons, reactions and time/frequency answers are useful discourse, but cannot fill a noun slot.
     if(/^(?:at|in|on|to|from|with|without|by|for|about|because|during|after|before|under|over|around|through|every|each|all|once|twice)\b/i.test(t)||/^(?:usually|sometimes|often|always|never|daily|weekly|recently|yesterday|today|tomorrow|tonight)$/i.test(t))return null;
     if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
-    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?)\b/i.test(t))return null;
+    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say)\b/i.test(t))return null;
+    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did)\b/i.test(t))return null;
+    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
     // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
     return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
   }

@@ -29,11 +29,14 @@ MODEL = (
     "dialogue-assets.js",
     "theme-packs.js",
     "themes.js",
+    "knowledge.js",
+    "nlu.js",
     "field.js",
     "variation.js",
     "interaction.js",
     "creative.js",
     "realization.js",
+    "responder.js",
     "dialogue.js",
 )
 BROWSER = ("persistence.js", "presenter.js", "view.js")

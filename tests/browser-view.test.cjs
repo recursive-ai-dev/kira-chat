@@ -114,3 +114,30 @@ test('every shipped dialog has an accessible name', () => {
     else assert.match(attributes, /aria-label="[^"]+"/);
   }
 });
+
+test('renderMessages resets lastCount when clearing an emptied conversation', () => {
+  const s = setup();
+  const box = s.node('messages');
+  box.querySelector = () => null;
+  box.scrollHeight = 200;
+  box.scrollTop = 200;
+  box.clientHeight = 200;
+  s.document.createTextNode = text => ({textContent: text});
+  s.context.requestAnimationFrame = fn => fn();
+  s.view.state = {memories: [], messages: [
+    {id: 'm1', role: 'user', text: 'I like coffee', time: 1},
+    {id: 'm2', role: 'assistant', text: 'Saved.', time: 2},
+  ]};
+  s.view.renderMessages();
+  assert.equal(s.view.lastCount, 2);
+
+  s.view.state.messages = [];
+  s.view.renderMessages();
+  assert.equal(s.view.lastCount, 0);
+
+  s.document.hidden = true;
+  s.view.state.messages = [{id: 'm3', role: 'user', text: 'Hello again', time: 3}];
+  s.view.renderMessages();
+  assert.equal(s.view.lastCount, 1);
+  assert.equal(s.document.title, 'New reply · Kira');
+});

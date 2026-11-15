@@ -58,10 +58,10 @@
       const chosen=p.choices.find((c,i)=>core===String(i+1)||core===K.fold(c.label)||c.aliases.some(x=>core===K.fold(x)));
       if(chosen){const frames=K.clone(p.frames||[p.frame]);for(const frame of frames)if(frame.object.key===p.frame.object.key){frame.object.concept=chosen.id;frame.object.key=chosen.id;frame.object.candidates=[chosen.id];}const unresolved=frames.find(f=>f.object.candidates.length>1);if(unresolved)return result('clarify',{supported:false,ambiguity:unresolved,candidateFrames:frames,sourceMessage:p.sourceMessage,reason:'There is one more ambiguous word.'});const frame=frames[0];return result(frames.every(f=>f.kind===frame.kind)?frame.kind:'note',{frames,object:frame.object,resolvedPending:true,sourceMessage:p.sourceMessage,speechAct:'clarification'});}
     }
-    if(/^(?:(?:what|who) (?:can|do) you (?:do|help with)|how does this work|how do (?:i|you) use (?:this|you)|help|help me|can you help(?: me)?|what should (?:i|we) (?:say|talk about)|what else|what now|i don't know what to say|idk|any ideas)$/.test(core))return result('about',{speechAct:'question',aboutKind:'capabilities'});
+    if(/^(?:(?:what|who) (?:can|do) you (?:do|help with)|how does this work|how do (?:i|you) use (?:this|you)|help|help me|can you help(?: me)?|what should (?:i|we) (?:say|talk about)|what else|what now|i (?:don't|dont) know what to say|idk|any ideas)$/.test(core))return result('about',{speechAct:'question',aboutKind:'capabilities'});
     if(/^(?:are you (?:real|human|a (?:bot|robot|person|human|machine)|an ai|ai|alive|conscious|sentient)|do you have (?:feelings|emotions|a body)|are you an? (?:llm|chatbot)|what are you really)$/.test(core))return result('about',{speechAct:'question',aboutKind:'honest'});
     if((m=core.match(/^(?:do you (?:like|love|enjoy)|what do you think (?:of|about)|how do you feel about) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'taste',object:object(original(m[1]))});
-    if((m=core.match(/^(?:what(?:'s| is) your fav(?:ou?rite)?|do you have a fav(?:ou?rite)?) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'favorite',object:object(original(m[1]))});
+    if((m=core.match(/^(?:what(?:'s|s| is) your fav(?:ou?rite)?|do you have a fav(?:ou?rite)?) (.+)$/)))return result('about',{speechAct:'question',aboutKind:'favorite',object:object(original(m[1]))});
     const lastAct=state.lastPlan?.policy.secondaryActs?.at(-1)||state.lastPlan?.act;
     if(/^(?:another(?: one)?|one more|again|more)$/.test(core)&&['joke','prompt'].includes(lastAct))return result(lastAct);
     if(/^(?:lol|lmao|haha+|hehe+|ha(?: ha)+|that's funny|that was funny|good one|nice one)$/.test(core))return result('social',{socialKind:'laugh'});
@@ -158,10 +158,11 @@
         }
         const moodText=c.replace(/,?\s+(?:thanks|thank you|thx)(?: for asking)?$/,'').replace(/\s+(?:today|right now|now|lately|tonight)$/,'');
         let mood=null;
-        if((m=moodText.match(/^i(?:'m| am| feel| was| felt| have been feeling|'ve been feeling)\s+(not\s+)?(?:(?:feeling|doing)\s+)?(?:(?:really|so|very|pretty|quite|a bit|a little|kind of|kinda)\s+)?(.+)$/)))mood={label:m[2],negative:!!m[1],past:/^i (?:was|felt)/.test(c)};
-        else if((m=moodText.match(/^i (don't|do not|didn't|did not) feel\s+(.+)$/)))mood={label:m[2],negative:true,past:/^did/.test(m[1])};
+        if((m=moodText.match(/^i(?:'m|m| am| feel| was| felt|(?:\s+have|'ve|ve) been feeling)\s+(not\s+)?(?:(?:feeling|doing)\s+)?(?:(?:really|so|very|pretty|quite|a bit|a little|kind of|kinda|sort of|sorta)\s+)?(.+)$/)))mood={label:m[2],negative:!!m[1],past:/^i (?:was|felt)/.test(c)};
+        else if((m=moodText.match(/^i (don't|dont|do not|didn't|didnt|did not) feel\s+(.+)$/)))mood={label:m[2],negative:true,past:/^did/.test(m[1])};
         else if((m=moodText.match(/^i no longer feel\s+(.+)$/)))mood={label:m[1],negative:true,past:false};
-        if(mood&&(moods.includes(mood.label)||(engine.lookup(mood.label).length===1&&engine.sub(engine.lookup(mood.label)[0],'c:feeling'))))f={kind:'mood',subject:'user',predicate:'feels',object:object(mood.label),polarity:mood.negative?'negative':'positive',temporal:mood.past?'past':'present',span:span(mood.label),attribution:'user_reported'};
+        const EXTRA_MOODS=new Set(['burnt out','burned out','wiped','drained','exhausted','wrecked','swamped','overwhelmed','stressed','stressed out','annoyed','irritated','frustrated','bummed','down','lonely','restless','uninspired','meh','pumped','stoked','hyped','grateful','thankful','proud','relieved','cozy','cosy','nostalgic','mellow','chill','upbeat','energized','peaceful','content','curious','hopeful','homesick']);
+        if(mood&&(moods.includes(mood.label)||EXTRA_MOODS.has(mood.label)||(engine.lookup(mood.label).length===1&&engine.sub(engine.lookup(mood.label)[0],'c:feeling'))))f={kind:'mood',subject:'user',predicate:'feels',object:object(mood.label),polarity:mood.negative?'negative':'positive',temporal:mood.past?'past':'present',span:span(mood.label),attribution:'user_reported'};
       }
       if(!f)return {...clarify('I don’t have a reliable reading of that yet.'),reasonCode:'unparsed'};
       frames.push(f);

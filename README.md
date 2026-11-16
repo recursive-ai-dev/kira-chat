@@ -4,7 +4,7 @@
 
 Kira is an experimental fictional companion built around the **Rotational Semantic Engine (RSE), Draft 4.1**. She runs in a single HTML file and uses explicit parsing rules, a curated lexicon, attributed memories, and structured sentence plans to carry a conversation. Controlled grammars compose memory replies, social dialogue, general topic questions, fictional jokes, and writing prompts.
 
-The platform release is **4.6.0**: the **4.6.0 companion app**, plus **Narrative SDK 0.4.0** for independent game characters. Neither requires an account, API key, model download, backend, or LLM.
+The platform release is **4.7.0**: the **4.7.0 companion app**, plus **Narrative SDK 0.4.0** for independent game characters. Neither requires an account, API key, model download, backend, or LLM.
 
 Kira also provides **NPC dialogue shaped by what characters know, remember, and want**. The new SDK shares one semantic engine across independent characters, keeps private conversations separate, delivers witnessed events and attributed rumours, composes authored phrases, and replays complete world sessions. The host game controls time and actions. See the [Narrative SDK guide](docs/narrative-sdk.md).
 
@@ -45,7 +45,7 @@ Kira's topics and wording grow through four layers, all deterministic and replay
 2. Open the downloaded file in a modern desktop browser.
 3. Start a conversation. No installation is required.
 
-The bundled application version is **4.6.0**.
+The bundled application version is **4.7.0**.
 
 If you downloaded the complete source archive, open `Kira.html` after extracting it. Browser-only use does not require a build step. A Web Worker runs the model where supported, with a main-thread fallback if the browser cannot start the local worker.
 
@@ -295,7 +295,7 @@ Use **Settings & data → Export session** to keep a portable backup. If the app
 
 Exports contain recorded events and pinned asset identities, with a digest used to verify the reconstructed state. Imports replay the log rather than trusting a supplied state snapshot. A failed save leaves the previously committed conversation intact.
 
-Version 4.6.0 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Keep the previous HTML alongside its exported sessions; the [4.4.0 companion source](https://github.com/recursive-ai-dev/kira-chat/blob/81da0bbda085942de7b205210f313eefc84491b5/Kira.html) remains available. Open the original app at its original browser origin to access its local save. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
+Version 4.7.0 uses a separate storage key, leaving older saves untouched. Earlier exports remain tied to their original model. Keep the previous HTML alongside its exported sessions; the [4.4.0 companion source](https://github.com/recursive-ai-dev/kira-chat/blob/81da0bbda085942de7b205210f313eefc84491b5/Kira.html) remains available. Open the original app at its original browser origin to access its local save. Changing parser rules, dialogue assets, or the ontology can change replay results; there is no automatic migration across incompatible model hashes.
 
 Older Kira v3 transcripts can be appended as unverified archives. Their learned weights and inferred memories are not promoted into current semantic facts.
 

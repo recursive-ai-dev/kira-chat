@@ -167,3 +167,50 @@ test('open-ended novel sentences never drop to my grammar is fairly small and re
   assert.doesNotMatch(replies[2].text,/\?/);
   assert.doesNotMatch(replies[2].text,/my grammar is fairly small/i);
 });
+
+test('game-dev single chat handles preambles, invitations, opinions, and contractions without knowledge hijacks or fallback loops',()=>{
+  const {K,dialogue}=loadModel();
+  assert.notEqual(K.focusPhrase('im working on a narrative engine for games'),'im working');
+  assert.equal(K.focusPhrase('ok fair enough'),null);
+  assert.equal(K.focusPhrase('thanks for the help'),null);
+
+  const {state,events,replies}=runTurns(dialogue,K,[
+    'hey',
+    'im working on a narrative engine for games',
+    'it is for an indie game im building',
+    'what do you think about branching dialogue?',
+    'do you want to hear about the characters?',
+    'can you help me test a scene?',
+    'anyway how are you doing?',
+    'ok fair enough',
+    'thanks for the help',
+    'by the way, i love dark roast coffee',
+    'anyway see you later'
+  ]);
+
+  assert.doesNotMatch(replies[1].text,/about im working|Switching gears/i);
+  assert.doesNotMatch(replies[2].text,/Indie Rock/i);
+  assert.doesNotMatch(replies[3].text,/version control|git/i);
+  assert.match(replies[4].text,/characters/i);
+  assert.match(replies[5].text,/setup|scene|test/i);
+  assert.equal(replies[6].plan.act,'how');
+  assert.equal(replies[7].plan.act,'social');
+  assert.doesNotMatch(replies[7].text,/about ok fair enough|Okay\. I can listen/i);
+  assert.equal(replies[8].plan.act,'thanks');
+  assert.equal(replies[9].plan.act,'preference');
+  const coffee=state.memories.find(m=>m.kind==='preference'&&m.object.label==='dark roast coffee');
+  assert.ok(coffee);
+  assert.equal(replies[9].user.slice(coffee.span.start,coffee.span.end),'dark roast coffee');
+  assert.equal(replies[10].plan.act,'farewell');
+
+  // Repeated novel prose turns must advance usage rather than looping verbatim.
+  const loopCheck=runTurns(dialogue,K,[
+    'The lighthouse signal lamp flickers every third wave.',
+    'The brass telescope on the desk points toward the breakwater.',
+    'An old ledger sits open beside the inkwell.'
+  ]);
+  assert.equal(new Set(loopCheck.replies.map(r=>r.text)).size,3);
+
+  const replayed=dialogue.replay(events);
+  assert.equal(replayed.lastPlan.digest,state.lastPlan.digest);
+});

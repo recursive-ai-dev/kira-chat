@@ -54,7 +54,7 @@
     const affect=nlu?.affect||{tags:[],valence:'neutral',energy:'calm'};
     const ent=state?.context?.activeEntity;
     const latestEvent=state?.context?.episodic?.[state.context.episodic.length-1];
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
     const tag=affect.primary;
 
     // 1. Affect-tuned opening when emotion is clear
@@ -167,15 +167,16 @@
     if(gist&&(gist.pattern==='effort'||gist.pattern==='activity')&&gist.phrase&&gist.phrase.length<=45&&!questionsPaused){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(!/\?/.test(echoed)&&!/^\s*(?:yes|no|yeah|haha)/i.test(echoed)){
-        return {text:`${cap(echoed)} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
+        const subject=gist.pattern==='effort'?`Trying to ${lowerFirst(echoed)}`:cap(echoed);
+        return {text:`${subject} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
       }
     }
 
     const neutral={
-      warm:['That makes a lot of sense.','I really hear you on that.','Always interesting hearing how things fit together for you.'],
-      playful:['Fair enough — that checks out completely.','Honestly, I respect that angle.','Gotcha, now the picture makes way more sense.'],
-      thoughtful:['There is usually a lot sitting underneath a thread like that.','I can see why that stays on your mind.','That tracks cleanly when you look at the bigger picture.'],
-      direct:['Makes sense.','Got it.','Fair enough.']
+      warm:['Got it — I’m following you.','Yeah, that makes sense.','I hear what you’re getting at.','Right, I see where you’re coming from.'],
+      playful:['Fair enough — that checks out.','Okay, I see the angle now.','Gotcha, that tracks.','Right — now the picture makes more sense.'],
+      thoughtful:['I see where that’s heading.','That makes sense when you put it like that.','Got it — I’m following the thread.','Right, I can see why that matters here.'],
+      direct:['Makes sense.','Got it.','Fair enough.','I follow.']
     }[persona];
     return pick(neutral,'resp:neutral:'+persona,state);
   }
@@ -192,9 +193,9 @@
         direct:['Glad it got a laugh.', 'Yeah, pretty funny when you step back.']
       },
       agree:{
-        warm:['It really is true once you notice it.', 'Right? Everything clicks a bit easier that way.'],
-        playful:['100 percent — glad we are on the same wavelength.', 'You see the vision!'],
-        thoughtful:['That shared wavelength makes talking through things much smoother.', 'Quietly true in more places than people expect.'],
+        warm:['Right? It really does come down to that.', 'Yeah, exactly.'],
+        playful:['100 percent — same wavelength.', 'Right? You see it too.'],
+        thoughtful:['Yeah, that usually holds up once you test it.', 'True — the simple version is often the honest one.'],
         direct:['Agreed.', 'Pretty much.']
       },
       hedge:{
@@ -223,11 +224,10 @@
       }
     };
     const p=pick((bank[reaction]||bank.agree)[persona],'react:'+reaction+':'+persona,state);
-    if(questionsPaused)return {text:p.text,key:p.key,followUp:null};
-    const prompt=activeTopic
-      ?pick([`Still in a ${activeTopic} mood, or feel like pivoting somewhere new?`,`What else has been happening on the ${activeTopic} front lately?`],'react:q:'+activeTopic,state).text
-      :pick(['What else is crossing your mind tonight?','Feel like switching gears to a riddle, a quick story, or another topic?'],'react:q:gen',state).text;
-    return {text:p.text,key:p.key,followUp:prompt};
+    const count=(state?.usage?.[p.key])||0;
+    if(questionsPaused||count%2===0)return {text:p.text,key:p.key,followUp:null};
+    const prompt=pick(['What else is on your mind?','Want to keep going with that, or try something else?'],'react:q:gen',state);
+    return {text:p.text,key:p.key,followUp:prompt.text,followUpKey:prompt.key};
   }
 
   // Natural in-character answers to hobbies/tastes/opinions without triggering fake human biology.
@@ -371,49 +371,151 @@
     return `I don't think you have told me about "${cleanFrag(target)}" yet — want to fill me in?`.replace(/\?/g,questionsPaused?'.':'?');
   }
 
+  function respondInviteShare({target,state}){
+    const persona=personaOf(state);
+    const topic=cleanFrag(target||'that').replace(/^(?:more )?about\s+/i,'');
+    const safeTopic=topic&&topic.length<=50&&!/\b(?:you|your)\b/i.test(topic)?topic:'it';
+    const bank={
+      warm:[`Yes, definitely — tell me about ${safeTopic}.`,`I’d love to hear about ${safeTopic}. Go ahead.`],
+      playful:[`Always — tell me about ${safeTopic}.`,`Yes, hit me with the details on ${safeTopic}.`],
+      thoughtful:[`Please do — I’d like to hear about ${safeTopic}.`,`Yes, go ahead. Tell me about ${safeTopic}.`],
+      direct:[`Sure. Tell me about ${safeTopic}.`,`Go ahead — tell me about ${safeTopic}.`]
+    }[persona];
+    const p=pick(bank,'invite:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondHelpRequest({target,state}){
+    const persona=personaOf(state);
+    const clean=cleanFrag(target||'');
+    const isDialogueScene=/\b(?:scene|dialogue|chat|character|characters|story|script|narrative|test)\b/i.test(clean);
+    const bank=isDialogueScene?{
+      warm:[`Gladly — give me the setup or send a line in character and we’ll see how it plays.`,`Sure. Tell me who’s talking and what you want to test first.`],
+      playful:[`I’m in — drop the scene setup or throw a line at me and let’s test it.`,`Sure thing. Tell me the premise and what you want to try.`],
+      thoughtful:[`I can help you test it out. Give me the setup or the first line and we’ll work through it.`,`Sure — describe the scene or what you want to check, and we’ll take it one turn at a time.`],
+      direct:[`Sure. Give me the setup or the first line to test.`,`I can help with that. What’s the scene and what do you want to try first?`]
+    }[persona]:{
+      warm:[`I’ll help however I can within what I can run offline — walk me through what you’re trying to do.`,`Sure, tell me what you’re working on and what part you want to look at.`],
+      playful:[`Happy to pitch in — tell me what we’re tackling first.`,`I’m game. What part do you want to bounce around?`],
+      thoughtful:[`Tell me what you’re trying to work out, and I’ll help think through it within what I can do here.`,`Sure — lay out the piece you’re focusing on and where it’s sticking.`],
+      direct:[`Sure. What are you trying to get working first?`,`Tell me the piece you want to work through.`]
+    }[persona];
+    const p=pick(bank,'help:'+persona+(isDialogueScene?':scene':''),state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondOpinion({target,isAbout,state,engine,questionsPaused}){
+    const persona=personaOf(state);
+    const rawTarget=cleanFrag(target||'');
+    const folded=K.fold(rawTarget);
+    const entry=isAbout&&K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(rawTarget,{exact:true}):null;
+    if(entry){
+      const q=questionsPaused?'':` What’s your own take on ${entry.label.toLowerCase()}?`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+    if(/\b(?:dialogue|conversation|narrative|character|characters|chat|natural|writing|story|stories)\b/i.test(folded)){
+      const bank={
+        warm:[
+          'Natural dialogue usually comes from subtext and restraint — not explaining everything, not asking a question on every single line, and letting characters remember what actually mattered to them.',
+          'When characters only react to what they’ve genuinely witnessed or been told, and their lines match their mood instead of a generic template, even simple replies start feeling alive.'
+        ],
+        playful:[
+          'Honestly, half of sounding natural is knowing when *not* to talk like a customer-service bot — shorter beats, fewer forced follow-up questions, and letting a character push back or stay quiet sometimes.',
+          'Specificity beats cleverness every time: a character who remembers one concrete detail and reacts in voice feels ten times realer than walls of generic polish.'
+        ],
+        thoughtful:[
+          'Good dialogue rarely sounds like two people exchanging tidy summaries. It comes from perspective, memory, and rhythm — knowing what each speaker cares about and leaving room between lines.',
+          'Usually it’s rhythm and accountability: not repeating the same cadence every turn, and grounding what a character says in what they actually know.'
+        ],
+        direct:[
+          'Specificity and pacing. Cut the filler acknowledgements, vary whether you end with a question, and tie replies to what the character actually knows.',
+          'Fewer generic templates, sharper state-driven conditions, and letting some turns land as statements instead of interviews.'
+        ]
+      }[persona];
+      const p=pick(bank,'opinion:dialogue:'+persona,state);
+      const q=questionsPaused?'':' Which part feels stiffest in what you’re building right now?';
+      return {text:p.text+q,keys:[p.key]};
+    }
+    const cleanTopic=rawTarget&&rawTarget.length<=45&&isAbout?rawTarget:'that';
+    const bank={
+      warm:[`I don’t have a canned rulebook view on ${cleanTopic}, honestly — it usually depends on what you’re trying to get out of it.`,`Hard to reduce ${cleanTopic} to one tidy take, though I’m curious where you land on it.`],
+      playful:[`I don’t have an off-the-shelf hot take on ${cleanTopic}, which might actually be a relief.`,`Honestly ${cleanTopic} could go a few ways — what’s your angle on it?`],
+      thoughtful:[`There’s no single pat answer on ${cleanTopic}; most of the interesting part is in the tradeoffs.`,`I don’t have a preset opinion on ${cleanTopic}, though I’d like to hear what drew your attention to it.`],
+      direct:[`No canned take on ${cleanTopic}. What’s your angle on it?`,`Depends on what you want ${cleanTopic} to do. Where are you leaning?`]
+    }[persona];
+    const p=pick(bank,'opinion:gen:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
   // Graceful, varied open-ended prose fallback (replaces robotic "my grammar is fairly small" brick wall).
   function respondNovelFallback({nlu,rawText,state,engine,questionsPaused,misses}){
     const persona=personaOf(state);
     const topic=nlu?.topicScores?.[0]?.[0]||state?.context?.topic||'general';
     const affect=nlu?.affect||{};
     const gist=nlu?.act?.gist;
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const isQuestion=nlu?.act?.kind==='open_question'||/\?\s*$/.test(rawText||'');
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
 
-    if(entry){
+    if(entry&&!isQuestion){
       const q=questionsPaused?'':` ${K.conversationQuestions?.[entry.topic]?.[0]||`What brought ${entry.label.toLowerCase()} to mind?`}`;
-      return `${entry.summary} ${entry.angle}${q}`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+
+    if(isQuestion){
+      const qBank={
+        warm:['I’m not sure I caught enough context to answer that cleanly — tell me a bit more about what you mean?','I don’t have a straight answer for that built in, though if you give me the context I’ll follow along.'],
+        playful:['Hmm, you stumped my rulebook on that one — give me a little more context?','I don’t have an obvious answer ready for that — what’s the backdrop?'],
+        thoughtful:['I don’t want to bluff an answer to that without more context. What’s behind the question?','That sits a bit outside what I can read cleanly — say a little more about what you’re aiming at?'],
+        direct:['Not sure I can answer that cleanly as phrased. What’s the context?','Outside what I can parse cleanly — give me a bit more to go on.']
+      }[persona];
+      const p=pick(qBank,'fallback:openq:'+persona,state);
+      return {text:questionsPaused?p.text.replace(/\?/g,'.'):p.text,keys:[p.key]};
     }
 
     // Acknowledge emotional or gist meaning gracefully instead of scolding user's phrasing.
-    const lead=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused}).text;
+    const keys=[];
+    const leadRes=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused});
+    if(leadRes.key)keys.push(leadRes.key);
+    const lead=leadRes.text;
     let middle='';
     if(gist&&gist.phrase&&gist.phrase.length<=55){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(gist.pattern==='desire')middle=` Wanting to ${lowerFirst(echoed)} makes complete sense.`;
-      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is where all the interesting friction lives.`;
+      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is a solid focus.`;
       else if(gist.pattern==='subject_state'&&gist.subject)middle=` Funny how much attention your ${gist.subject} can pull once things get moving.`;
     }
     if(!middle&&affect.valence==='neutral'&&misses>=2){
-      middle={
-        warm:' I want to make sure I follow where you want this to go.',
-        playful:' Let me make sure I catch your angle clearly here.',
-        thoughtful:' Give me one small anchor on what matters most to you in that.',
-        direct:' Point me at the main piece you want to unpack.'
+      const mBank={
+        warm:[' Tell me a bit more about where you want to take this.',' We can take that wherever you want next.'],
+        playful:[' Throw me the next piece when you’re ready.',' Where are we steering this next?'],
+        thoughtful:[' Give me one concrete detail you want to unpack.',' Let me know which thread you want to follow.'],
+        direct:[' What’s the main piece you want to look at?',' Point me at what comes next.']
       }[persona];
+      const mp=pick(mBank,'fallback:miss:'+persona,state);
+      keys.push(mp.key);
+      middle=mp.text;
     }
 
-    if(questionsPaused)return (lead+middle).trim();
+    if(questionsPaused)return {text:(lead+middle).trim(),keys};
+
+    // Vary whether we tack on a question so open chat doesn't interrogate every turn.
+    const turnCount=(state?.usage?.['fallback:turn:'+persona])||0;
+    keys.push('fallback:turn:'+persona);
+    if(middle||turnCount%2===1){
+      return {text:`${lead}${middle}`.replace(/\s+/g,' ').trim(),keys};
+    }
 
     const tailored=(K.conversationTailored?.[topic]?.[0]);
-    const follow=topic!=='general'&&tailored
-      ?` ${tailored}`
+    const followPick=topic!=='general'&&tailored
+      ?{text:` ${tailored}`,key:null}
       :pick([
-        ' What part of that is taking up the most space in your head right now?',
-        ' Walk me through the backstory — what sparked that?',
-        ' Want to unpack that a bit more, or pivot toward something lighter like a riddle or a story?'
-      ],'fallback:q:'+persona,state).text;
+        ' What part of that are you focusing on right now?',
+        ' What sparked that?',
+        ' Want to dig into that more, or switch to something else?'
+      ],'fallback:q:'+persona,state);
+    if(followPick.key)keys.push(followPick.key);
 
-    return `${lead}${middle}${follow}`.replace(/\s+/g,' ').trim();
+    return {text:`${lead}${middle}${followPick.text}`.replace(/\s+/g,' ').trim(),keys};
   }
 
   // Wrap a verified Realization sentence (preserving the exact substring span!) in warm human phrasing.
@@ -468,6 +570,9 @@
     personaOf,
     reflectTopic,
     respondReaction,
+    respondInviteShare,
+    respondHelpRequest,
+    respondOpinion,
     respondKiraPersona,
     respondKiraTaste,
     respondEpisodicRecall,

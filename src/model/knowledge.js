@@ -20,7 +20,7 @@
       summary:'Music built on swing, extended harmony, and live conversation between players — nobody plays the exact same chart twice.',
       angle:'Once you hear how jazz treats "wrong" notes as tension waiting one half-step away from home, standard pop chords sound delightfully tame.',
       traits:['improvised','rich harmony','conversational']},
-    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie','indie music','shoegaze','post-punk','dream pop'],topic:'music',
+    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie music','indie folk','shoegaze','post-punk','dream pop'],topic:'music',
       summary:'Guitar-driven music born outside major-label polish — trading stadium perfection for texture, jagged riffs, and rooms that actually sound alive.',
       angle:'The best indie records make slight imperfections feel like the whole emotional point.',
       traits:['textured','DIY','melodic']},
@@ -32,7 +32,7 @@
       summary:'Eighty-eight keys laid out like an open map of harmony — letting you hear bass, counterpoint, and melody all under two hands.',
       angle:'Nothing makes music theory click faster than seeing whole steps and half steps sitting right in front of you.',
       traits:['polyphonic','visual harmony','percussive']},
-    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','turntable','record player','records'],topic:'music',
+    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','vinyl record','turntable','record player'],topic:'music',
       summary:'Physical albums that turn listening into an intentional ritual — big sleeve art, an A-side pacing arc, and gentle analog warmth.',
       angle:'Having to stand up and flip the record makes you actually listen to an album from front to back instead of skipping after twelve seconds.',
       traits:['tactile','ritual','warm']},
@@ -54,7 +54,7 @@
       summary:'The language woven into every web browser — dynamic, event-driven, and quirky enough to keep even veterans humble.',
       angle:'Async workflows feel tricky until promises click, after which wiring interactive UIs becomes second nature.',
       traits:['ubiquitous','event-driven','dynamic']},
-    {id:'git',label:'Git',aliases:['git','github','version control','branching'],topic:'coding',
+    {id:'git',label:'Git',aliases:['git','github','version control','git branching'],topic:'coding',
       summary:'Distributed version control that turns project history into cheap snapshots, making wild experiments safe because cleanly reverting is always one step away.',
       angle:'A clean commit log reads like a diary of decisions rather than just a pile of changed lines.',
       traits:['branching','reversible','collaborative']},
@@ -334,13 +334,17 @@
     return out;
   }
 
-  function lookupEntry(text){
+  const BROAD_PROSE=new Set(['writing','art','history','reading','movies','sleep','philosophy','cooking','running']);
+  function lookupEntry(text,options){
     const c=K.fold(text).replace(/^(?:the|a|an)\s+/,'').replace(/[.!?]+$/,'').trim();
     if(!c)return null;
     if(BY_ALIAS.has(c))return BY_ALIAS.get(c);
     const singular=c.replace(/s$/,'');
     if(BY_ALIAS.has(singular))return BY_ALIAS.get(singular);
+    if(options?.exact)return null;
+    const isLongProse=options?.prose&&c.split(/\s+/).length>3;
     for(const entry of ENTRIES){
+      if(isLongProse&&BROAD_PROSE.has(entry.id))continue;
       for(const alias of entry.aliases){
         if(alias.length>=4){
           const re=new RegExp('\\b'+alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');

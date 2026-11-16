@@ -7,7 +7,7 @@
   function download(name,text){if(window.KiraHost&&KiraHost.saveFile){KiraHost.saveFile(name,text);return false;}const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}
   function detail(label,data){const d=el('details');d.append(el('summary','',label),el('pre','',typeof data==='string'?data:JSON.stringify(data,null,2)));return d;}
   const KIND_HELP={subsumes:'Checks whether the first concept is provably a kind of the second, using the bundled axioms and their closure.',existential:'Checks a typed part or role relation between two concepts.',relation:'Computes the set of possible basic lexical relations between two word senses.',entails:'Projects lexical edits through an extensional context and reports the surviving relations.',shift:'Finds an approved wording in the same meaning that moves register and affect in the requested directions.',realize:'Chooses the approved wording closest to an absolute register and affect target.'};
-  const DRAFT_KEY='kira_rse_draft_4_6_0';
+  const DRAFT_KEY='kira_rse_draft_4_7_0';
   function yesterdayKey(now){const d=new Date(now);d.setDate(d.getDate()-1);return dayKey(d);}
   function timeLabel(time){try{const d=new Date(time),now=Date.now();if(!Number.isFinite(d.getTime()))return '';if(dayKey(now)!==dayKey(time))return yesterdayKey(now)===dayKey(time)?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric'});return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return '';}}
   function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}

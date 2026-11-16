@@ -68,7 +68,7 @@ body:has(.composer:focus-within) .jump-latest{bottom:122px}
 <a class="skip-link" href="#message-input">Skip to the conversation</a>
 <div id="app">
   <aside class="sidebar">
-    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.6.0</span></a>
+    <a class="brand" href="#conversation" aria-label="Kira conversation"><span class="brand-mark" aria-hidden="true">✳</span> kira<span class="version">4.7.0</span></a>
     <div class="side-caption">A LITTLE CONTINUITY</div>
     <nav aria-label="Main navigation">
       <button class="nav-item active" data-screen="conversation" aria-current="page"><span aria-hidden="true">◌</span> Conversation <span class="nav-arrow">↗</span></button>
@@ -985,6 +985,14 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
     }
     const parsed=base();
     if(parsed.supported||parsed.ambiguity)return finish(parsed);
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&K.NLU?.stripPreambles){
+      const stripped=K.NLU.stripPreambles(text);
+      if(stripped.preambles.length&&stripped.core){
+        const offset=text.length-stripped.core.length;
+        const pr=base(stripped.core);
+        if(pr.supported||pr.ambiguity)return finish(relocate(pr,offset));
+      }
+    }
     if(!protectedText&&pending?.kind==='riddle'&&!isRepairFeedback(text)){
       return finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],nluAct:{kind:'riddle_answer',answer:raw},reason:null});
     }
@@ -1010,9 +1018,13 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
       const ak=nlu.act?.kind;
       const route=(intent,speechAct='statement')=>finish({intent,speechAct,supported:true,frames:[],quoted:[],nluAct:nlu.act,reason:null});
       if(ak==='reaction'&&!(pending?.kind==='detail'&&yesNo))return route('c:social','reaction');
+      if(ak==='social_how')return route('c:how','question');
+      if(ak==='social_thanks')return route('c:thanks','statement');
+      if(ak==='social_farewell')return route('c:farewell','statement');
       if(ak==='clarify_last')return route('c:clarify','question');
       if(ak==='episodic_recall')return route('c:recall','question');
       if(ak==='kira_persona'||ak==='kira_taste'||ak==='live_world')return route('c:about','question');
+      if(ak==='invite_share'||ak==='help_request'||ak==='opinion_question')return route('c:topic','question');
       if(ak==='story'||ak==='fun_fact'||ak==='riddle'||ak==='dilemma'||ak==='recommend'||ak==='decide')return route('c:topic','request');
       if(ak==='cheer_up')return route('c:social','request');
       if(ak==='compare'||ak==='knowledge')return route('c:topic','question');
@@ -1056,18 +1068,19 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
   function focusPhrase(answer){
     if(typeof answer!=='string')return null;
     if(K.NLU?.classifyReaction?.(answer))return null;
-    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    const raw=K.NLU?.normalize?K.NLU.normalize(answer):answer;
+    let t=raw.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
     if(K.NLU?.classifyReaction?.(t))return null;
-    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:trying to |attempting to )?(?:making|make|building|build|working on|writing|write|creating|create|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying|testing|test)\s+/i,'');
     t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
     const words=t.split(/\s+/).filter(Boolean);
     if(words.length<1||words.length>4||t.length>32)return null;
     // Places, reasons, reactions and time/frequency answers are useful discourse, but cannot fill a noun slot.
     if(/^(?:at|in|on|to|from|with|without|by|for|about|because|during|after|before|under|over|around|through|every|each|all|once|twice)\b/i.test(t)||/^(?:usually|sometimes|often|always|never|daily|weekly|recently|yesterday|today|tomorrow|tonight)$/i.test(t))return null;
-    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
-    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say)\b/i.test(t))return null;
-    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did)\b/i.test(t))return null;
-    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure|thanks|thank you|hello|hi|hey|bye|goodbye)$/i.test(t))return null;
+    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say|ok|okay|alright|no worries|all good)\b/i.test(t))return null;
+    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did|working|trying|building|making|doing|going|getting|looking|helping|testing|telling|saying|focusing)\b/i.test(t))return null;
+    if(/\b(?:i|i'm|im|i've|ive|i'll|ill|i'd|id|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|dont|can't|cant|won't|wont|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
     // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
     return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
   }
@@ -1275,7 +1288,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'Music built on swing, extended harmony, and live conversation between players — nobody plays the exact same chart twice.',
       angle:'Once you hear how jazz treats "wrong" notes as tension waiting one half-step away from home, standard pop chords sound delightfully tame.',
       traits:['improvised','rich harmony','conversational']},
-    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie','indie music','shoegaze','post-punk','dream pop'],topic:'music',
+    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie music','indie folk','shoegaze','post-punk','dream pop'],topic:'music',
       summary:'Guitar-driven music born outside major-label polish — trading stadium perfection for texture, jagged riffs, and rooms that actually sound alive.',
       angle:'The best indie records make slight imperfections feel like the whole emotional point.',
       traits:['textured','DIY','melodic']},
@@ -1287,7 +1300,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'Eighty-eight keys laid out like an open map of harmony — letting you hear bass, counterpoint, and melody all under two hands.',
       angle:'Nothing makes music theory click faster than seeing whole steps and half steps sitting right in front of you.',
       traits:['polyphonic','visual harmony','percussive']},
-    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','turntable','record player','records'],topic:'music',
+    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','vinyl record','turntable','record player'],topic:'music',
       summary:'Physical albums that turn listening into an intentional ritual — big sleeve art, an A-side pacing arc, and gentle analog warmth.',
       angle:'Having to stand up and flip the record makes you actually listen to an album from front to back instead of skipping after twelve seconds.',
       traits:['tactile','ritual','warm']},
@@ -1309,7 +1322,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'The language woven into every web browser — dynamic, event-driven, and quirky enough to keep even veterans humble.',
       angle:'Async workflows feel tricky until promises click, after which wiring interactive UIs becomes second nature.',
       traits:['ubiquitous','event-driven','dynamic']},
-    {id:'git',label:'Git',aliases:['git','github','version control','branching'],topic:'coding',
+    {id:'git',label:'Git',aliases:['git','github','version control','git branching'],topic:'coding',
       summary:'Distributed version control that turns project history into cheap snapshots, making wild experiments safe because cleanly reverting is always one step away.',
       angle:'A clean commit log reads like a diary of decisions rather than just a pile of changed lines.',
       traits:['branching','reversible','collaborative']},
@@ -1589,13 +1602,17 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     return out;
   }
 
-  function lookupEntry(text){
+  const BROAD_PROSE=new Set(['writing','art','history','reading','movies','sleep','philosophy','cooking','running']);
+  function lookupEntry(text,options){
     const c=K.fold(text).replace(/^(?:the|a|an)\s+/,'').replace(/[.!?]+$/,'').trim();
     if(!c)return null;
     if(BY_ALIAS.has(c))return BY_ALIAS.get(c);
     const singular=c.replace(/s$/,'');
     if(BY_ALIAS.has(singular))return BY_ALIAS.get(singular);
+    if(options?.exact)return null;
+    const isLongProse=options?.prose&&c.split(/\s+/).length>3;
     for(const entry of ENTRIES){
+      if(isLongProse&&BROAD_PROSE.has(entry.id))continue;
       for(const alias of entry.aliases){
         if(alias.length>=4){
           const re=new RegExp('\\b'+alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
@@ -1744,7 +1761,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     [/\btbh\b/gi,'to be honest'],[/\bngl\b/gi,'not going to lie'],[/\brn\b/gi,'right now'],
     [/\bits\b(?=\s+(?:a|an|the|so|very|pretty|really|kind|sort|not|been|just|actually|honestly|getting|hard|easy|good|bad|great|nice|tough|late|early|cold|hot|warm|raining|snowing))/gi,"it's"]
   ];
-  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
+  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|by the way|btw|for what it's worth|fwiw|on another note|speaking of which|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
   const STOP_ENTITIES=new Set(['i','me','my','mine','you','your','we','our','us','they','them','their','he','him','his','she','her','it','its','this','that','these','those','something','anything','everything','nothing','someone','anyone','everyone','stuff','thing','things','lot','bit','kind','sort','part','way','time','day','today','tonight','yesterday','tomorrow','now','here','there','home','work','school','life','world','haha','yeah','lol','lmao','okay','ok','yes','no','sure','maybe','really','mostly','just','actually','honestly','pretty','very','quite','good','bad','great','nice','long','rough','hard','little','more','much','many','some']);
 
   // Normalize casual English without mutating user-quoted spans when building discourse features.
@@ -1799,9 +1816,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
 
   // Reactions and backchannels that should never be parsed as noun-phrase topics.
   function classifyReaction(text){
-    const c=K.fold(text).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well),?\s+/,'').trim();
+    const c=K.fold(normalize(text)).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well|yeah|yep|yup|ok|okay|alright),?\s+(?=(?:fair|true|that's|good|no worries|all good|makes sense|i agree|got|sounds))?/,'').trim();
     if(/^(?:(?:haha+|hahaha+|hehe+|lol|lmao|rofl)(?:\s+(?:yeah|yep|yup|true|right|fair|same|totally|i know|for real|fr|man|seriously))?|(?:yeah|yep|yup|oh)\s+(?:haha+|lol|lmao|that's funny|too funny))$/.test(c))return 'laugh';
-    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|fair|fair enough|pretty much|mostly|right|exactly|i know|i get that|makes sense|good point|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course)$/.test(c))return 'agree';
+    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|true enough|that's true|so true|totally true|fair|fair enough|fair point|good point|pretty much|mostly|right|exactly|i know|i get that|i agree|agreed|makes sense|makes total sense|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course|gotcha|got it|understood|no worries|all good|okay|ok|alright)$/.test(c))return 'agree';
     if(/^(?:kind of|kinda|sort of|sorta|a bit|a little|maybe|i guess|i suppose|hard to say|not really sure|not sure|depends|sometimes|a mix|both|neither|either way|who knows|probably|possibly|to some extent)$/.test(c))return 'hedge';
     if(/^(?:oof|ugh|yikes|ouch|damn|welp|sigh|man|oh man|oh no|rough|rip)$/.test(c))return 'empathy_cue';
     if(/^(?:wait what|really\??|no way|seriously\??|wait really\??|oh really\??|huh\??|what\??)$/.test(c))return 'surprise';
@@ -1908,7 +1925,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if(!s)return null;
     let m;
     if((m=s.match(/^i\s+(?:just\s+)?(?:really\s+)?wanted to\s+(.+)$/i)))return {pattern:'desire',phrase:m[1].trim()};
-    if((m=s.match(/^i(?:'m| am)\s+(?:just\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
+    if((m=s.match(/^(?:i(?:'m| am)\s+)?(?:just\s+|mostly\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:spent|wasted|took)\s+(?:the\s+\w+\s+|all\s+\w+\s+)?([a-z]+ing\b.*)$/i)))return {pattern:'activity',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:had|just had|have)\s+(.+)$/i)))return {pattern:'experience',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(went|got|made|built|wrote|finished|started|tried|found|learned|saw|heard|read|watched|played)\s+(.+)$/i)))return {pattern:'action',verb:m[1].toLowerCase(),phrase:m[2].trim()};
@@ -1938,6 +1955,17 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       return {kind:'clarify_last',preambles};
     }
 
+    // 2b. Casual social variants after preamble stripping
+    if(/^(?:how are you(?: doing| holding up| feeling)?|how's it going|how are things|how have you been)(?:\s+today|\s+tonight)?$/i.test(folded)){
+      return {kind:'social_how',preambles};
+    }
+    if(/^(?:thanks|thank you)(?: so much| a lot| again)?(?:\s+for\s+(?:the\s+)?(?:help|listening|chatting|talking|that|everything|this|your help|being here))?$/i.test(folded)){
+      return {kind:'social_thanks',preambles};
+    }
+    if(/^(?:see you(?: later| soon| around)?|catch you later|talk to you later|gotta go|got to go|have a good (?:one|night|day|evening)|good ?night|bye for now)$/i.test(folded)){
+      return {kind:'social_farewell',preambles};
+    }
+
     // 3. Creative, games, stories, facts, advice, recommendations
     if(/^(?:tell me|spin me|give me|write me|share)?\s*(?:a )?(?:short |bedtime |little |quick )?story\b/i.test(folded))return {kind:'story',preambles};
     if(/^(?:tell me|give me|share)?\s*(?:a )?(?:fun |random |interesting |cool )?(?:fact|trivia)\b|^tell me something (?:interesting|cool|weird|random|surprising|new)$|^surprise me$/i.test(folded)){
@@ -1948,8 +1976,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if((m=trimmed.match(/^(?:help me (?:decide|choose)|should i)\s+(.+?)\s+or\s+(.+)$/i))){
       return {kind:'decide',a:m[1].trim(),b:m[2].trim(),preambles};
     }
-    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas|what should i)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))){
-      const target=(m[1]||'').replace(/^(?:a|an|some)\s+/,'').trim();
+    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))
+      ||(m=folded.match(/^what should i\s+(read|watch|play|listen to|cook|make|eat|drink|try|do tonight)(?:\s+(.+))?$/i))){
+      const target=((m[1]||'')+(m[2]?' '+m[2]:'')).replace(/^(?:a|an|some)\s+/,'').trim();
       return {kind:'recommend',target,preambles};
     }
     if(/^(?:cheer me up|make me smile|i need a distraction|distract me|say something nice|compliment me)$/i.test(folded)){
@@ -1977,6 +2006,20 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     }
     if((m=folded.match(/^(?:what kind of|what sort of|what type of)\s+(.+?)\s+do you (?:like|love|enjoy|listen to|read|watch|play|prefer)$/i))){
       return {kind:'kira_taste',target:m[1].trim(),preambles};
+    }
+
+    // 6b. Invitations to share, help requests, and opinion questions
+    if((m=trimmed.match(/^(?:do you )?(?:want|would you like) to (?:hear|know)(?: more)?(?: about)?\s+(.+)$/i))
+      ||(m=trimmed.match(/^(?:can|could|may|should) i tell you (?:about|more about)\s+(.+)$/i))){
+      return {kind:'invite_share',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:can|could|would) you help(?: me)?(?:\s+(?:with|to))?\s+(.+)$/i))
+      ||(m=trimmed.match(/^help me(?:\s+(?:with|to))?\s+(.+)$/i))){
+      return {kind:'help_request',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:what do you think(?:\s+(about|of))?|what's your take (on)|how do you feel (about))\s+(.+)$/i))){
+      const isAbout=!!(m[1]||m[2]||m[3]),target=m[4].trim();
+      if(target&&!/^(?:of me|about me)$/i.test(target))return {kind:'opinion_question',target,isAbout,preambles};
     }
 
     // 7. Comparisons ("what's the difference between X and Y?", "compare X and Y", "X vs Y")
@@ -3081,7 +3124,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     const affect=nlu?.affect||{tags:[],valence:'neutral',energy:'calm'};
     const ent=state?.context?.activeEntity;
     const latestEvent=state?.context?.episodic?.[state.context.episodic.length-1];
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
     const tag=affect.primary;
 
     // 1. Affect-tuned opening when emotion is clear
@@ -3194,15 +3237,16 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if(gist&&(gist.pattern==='effort'||gist.pattern==='activity')&&gist.phrase&&gist.phrase.length<=45&&!questionsPaused){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(!/\?/.test(echoed)&&!/^\s*(?:yes|no|yeah|haha)/i.test(echoed)){
-        return {text:`${cap(echoed)} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
+        const subject=gist.pattern==='effort'?`Trying to ${lowerFirst(echoed)}`:cap(echoed);
+        return {text:`${subject} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
       }
     }
 
     const neutral={
-      warm:['That makes a lot of sense.','I really hear you on that.','Always interesting hearing how things fit together for you.'],
-      playful:['Fair enough — that checks out completely.','Honestly, I respect that angle.','Gotcha, now the picture makes way more sense.'],
-      thoughtful:['There is usually a lot sitting underneath a thread like that.','I can see why that stays on your mind.','That tracks cleanly when you look at the bigger picture.'],
-      direct:['Makes sense.','Got it.','Fair enough.']
+      warm:['Got it — I’m following you.','Yeah, that makes sense.','I hear what you’re getting at.','Right, I see where you’re coming from.'],
+      playful:['Fair enough — that checks out.','Okay, I see the angle now.','Gotcha, that tracks.','Right — now the picture makes more sense.'],
+      thoughtful:['I see where that’s heading.','That makes sense when you put it like that.','Got it — I’m following the thread.','Right, I can see why that matters here.'],
+      direct:['Makes sense.','Got it.','Fair enough.','I follow.']
     }[persona];
     return pick(neutral,'resp:neutral:'+persona,state);
   }
@@ -3219,9 +3263,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         direct:['Glad it got a laugh.', 'Yeah, pretty funny when you step back.']
       },
       agree:{
-        warm:['It really is true once you notice it.', 'Right? Everything clicks a bit easier that way.'],
-        playful:['100 percent — glad we are on the same wavelength.', 'You see the vision!'],
-        thoughtful:['That shared wavelength makes talking through things much smoother.', 'Quietly true in more places than people expect.'],
+        warm:['Right? It really does come down to that.', 'Yeah, exactly.'],
+        playful:['100 percent — same wavelength.', 'Right? You see it too.'],
+        thoughtful:['Yeah, that usually holds up once you test it.', 'True — the simple version is often the honest one.'],
         direct:['Agreed.', 'Pretty much.']
       },
       hedge:{
@@ -3250,11 +3294,10 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       }
     };
     const p=pick((bank[reaction]||bank.agree)[persona],'react:'+reaction+':'+persona,state);
-    if(questionsPaused)return {text:p.text,key:p.key,followUp:null};
-    const prompt=activeTopic
-      ?pick([`Still in a ${activeTopic} mood, or feel like pivoting somewhere new?`,`What else has been happening on the ${activeTopic} front lately?`],'react:q:'+activeTopic,state).text
-      :pick(['What else is crossing your mind tonight?','Feel like switching gears to a riddle, a quick story, or another topic?'],'react:q:gen',state).text;
-    return {text:p.text,key:p.key,followUp:prompt};
+    const count=(state?.usage?.[p.key])||0;
+    if(questionsPaused||count%2===0)return {text:p.text,key:p.key,followUp:null};
+    const prompt=pick(['What else is on your mind?','Want to keep going with that, or try something else?'],'react:q:gen',state);
+    return {text:p.text,key:p.key,followUp:prompt.text,followUpKey:prompt.key};
   }
 
   // Natural in-character answers to hobbies/tastes/opinions without triggering fake human biology.
@@ -3398,49 +3441,151 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     return `I don't think you have told me about "${cleanFrag(target)}" yet — want to fill me in?`.replace(/\?/g,questionsPaused?'.':'?');
   }
 
+  function respondInviteShare({target,state}){
+    const persona=personaOf(state);
+    const topic=cleanFrag(target||'that').replace(/^(?:more )?about\s+/i,'');
+    const safeTopic=topic&&topic.length<=50&&!/\b(?:you|your)\b/i.test(topic)?topic:'it';
+    const bank={
+      warm:[`Yes, definitely — tell me about ${safeTopic}.`,`I’d love to hear about ${safeTopic}. Go ahead.`],
+      playful:[`Always — tell me about ${safeTopic}.`,`Yes, hit me with the details on ${safeTopic}.`],
+      thoughtful:[`Please do — I’d like to hear about ${safeTopic}.`,`Yes, go ahead. Tell me about ${safeTopic}.`],
+      direct:[`Sure. Tell me about ${safeTopic}.`,`Go ahead — tell me about ${safeTopic}.`]
+    }[persona];
+    const p=pick(bank,'invite:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondHelpRequest({target,state}){
+    const persona=personaOf(state);
+    const clean=cleanFrag(target||'');
+    const isDialogueScene=/\b(?:scene|dialogue|chat|character|characters|story|script|narrative|test)\b/i.test(clean);
+    const bank=isDialogueScene?{
+      warm:[`Gladly — give me the setup or send a line in character and we’ll see how it plays.`,`Sure. Tell me who’s talking and what you want to test first.`],
+      playful:[`I’m in — drop the scene setup or throw a line at me and let’s test it.`,`Sure thing. Tell me the premise and what you want to try.`],
+      thoughtful:[`I can help you test it out. Give me the setup or the first line and we’ll work through it.`,`Sure — describe the scene or what you want to check, and we’ll take it one turn at a time.`],
+      direct:[`Sure. Give me the setup or the first line to test.`,`I can help with that. What’s the scene and what do you want to try first?`]
+    }[persona]:{
+      warm:[`I’ll help however I can within what I can run offline — walk me through what you’re trying to do.`,`Sure, tell me what you’re working on and what part you want to look at.`],
+      playful:[`Happy to pitch in — tell me what we’re tackling first.`,`I’m game. What part do you want to bounce around?`],
+      thoughtful:[`Tell me what you’re trying to work out, and I’ll help think through it within what I can do here.`,`Sure — lay out the piece you’re focusing on and where it’s sticking.`],
+      direct:[`Sure. What are you trying to get working first?`,`Tell me the piece you want to work through.`]
+    }[persona];
+    const p=pick(bank,'help:'+persona+(isDialogueScene?':scene':''),state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondOpinion({target,isAbout,state,engine,questionsPaused}){
+    const persona=personaOf(state);
+    const rawTarget=cleanFrag(target||'');
+    const folded=K.fold(rawTarget);
+    const entry=isAbout&&K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(rawTarget,{exact:true}):null;
+    if(entry){
+      const q=questionsPaused?'':` What’s your own take on ${entry.label.toLowerCase()}?`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+    if(/\b(?:dialogue|conversation|narrative|character|characters|chat|natural|writing|story|stories)\b/i.test(folded)){
+      const bank={
+        warm:[
+          'Natural dialogue usually comes from subtext and restraint — not explaining everything, not asking a question on every single line, and letting characters remember what actually mattered to them.',
+          'When characters only react to what they’ve genuinely witnessed or been told, and their lines match their mood instead of a generic template, even simple replies start feeling alive.'
+        ],
+        playful:[
+          'Honestly, half of sounding natural is knowing when *not* to talk like a customer-service bot — shorter beats, fewer forced follow-up questions, and letting a character push back or stay quiet sometimes.',
+          'Specificity beats cleverness every time: a character who remembers one concrete detail and reacts in voice feels ten times realer than walls of generic polish.'
+        ],
+        thoughtful:[
+          'Good dialogue rarely sounds like two people exchanging tidy summaries. It comes from perspective, memory, and rhythm — knowing what each speaker cares about and leaving room between lines.',
+          'Usually it’s rhythm and accountability: not repeating the same cadence every turn, and grounding what a character says in what they actually know.'
+        ],
+        direct:[
+          'Specificity and pacing. Cut the filler acknowledgements, vary whether you end with a question, and tie replies to what the character actually knows.',
+          'Fewer generic templates, sharper state-driven conditions, and letting some turns land as statements instead of interviews.'
+        ]
+      }[persona];
+      const p=pick(bank,'opinion:dialogue:'+persona,state);
+      const q=questionsPaused?'':' Which part feels stiffest in what you’re building right now?';
+      return {text:p.text+q,keys:[p.key]};
+    }
+    const cleanTopic=rawTarget&&rawTarget.length<=45&&isAbout?rawTarget:'that';
+    const bank={
+      warm:[`I don’t have a canned rulebook view on ${cleanTopic}, honestly — it usually depends on what you’re trying to get out of it.`,`Hard to reduce ${cleanTopic} to one tidy take, though I’m curious where you land on it.`],
+      playful:[`I don’t have an off-the-shelf hot take on ${cleanTopic}, which might actually be a relief.`,`Honestly ${cleanTopic} could go a few ways — what’s your angle on it?`],
+      thoughtful:[`There’s no single pat answer on ${cleanTopic}; most of the interesting part is in the tradeoffs.`,`I don’t have a preset opinion on ${cleanTopic}, though I’d like to hear what drew your attention to it.`],
+      direct:[`No canned take on ${cleanTopic}. What’s your angle on it?`,`Depends on what you want ${cleanTopic} to do. Where are you leaning?`]
+    }[persona];
+    const p=pick(bank,'opinion:gen:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
   // Graceful, varied open-ended prose fallback (replaces robotic "my grammar is fairly small" brick wall).
   function respondNovelFallback({nlu,rawText,state,engine,questionsPaused,misses}){
     const persona=personaOf(state);
     const topic=nlu?.topicScores?.[0]?.[0]||state?.context?.topic||'general';
     const affect=nlu?.affect||{};
     const gist=nlu?.act?.gist;
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const isQuestion=nlu?.act?.kind==='open_question'||/\?\s*$/.test(rawText||'');
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
 
-    if(entry){
+    if(entry&&!isQuestion){
       const q=questionsPaused?'':` ${K.conversationQuestions?.[entry.topic]?.[0]||`What brought ${entry.label.toLowerCase()} to mind?`}`;
-      return `${entry.summary} ${entry.angle}${q}`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+
+    if(isQuestion){
+      const qBank={
+        warm:['I’m not sure I caught enough context to answer that cleanly — tell me a bit more about what you mean?','I don’t have a straight answer for that built in, though if you give me the context I’ll follow along.'],
+        playful:['Hmm, you stumped my rulebook on that one — give me a little more context?','I don’t have an obvious answer ready for that — what’s the backdrop?'],
+        thoughtful:['I don’t want to bluff an answer to that without more context. What’s behind the question?','That sits a bit outside what I can read cleanly — say a little more about what you’re aiming at?'],
+        direct:['Not sure I can answer that cleanly as phrased. What’s the context?','Outside what I can parse cleanly — give me a bit more to go on.']
+      }[persona];
+      const p=pick(qBank,'fallback:openq:'+persona,state);
+      return {text:questionsPaused?p.text.replace(/\?/g,'.'):p.text,keys:[p.key]};
     }
 
     // Acknowledge emotional or gist meaning gracefully instead of scolding user's phrasing.
-    const lead=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused}).text;
+    const keys=[];
+    const leadRes=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused});
+    if(leadRes.key)keys.push(leadRes.key);
+    const lead=leadRes.text;
     let middle='';
     if(gist&&gist.phrase&&gist.phrase.length<=55){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(gist.pattern==='desire')middle=` Wanting to ${lowerFirst(echoed)} makes complete sense.`;
-      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is where all the interesting friction lives.`;
+      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is a solid focus.`;
       else if(gist.pattern==='subject_state'&&gist.subject)middle=` Funny how much attention your ${gist.subject} can pull once things get moving.`;
     }
     if(!middle&&affect.valence==='neutral'&&misses>=2){
-      middle={
-        warm:' I want to make sure I follow where you want this to go.',
-        playful:' Let me make sure I catch your angle clearly here.',
-        thoughtful:' Give me one small anchor on what matters most to you in that.',
-        direct:' Point me at the main piece you want to unpack.'
+      const mBank={
+        warm:[' Tell me a bit more about where you want to take this.',' We can take that wherever you want next.'],
+        playful:[' Throw me the next piece when you’re ready.',' Where are we steering this next?'],
+        thoughtful:[' Give me one concrete detail you want to unpack.',' Let me know which thread you want to follow.'],
+        direct:[' What’s the main piece you want to look at?',' Point me at what comes next.']
       }[persona];
+      const mp=pick(mBank,'fallback:miss:'+persona,state);
+      keys.push(mp.key);
+      middle=mp.text;
     }
 
-    if(questionsPaused)return (lead+middle).trim();
+    if(questionsPaused)return {text:(lead+middle).trim(),keys};
+
+    // Vary whether we tack on a question so open chat doesn't interrogate every turn.
+    const turnCount=(state?.usage?.['fallback:turn:'+persona])||0;
+    keys.push('fallback:turn:'+persona);
+    if(middle||turnCount%2===1){
+      return {text:`${lead}${middle}`.replace(/\s+/g,' ').trim(),keys};
+    }
 
     const tailored=(K.conversationTailored?.[topic]?.[0]);
-    const follow=topic!=='general'&&tailored
-      ?` ${tailored}`
+    const followPick=topic!=='general'&&tailored
+      ?{text:` ${tailored}`,key:null}
       :pick([
-        ' What part of that is taking up the most space in your head right now?',
-        ' Walk me through the backstory — what sparked that?',
-        ' Want to unpack that a bit more, or pivot toward something lighter like a riddle or a story?'
-      ],'fallback:q:'+persona,state).text;
+        ' What part of that are you focusing on right now?',
+        ' What sparked that?',
+        ' Want to dig into that more, or switch to something else?'
+      ],'fallback:q:'+persona,state);
+    if(followPick.key)keys.push(followPick.key);
 
-    return `${lead}${middle}${follow}`.replace(/\s+/g,' ').trim();
+    return {text:`${lead}${middle}${followPick.text}`.replace(/\s+/g,' ').trim(),keys};
   }
 
   // Wrap a verified Realization sentence (preserving the exact substring span!) in warm human phrasing.
@@ -3495,6 +3640,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     personaOf,
     reflectTopic,
     respondReaction,
+    respondInviteShare,
+    respondHelpRequest,
+    respondOpinion,
     respondKiraPersona,
     respondKiraTaste,
     respondEpisodicRecall,
@@ -3723,11 +3871,20 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         if(kind==='capabilities'||kind==='honest'){plan.text+=prefix+generic(kind);askLastQuestion('general',0);}
         else if(kind==='taste'||kind==='favorite'){
           const topic=o?.candidates?.length===1?this.engine.topicFor(o.concept):null;
-          const taste=K.Responder?.respondKiraTaste
-            ?K.Responder.respondKiraTaste({kind,target:o?.label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
-            :{text:generic('honest',{questionsPaused:true}),topic:null};
-          const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(o?.label||'',this.engine):null)||'general';
-          plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,o?.label)).trim();
+          const label=o?.label||'';
+          const exactEntry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(label,{exact:true}):null;
+          const isCategoryTaste=/\b(?:music|band|song|album|book|novel|author|genre|read|food|eat|cuisine|dish|drink|tea|coffee|movie|film|show|game|games)\b/i.test(label);
+          if(kind==='taste'&&!exactEntry&&!isCategoryTaste&&K.Responder?.respondOpinion){
+            const op=K.Responder.respondOpinion({target:label,isAbout:true,state,engine:this.engine,questionsPaused:state.context.questionsPaused});
+            for(const k of op.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+            plan.text+=prefix+op.text;
+          }else{
+            const taste=K.Responder?.respondKiraTaste
+              ?K.Responder.respondKiraTaste({kind,target:label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
+              :{text:generic('honest',{questionsPaused:true}),topic:null};
+            const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(label,this.engine):null)||'general';
+            plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,label)).trim();
+          }
         }else plan.text+=prefix+generic('about');
       };
       state.context.pending=null;
@@ -3852,7 +4009,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
               plan.text=((lead?lead.text:interact('social',{questionsPaused:true}))+' '+ask(topicCue,startStep,undefined,parsed.text,[])).trim();
             }
             else if(K.Responder?.respondNovelFallback){
-              plan.text=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              const fb=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              if(typeof fb==='string')plan.text=fb;
+              else{plan.text=fb.text;for(const k of fb.keys||[])state.usage[k]=(state.usage[k]||0)+1;}
             }
             else if(misses===1)plan.text='I caught the drift of that, even if it sits outside my structured memory commands — tell me a little more about what you mean?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
             else plan.text='Let me make sure I follow where you want to go — what part of that matters most to you right now?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
@@ -3906,9 +4065,28 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
               else{plan.text=picked.item.prompt;state.context.pending={kind:'dilemma',dilemmaId:picked.item.id,question:picked.item.prompt,questionMessage:aid};}
               break;
             }
+            if(na.kind==='invite_share'&&K.Responder?.respondInviteShare){
+              const res=K.Responder.respondInviteShare({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='help_request'&&K.Responder?.respondHelpRequest){
+              const res=K.Responder.respondHelpRequest({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='opinion_question'&&K.Responder?.respondOpinion){
+              const res=K.Responder.respondOpinion({target:na.target,isAbout:na.isAbout,state,engine:this.engine,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
             if(na.kind==='recommend'){
               const rec=K.Knowledge.recommend(na.target,state);state.usage[rec.key]=(state.usage[rec.key]||0)+1;
-              plan.text=rec.text+(paused?'':` Want another option in a different mood, or does ${rec.topic} sound right tonight?`);
+              const recFollow=rec.topic&&rec.topic!=='general'?` Want another option in a different mood, or does ${rec.topic} sound right tonight?`:' Want another idea, or something else entirely?';
+              plan.text=rec.text+(paused?'':recFollow);
               break;
             }
             if(na.kind==='decide'){
@@ -3941,7 +4119,8 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,{purpose:'start'});}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,{purpose:'detail'});}
             else{
-              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(cue&&cue!==f?.topic),questionsPaused:state.context.questionsPaused}):null;
+              const prevTopic=f?.topic||previous.context.field?.topic;
+              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(prevTopic&&prevTopic!=='general'&&cue&&cue!==prevTopic),questionsPaused:state.context.questionsPaused}):null;
               if(reflection?.key)state.usage[reflection.key]=(state.usage[reflection.key]||0)+1;
               const lead=reflection?reflection.text:interact('social',{questionsPaused:true}),asked=cue&&cue!==f?.topic?[]:f?.asked;
               const move=f?this.field.nextMove({ctx:state.context.field,topic,step,ladderLength:(K.conversationQuestions[topic]||[]).length,answer,memories:state.memories.filter(m=>!(state.context.declinedTopics||[]).includes(memoryTopic(m))),turn:state.turn}):{kind:'ladder'};
@@ -3983,10 +4162,15 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         }
         case 'social':{
           const paused=state.context.questionsPaused||!allowQuestions;
-          if(parsed.nluAct?.kind==='reaction'&&K.Responder?.respondReaction){
+          const priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const isJokeOrPromptLaugh=parsed.socialKind==='laugh'&&['joke','prompt'].includes(priorAct);
+          const isBareAck=/^(?:ok|okay|alright)[.!]*$/i.test(parsed.text.trim());
+          const reactionKind=!isJokeOrPromptLaugh&&!isBareAck?(parsed.nluAct?.kind==='reaction'?parsed.nluAct.reaction:parsed.nlu?.act?.kind==='reaction'?parsed.nlu.act.reaction:null):null;
+          if(reactionKind&&K.Responder?.respondReaction){
             const topic=previous.context.pending?.topic||previous.context.field?.topic;
-            const res=K.Responder.respondReaction({reaction:parsed.nluAct.reaction,topic,state,questionsPaused:paused});
+            const res=K.Responder.respondReaction({reaction:reactionKind,topic,state,questionsPaused:paused});
             if(res.key)state.usage[res.key]=(state.usage[res.key]||0)+1;
+            if(res.followUpKey)state.usage[res.followUpKey]=(state.usage[res.followUpKey]||0)+1;
             plan.text=res.followUp?res.text+' '+res.followUp:res.text;
             break;
           }
@@ -3996,7 +4180,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
             plan.text=lead+picked.item.fact+(paused?'':' Want a quick riddle, a warm micro-story, or just someone to vent to?');
             break;
           }
-          const kind=parsed.socialKind,priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const kind=parsed.socialKind;
           if(kind==='laugh'&&['joke','prompt'].includes(priorAct)){plan.text=generic('laugh');if(!state.context.questionsPaused)state.context.pending={kind:'offer',act:priorAct};}
           else{const hook=kind==='ack'||kind==='decline'?recallHook():null;if(hook){plan.text=hook.text+' '+ask(hook.topic,0);}else{plan.text=generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}}
           break;
@@ -4062,7 +4246,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"143ec67a775f4fd1ceabaed889b5fc5a20ced0824c366793f4870c7d48938cc3","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.7.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f23d194a8547abcbd944cea4b600b0aecae91e4a0347d43cf596eb66001c5c11","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 </script>
 <script id="worker-source" type="text/plain">'use strict';
 // The canonical layer is shared infrastructure, not part of the optimizer.
@@ -4899,6 +5083,14 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
     }
     const parsed=base();
     if(parsed.supported||parsed.ambiguity)return finish(parsed);
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&K.NLU?.stripPreambles){
+      const stripped=K.NLU.stripPreambles(text);
+      if(stripped.preambles.length&&stripped.core){
+        const offset=text.length-stripped.core.length;
+        const pr=base(stripped.core);
+        if(pr.supported||pr.ambiguity)return finish(relocate(pr,offset));
+      }
+    }
     if(!protectedText&&pending?.kind==='riddle'&&!isRepairFeedback(text)){
       return finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],nluAct:{kind:'riddle_answer',answer:raw},reason:null});
     }
@@ -4924,9 +5116,13 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
       const ak=nlu.act?.kind;
       const route=(intent,speechAct='statement')=>finish({intent,speechAct,supported:true,frames:[],quoted:[],nluAct:nlu.act,reason:null});
       if(ak==='reaction'&&!(pending?.kind==='detail'&&yesNo))return route('c:social','reaction');
+      if(ak==='social_how')return route('c:how','question');
+      if(ak==='social_thanks')return route('c:thanks','statement');
+      if(ak==='social_farewell')return route('c:farewell','statement');
       if(ak==='clarify_last')return route('c:clarify','question');
       if(ak==='episodic_recall')return route('c:recall','question');
       if(ak==='kira_persona'||ak==='kira_taste'||ak==='live_world')return route('c:about','question');
+      if(ak==='invite_share'||ak==='help_request'||ak==='opinion_question')return route('c:topic','question');
       if(ak==='story'||ak==='fun_fact'||ak==='riddle'||ak==='dilemma'||ak==='recommend'||ak==='decide')return route('c:topic','request');
       if(ak==='cheer_up')return route('c:social','request');
       if(ak==='compare'||ak==='knowledge')return route('c:topic','question');
@@ -4970,18 +5166,19 @@ Kira.WORDNET_TOPICS={"art":"aaron copland,abstract art,abstract artist,abstracti
   function focusPhrase(answer){
     if(typeof answer!=='string')return null;
     if(K.NLU?.classifyReaction?.(answer))return null;
-    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    const raw=K.NLU?.normalize?K.NLU.normalize(answer):answer;
+    let t=raw.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
     if(K.NLU?.classifyReaction?.(t))return null;
-    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:trying to |attempting to )?(?:making|make|building|build|working on|writing|write|creating|create|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying|testing|test)\s+/i,'');
     t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
     const words=t.split(/\s+/).filter(Boolean);
     if(words.length<1||words.length>4||t.length>32)return null;
     // Places, reasons, reactions and time/frequency answers are useful discourse, but cannot fill a noun slot.
     if(/^(?:at|in|on|to|from|with|without|by|for|about|because|during|after|before|under|over|around|through|every|each|all|once|twice)\b/i.test(t)||/^(?:usually|sometimes|often|always|never|daily|weekly|recently|yesterday|today|tomorrow|tonight)$/i.test(t))return null;
-    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
-    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say)\b/i.test(t))return null;
-    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did)\b/i.test(t))return null;
-    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure|thanks|thank you|hello|hi|hey|bye|goodbye)$/i.test(t))return null;
+    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say|ok|okay|alright|no worries|all good)\b/i.test(t))return null;
+    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did|working|trying|building|making|doing|going|getting|looking|helping|testing|telling|saying|focusing)\b/i.test(t))return null;
+    if(/\b(?:i|i'm|im|i've|ive|i'll|ill|i'd|id|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|dont|can't|cant|won't|wont|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
     // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
     return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
   }
@@ -5189,7 +5386,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'Music built on swing, extended harmony, and live conversation between players — nobody plays the exact same chart twice.',
       angle:'Once you hear how jazz treats "wrong" notes as tension waiting one half-step away from home, standard pop chords sound delightfully tame.',
       traits:['improvised','rich harmony','conversational']},
-    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie','indie music','shoegaze','post-punk','dream pop'],topic:'music',
+    {id:'indie rock',label:'Indie Rock',aliases:['indie rock','indie music','indie folk','shoegaze','post-punk','dream pop'],topic:'music',
       summary:'Guitar-driven music born outside major-label polish — trading stadium perfection for texture, jagged riffs, and rooms that actually sound alive.',
       angle:'The best indie records make slight imperfections feel like the whole emotional point.',
       traits:['textured','DIY','melodic']},
@@ -5201,7 +5398,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'Eighty-eight keys laid out like an open map of harmony — letting you hear bass, counterpoint, and melody all under two hands.',
       angle:'Nothing makes music theory click faster than seeing whole steps and half steps sitting right in front of you.',
       traits:['polyphonic','visual harmony','percussive']},
-    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','turntable','record player','records'],topic:'music',
+    {id:'vinyl',label:'Vinyl Records',aliases:['vinyl','vinyl records','vinyl record','turntable','record player'],topic:'music',
       summary:'Physical albums that turn listening into an intentional ritual — big sleeve art, an A-side pacing arc, and gentle analog warmth.',
       angle:'Having to stand up and flip the record makes you actually listen to an album from front to back instead of skipping after twelve seconds.',
       traits:['tactile','ritual','warm']},
@@ -5223,7 +5420,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       summary:'The language woven into every web browser — dynamic, event-driven, and quirky enough to keep even veterans humble.',
       angle:'Async workflows feel tricky until promises click, after which wiring interactive UIs becomes second nature.',
       traits:['ubiquitous','event-driven','dynamic']},
-    {id:'git',label:'Git',aliases:['git','github','version control','branching'],topic:'coding',
+    {id:'git',label:'Git',aliases:['git','github','version control','git branching'],topic:'coding',
       summary:'Distributed version control that turns project history into cheap snapshots, making wild experiments safe because cleanly reverting is always one step away.',
       angle:'A clean commit log reads like a diary of decisions rather than just a pile of changed lines.',
       traits:['branching','reversible','collaborative']},
@@ -5503,13 +5700,17 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     return out;
   }
 
-  function lookupEntry(text){
+  const BROAD_PROSE=new Set(['writing','art','history','reading','movies','sleep','philosophy','cooking','running']);
+  function lookupEntry(text,options){
     const c=K.fold(text).replace(/^(?:the|a|an)\s+/,'').replace(/[.!?]+$/,'').trim();
     if(!c)return null;
     if(BY_ALIAS.has(c))return BY_ALIAS.get(c);
     const singular=c.replace(/s$/,'');
     if(BY_ALIAS.has(singular))return BY_ALIAS.get(singular);
+    if(options?.exact)return null;
+    const isLongProse=options?.prose&&c.split(/\s+/).length>3;
     for(const entry of ENTRIES){
+      if(isLongProse&&BROAD_PROSE.has(entry.id))continue;
       for(const alias of entry.aliases){
         if(alias.length>=4){
           const re=new RegExp('\\b'+alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
@@ -5658,7 +5859,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     [/\btbh\b/gi,'to be honest'],[/\bngl\b/gi,'not going to lie'],[/\brn\b/gi,'right now'],
     [/\bits\b(?=\s+(?:a|an|the|so|very|pretty|really|kind|sort|not|been|just|actually|honestly|getting|hard|easy|good|bad|great|nice|tough|late|early|cold|hot|warm|raining|snowing))/gi,"it's"]
   ];
-  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
+  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|by the way|btw|for what it's worth|fwiw|on another note|speaking of which|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
   const STOP_ENTITIES=new Set(['i','me','my','mine','you','your','we','our','us','they','them','their','he','him','his','she','her','it','its','this','that','these','those','something','anything','everything','nothing','someone','anyone','everyone','stuff','thing','things','lot','bit','kind','sort','part','way','time','day','today','tonight','yesterday','tomorrow','now','here','there','home','work','school','life','world','haha','yeah','lol','lmao','okay','ok','yes','no','sure','maybe','really','mostly','just','actually','honestly','pretty','very','quite','good','bad','great','nice','long','rough','hard','little','more','much','many','some']);
 
   // Normalize casual English without mutating user-quoted spans when building discourse features.
@@ -5713,9 +5914,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
 
   // Reactions and backchannels that should never be parsed as noun-phrase topics.
   function classifyReaction(text){
-    const c=K.fold(text).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well),?\s+/,'').trim();
+    const c=K.fold(normalize(text)).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well|yeah|yep|yup|ok|okay|alright),?\s+(?=(?:fair|true|that's|good|no worries|all good|makes sense|i agree|got|sounds))?/,'').trim();
     if(/^(?:(?:haha+|hahaha+|hehe+|lol|lmao|rofl)(?:\s+(?:yeah|yep|yup|true|right|fair|same|totally|i know|for real|fr|man|seriously))?|(?:yeah|yep|yup|oh)\s+(?:haha+|lol|lmao|that's funny|too funny))$/.test(c))return 'laugh';
-    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|fair|fair enough|pretty much|mostly|right|exactly|i know|i get that|makes sense|good point|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course)$/.test(c))return 'agree';
+    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|true enough|that's true|so true|totally true|fair|fair enough|fair point|good point|pretty much|mostly|right|exactly|i know|i get that|i agree|agreed|makes sense|makes total sense|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course|gotcha|got it|understood|no worries|all good|okay|ok|alright)$/.test(c))return 'agree';
     if(/^(?:kind of|kinda|sort of|sorta|a bit|a little|maybe|i guess|i suppose|hard to say|not really sure|not sure|depends|sometimes|a mix|both|neither|either way|who knows|probably|possibly|to some extent)$/.test(c))return 'hedge';
     if(/^(?:oof|ugh|yikes|ouch|damn|welp|sigh|man|oh man|oh no|rough|rip)$/.test(c))return 'empathy_cue';
     if(/^(?:wait what|really\??|no way|seriously\??|wait really\??|oh really\??|huh\??|what\??)$/.test(c))return 'surprise';
@@ -5822,7 +6023,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if(!s)return null;
     let m;
     if((m=s.match(/^i\s+(?:just\s+)?(?:really\s+)?wanted to\s+(.+)$/i)))return {pattern:'desire',phrase:m[1].trim()};
-    if((m=s.match(/^i(?:'m| am)\s+(?:just\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
+    if((m=s.match(/^(?:i(?:'m| am)\s+)?(?:just\s+|mostly\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:spent|wasted|took)\s+(?:the\s+\w+\s+|all\s+\w+\s+)?([a-z]+ing\b.*)$/i)))return {pattern:'activity',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:had|just had|have)\s+(.+)$/i)))return {pattern:'experience',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(went|got|made|built|wrote|finished|started|tried|found|learned|saw|heard|read|watched|played)\s+(.+)$/i)))return {pattern:'action',verb:m[1].toLowerCase(),phrase:m[2].trim()};
@@ -5852,6 +6053,17 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       return {kind:'clarify_last',preambles};
     }
 
+    // 2b. Casual social variants after preamble stripping
+    if(/^(?:how are you(?: doing| holding up| feeling)?|how's it going|how are things|how have you been)(?:\s+today|\s+tonight)?$/i.test(folded)){
+      return {kind:'social_how',preambles};
+    }
+    if(/^(?:thanks|thank you)(?: so much| a lot| again)?(?:\s+for\s+(?:the\s+)?(?:help|listening|chatting|talking|that|everything|this|your help|being here))?$/i.test(folded)){
+      return {kind:'social_thanks',preambles};
+    }
+    if(/^(?:see you(?: later| soon| around)?|catch you later|talk to you later|gotta go|got to go|have a good (?:one|night|day|evening)|good ?night|bye for now)$/i.test(folded)){
+      return {kind:'social_farewell',preambles};
+    }
+
     // 3. Creative, games, stories, facts, advice, recommendations
     if(/^(?:tell me|spin me|give me|write me|share)?\s*(?:a )?(?:short |bedtime |little |quick )?story\b/i.test(folded))return {kind:'story',preambles};
     if(/^(?:tell me|give me|share)?\s*(?:a )?(?:fun |random |interesting |cool )?(?:fact|trivia)\b|^tell me something (?:interesting|cool|weird|random|surprising|new)$|^surprise me$/i.test(folded)){
@@ -5862,8 +6074,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if((m=trimmed.match(/^(?:help me (?:decide|choose)|should i)\s+(.+?)\s+or\s+(.+)$/i))){
       return {kind:'decide',a:m[1].trim(),b:m[2].trim(),preambles};
     }
-    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas|what should i)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))){
-      const target=(m[1]||'').replace(/^(?:a|an|some)\s+/,'').trim();
+    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))
+      ||(m=folded.match(/^what should i\s+(read|watch|play|listen to|cook|make|eat|drink|try|do tonight)(?:\s+(.+))?$/i))){
+      const target=((m[1]||'')+(m[2]?' '+m[2]:'')).replace(/^(?:a|an|some)\s+/,'').trim();
       return {kind:'recommend',target,preambles};
     }
     if(/^(?:cheer me up|make me smile|i need a distraction|distract me|say something nice|compliment me)$/i.test(folded)){
@@ -5891,6 +6104,20 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     }
     if((m=folded.match(/^(?:what kind of|what sort of|what type of)\s+(.+?)\s+do you (?:like|love|enjoy|listen to|read|watch|play|prefer)$/i))){
       return {kind:'kira_taste',target:m[1].trim(),preambles};
+    }
+
+    // 6b. Invitations to share, help requests, and opinion questions
+    if((m=trimmed.match(/^(?:do you )?(?:want|would you like) to (?:hear|know)(?: more)?(?: about)?\s+(.+)$/i))
+      ||(m=trimmed.match(/^(?:can|could|may|should) i tell you (?:about|more about)\s+(.+)$/i))){
+      return {kind:'invite_share',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:can|could|would) you help(?: me)?(?:\s+(?:with|to))?\s+(.+)$/i))
+      ||(m=trimmed.match(/^help me(?:\s+(?:with|to))?\s+(.+)$/i))){
+      return {kind:'help_request',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:what do you think(?:\s+(about|of))?|what's your take (on)|how do you feel (about))\s+(.+)$/i))){
+      const isAbout=!!(m[1]||m[2]||m[3]),target=m[4].trim();
+      if(target&&!/^(?:of me|about me)$/i.test(target))return {kind:'opinion_question',target,isAbout,preambles};
     }
 
     // 7. Comparisons ("what's the difference between X and Y?", "compare X and Y", "X vs Y")
@@ -6995,7 +7222,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     const affect=nlu?.affect||{tags:[],valence:'neutral',energy:'calm'};
     const ent=state?.context?.activeEntity;
     const latestEvent=state?.context?.episodic?.[state.context.episodic.length-1];
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
     const tag=affect.primary;
 
     // 1. Affect-tuned opening when emotion is clear
@@ -7108,15 +7335,16 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     if(gist&&(gist.pattern==='effort'||gist.pattern==='activity')&&gist.phrase&&gist.phrase.length<=45&&!questionsPaused){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(!/\?/.test(echoed)&&!/^\s*(?:yes|no|yeah|haha)/i.test(echoed)){
-        return {text:`${cap(echoed)} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
+        const subject=gist.pattern==='effort'?`Trying to ${lowerFirst(echoed)}`:cap(echoed);
+        return {text:`${subject} sounds like a worthwhile thing to spend time on.`,key:'resp:gist:'+gist.pattern};
       }
     }
 
     const neutral={
-      warm:['That makes a lot of sense.','I really hear you on that.','Always interesting hearing how things fit together for you.'],
-      playful:['Fair enough — that checks out completely.','Honestly, I respect that angle.','Gotcha, now the picture makes way more sense.'],
-      thoughtful:['There is usually a lot sitting underneath a thread like that.','I can see why that stays on your mind.','That tracks cleanly when you look at the bigger picture.'],
-      direct:['Makes sense.','Got it.','Fair enough.']
+      warm:['Got it — I’m following you.','Yeah, that makes sense.','I hear what you’re getting at.','Right, I see where you’re coming from.'],
+      playful:['Fair enough — that checks out.','Okay, I see the angle now.','Gotcha, that tracks.','Right — now the picture makes more sense.'],
+      thoughtful:['I see where that’s heading.','That makes sense when you put it like that.','Got it — I’m following the thread.','Right, I can see why that matters here.'],
+      direct:['Makes sense.','Got it.','Fair enough.','I follow.']
     }[persona];
     return pick(neutral,'resp:neutral:'+persona,state);
   }
@@ -7133,9 +7361,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         direct:['Glad it got a laugh.', 'Yeah, pretty funny when you step back.']
       },
       agree:{
-        warm:['It really is true once you notice it.', 'Right? Everything clicks a bit easier that way.'],
-        playful:['100 percent — glad we are on the same wavelength.', 'You see the vision!'],
-        thoughtful:['That shared wavelength makes talking through things much smoother.', 'Quietly true in more places than people expect.'],
+        warm:['Right? It really does come down to that.', 'Yeah, exactly.'],
+        playful:['100 percent — same wavelength.', 'Right? You see it too.'],
+        thoughtful:['Yeah, that usually holds up once you test it.', 'True — the simple version is often the honest one.'],
         direct:['Agreed.', 'Pretty much.']
       },
       hedge:{
@@ -7164,11 +7392,10 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
       }
     };
     const p=pick((bank[reaction]||bank.agree)[persona],'react:'+reaction+':'+persona,state);
-    if(questionsPaused)return {text:p.text,key:p.key,followUp:null};
-    const prompt=activeTopic
-      ?pick([`Still in a ${activeTopic} mood, or feel like pivoting somewhere new?`,`What else has been happening on the ${activeTopic} front lately?`],'react:q:'+activeTopic,state).text
-      :pick(['What else is crossing your mind tonight?','Feel like switching gears to a riddle, a quick story, or another topic?'],'react:q:gen',state).text;
-    return {text:p.text,key:p.key,followUp:prompt};
+    const count=(state?.usage?.[p.key])||0;
+    if(questionsPaused||count%2===0)return {text:p.text,key:p.key,followUp:null};
+    const prompt=pick(['What else is on your mind?','Want to keep going with that, or try something else?'],'react:q:gen',state);
+    return {text:p.text,key:p.key,followUp:prompt.text,followUpKey:prompt.key};
   }
 
   // Natural in-character answers to hobbies/tastes/opinions without triggering fake human biology.
@@ -7312,49 +7539,151 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     return `I don't think you have told me about "${cleanFrag(target)}" yet — want to fill me in?`.replace(/\?/g,questionsPaused?'.':'?');
   }
 
+  function respondInviteShare({target,state}){
+    const persona=personaOf(state);
+    const topic=cleanFrag(target||'that').replace(/^(?:more )?about\s+/i,'');
+    const safeTopic=topic&&topic.length<=50&&!/\b(?:you|your)\b/i.test(topic)?topic:'it';
+    const bank={
+      warm:[`Yes, definitely — tell me about ${safeTopic}.`,`I’d love to hear about ${safeTopic}. Go ahead.`],
+      playful:[`Always — tell me about ${safeTopic}.`,`Yes, hit me with the details on ${safeTopic}.`],
+      thoughtful:[`Please do — I’d like to hear about ${safeTopic}.`,`Yes, go ahead. Tell me about ${safeTopic}.`],
+      direct:[`Sure. Tell me about ${safeTopic}.`,`Go ahead — tell me about ${safeTopic}.`]
+    }[persona];
+    const p=pick(bank,'invite:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondHelpRequest({target,state}){
+    const persona=personaOf(state);
+    const clean=cleanFrag(target||'');
+    const isDialogueScene=/\b(?:scene|dialogue|chat|character|characters|story|script|narrative|test)\b/i.test(clean);
+    const bank=isDialogueScene?{
+      warm:[`Gladly — give me the setup or send a line in character and we’ll see how it plays.`,`Sure. Tell me who’s talking and what you want to test first.`],
+      playful:[`I’m in — drop the scene setup or throw a line at me and let’s test it.`,`Sure thing. Tell me the premise and what you want to try.`],
+      thoughtful:[`I can help you test it out. Give me the setup or the first line and we’ll work through it.`,`Sure — describe the scene or what you want to check, and we’ll take it one turn at a time.`],
+      direct:[`Sure. Give me the setup or the first line to test.`,`I can help with that. What’s the scene and what do you want to try first?`]
+    }[persona]:{
+      warm:[`I’ll help however I can within what I can run offline — walk me through what you’re trying to do.`,`Sure, tell me what you’re working on and what part you want to look at.`],
+      playful:[`Happy to pitch in — tell me what we’re tackling first.`,`I’m game. What part do you want to bounce around?`],
+      thoughtful:[`Tell me what you’re trying to work out, and I’ll help think through it within what I can do here.`,`Sure — lay out the piece you’re focusing on and where it’s sticking.`],
+      direct:[`Sure. What are you trying to get working first?`,`Tell me the piece you want to work through.`]
+    }[persona];
+    const p=pick(bank,'help:'+persona+(isDialogueScene?':scene':''),state);
+    return {text:p.text,keys:[p.key]};
+  }
+
+  function respondOpinion({target,isAbout,state,engine,questionsPaused}){
+    const persona=personaOf(state);
+    const rawTarget=cleanFrag(target||'');
+    const folded=K.fold(rawTarget);
+    const entry=isAbout&&K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(rawTarget,{exact:true}):null;
+    if(entry){
+      const q=questionsPaused?'':` What’s your own take on ${entry.label.toLowerCase()}?`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+    if(/\b(?:dialogue|conversation|narrative|character|characters|chat|natural|writing|story|stories)\b/i.test(folded)){
+      const bank={
+        warm:[
+          'Natural dialogue usually comes from subtext and restraint — not explaining everything, not asking a question on every single line, and letting characters remember what actually mattered to them.',
+          'When characters only react to what they’ve genuinely witnessed or been told, and their lines match their mood instead of a generic template, even simple replies start feeling alive.'
+        ],
+        playful:[
+          'Honestly, half of sounding natural is knowing when *not* to talk like a customer-service bot — shorter beats, fewer forced follow-up questions, and letting a character push back or stay quiet sometimes.',
+          'Specificity beats cleverness every time: a character who remembers one concrete detail and reacts in voice feels ten times realer than walls of generic polish.'
+        ],
+        thoughtful:[
+          'Good dialogue rarely sounds like two people exchanging tidy summaries. It comes from perspective, memory, and rhythm — knowing what each speaker cares about and leaving room between lines.',
+          'Usually it’s rhythm and accountability: not repeating the same cadence every turn, and grounding what a character says in what they actually know.'
+        ],
+        direct:[
+          'Specificity and pacing. Cut the filler acknowledgements, vary whether you end with a question, and tie replies to what the character actually knows.',
+          'Fewer generic templates, sharper state-driven conditions, and letting some turns land as statements instead of interviews.'
+        ]
+      }[persona];
+      const p=pick(bank,'opinion:dialogue:'+persona,state);
+      const q=questionsPaused?'':' Which part feels stiffest in what you’re building right now?';
+      return {text:p.text+q,keys:[p.key]};
+    }
+    const cleanTopic=rawTarget&&rawTarget.length<=45&&isAbout?rawTarget:'that';
+    const bank={
+      warm:[`I don’t have a canned rulebook view on ${cleanTopic}, honestly — it usually depends on what you’re trying to get out of it.`,`Hard to reduce ${cleanTopic} to one tidy take, though I’m curious where you land on it.`],
+      playful:[`I don’t have an off-the-shelf hot take on ${cleanTopic}, which might actually be a relief.`,`Honestly ${cleanTopic} could go a few ways — what’s your angle on it?`],
+      thoughtful:[`There’s no single pat answer on ${cleanTopic}; most of the interesting part is in the tradeoffs.`,`I don’t have a preset opinion on ${cleanTopic}, though I’d like to hear what drew your attention to it.`],
+      direct:[`No canned take on ${cleanTopic}. What’s your angle on it?`,`Depends on what you want ${cleanTopic} to do. Where are you leaning?`]
+    }[persona];
+    const p=pick(bank,'opinion:gen:'+persona,state);
+    return {text:p.text,keys:[p.key]};
+  }
+
   // Graceful, varied open-ended prose fallback (replaces robotic "my grammar is fairly small" brick wall).
   function respondNovelFallback({nlu,rawText,state,engine,questionsPaused,misses}){
     const persona=personaOf(state);
     const topic=nlu?.topicScores?.[0]?.[0]||state?.context?.topic||'general';
     const affect=nlu?.affect||{};
     const gist=nlu?.act?.gist;
-    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText):null;
+    const isQuestion=nlu?.act?.kind==='open_question'||/\?\s*$/.test(rawText||'');
+    const entry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(nlu?.normalized||rawText,{prose:true}):null;
 
-    if(entry){
+    if(entry&&!isQuestion){
       const q=questionsPaused?'':` ${K.conversationQuestions?.[entry.topic]?.[0]||`What brought ${entry.label.toLowerCase()} to mind?`}`;
-      return `${entry.summary} ${entry.angle}${q}`;
+      return {text:`${entry.summary} ${entry.angle}${q}`,keys:[]};
+    }
+
+    if(isQuestion){
+      const qBank={
+        warm:['I’m not sure I caught enough context to answer that cleanly — tell me a bit more about what you mean?','I don’t have a straight answer for that built in, though if you give me the context I’ll follow along.'],
+        playful:['Hmm, you stumped my rulebook on that one — give me a little more context?','I don’t have an obvious answer ready for that — what’s the backdrop?'],
+        thoughtful:['I don’t want to bluff an answer to that without more context. What’s behind the question?','That sits a bit outside what I can read cleanly — say a little more about what you’re aiming at?'],
+        direct:['Not sure I can answer that cleanly as phrased. What’s the context?','Outside what I can parse cleanly — give me a bit more to go on.']
+      }[persona];
+      const p=pick(qBank,'fallback:openq:'+persona,state);
+      return {text:questionsPaused?p.text.replace(/\?/g,'.'):p.text,keys:[p.key]};
     }
 
     // Acknowledge emotional or gist meaning gracefully instead of scolding user's phrasing.
-    const lead=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused}).text;
+    const keys=[];
+    const leadRes=reflectTopic({nlu,rawText,state,topic,isTopicShift:false,questionsPaused});
+    if(leadRes.key)keys.push(leadRes.key);
+    const lead=leadRes.text;
     let middle='';
     if(gist&&gist.phrase&&gist.phrase.length<=55){
       const echoed=cleanFrag(mirrorPronouns(gist.phrase));
       if(gist.pattern==='desire')middle=` Wanting to ${lowerFirst(echoed)} makes complete sense.`;
-      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is where all the interesting friction lives.`;
+      else if(gist.pattern==='effort')middle=` Taking a swing at ${lowerFirst(echoed)} is a solid focus.`;
       else if(gist.pattern==='subject_state'&&gist.subject)middle=` Funny how much attention your ${gist.subject} can pull once things get moving.`;
     }
     if(!middle&&affect.valence==='neutral'&&misses>=2){
-      middle={
-        warm:' I want to make sure I follow where you want this to go.',
-        playful:' Let me make sure I catch your angle clearly here.',
-        thoughtful:' Give me one small anchor on what matters most to you in that.',
-        direct:' Point me at the main piece you want to unpack.'
+      const mBank={
+        warm:[' Tell me a bit more about where you want to take this.',' We can take that wherever you want next.'],
+        playful:[' Throw me the next piece when you’re ready.',' Where are we steering this next?'],
+        thoughtful:[' Give me one concrete detail you want to unpack.',' Let me know which thread you want to follow.'],
+        direct:[' What’s the main piece you want to look at?',' Point me at what comes next.']
       }[persona];
+      const mp=pick(mBank,'fallback:miss:'+persona,state);
+      keys.push(mp.key);
+      middle=mp.text;
     }
 
-    if(questionsPaused)return (lead+middle).trim();
+    if(questionsPaused)return {text:(lead+middle).trim(),keys};
+
+    // Vary whether we tack on a question so open chat doesn't interrogate every turn.
+    const turnCount=(state?.usage?.['fallback:turn:'+persona])||0;
+    keys.push('fallback:turn:'+persona);
+    if(middle||turnCount%2===1){
+      return {text:`${lead}${middle}`.replace(/\s+/g,' ').trim(),keys};
+    }
 
     const tailored=(K.conversationTailored?.[topic]?.[0]);
-    const follow=topic!=='general'&&tailored
-      ?` ${tailored}`
+    const followPick=topic!=='general'&&tailored
+      ?{text:` ${tailored}`,key:null}
       :pick([
-        ' What part of that is taking up the most space in your head right now?',
-        ' Walk me through the backstory — what sparked that?',
-        ' Want to unpack that a bit more, or pivot toward something lighter like a riddle or a story?'
-      ],'fallback:q:'+persona,state).text;
+        ' What part of that are you focusing on right now?',
+        ' What sparked that?',
+        ' Want to dig into that more, or switch to something else?'
+      ],'fallback:q:'+persona,state);
+    if(followPick.key)keys.push(followPick.key);
 
-    return `${lead}${middle}${follow}`.replace(/\s+/g,' ').trim();
+    return {text:`${lead}${middle}${followPick.text}`.replace(/\s+/g,' ').trim(),keys};
   }
 
   // Wrap a verified Realization sentence (preserving the exact substring span!) in warm human phrasing.
@@ -7409,6 +7738,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
     personaOf,
     reflectTopic,
     respondReaction,
+    respondInviteShare,
+    respondHelpRequest,
+    respondOpinion,
     respondKiraPersona,
     respondKiraTaste,
     respondEpisodicRecall,
@@ -7637,11 +7969,20 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         if(kind==='capabilities'||kind==='honest'){plan.text+=prefix+generic(kind);askLastQuestion('general',0);}
         else if(kind==='taste'||kind==='favorite'){
           const topic=o?.candidates?.length===1?this.engine.topicFor(o.concept):null;
-          const taste=K.Responder?.respondKiraTaste
-            ?K.Responder.respondKiraTaste({kind,target:o?.label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
-            :{text:generic('honest',{questionsPaused:true}),topic:null};
-          const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(o?.label||'',this.engine):null)||'general';
-          plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,o?.label)).trim();
+          const label=o?.label||'';
+          const exactEntry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(label,{exact:true}):null;
+          const isCategoryTaste=/\b(?:music|band|song|album|book|novel|author|genre|read|food|eat|cuisine|dish|drink|tea|coffee|movie|film|show|game|games)\b/i.test(label);
+          if(kind==='taste'&&!exactEntry&&!isCategoryTaste&&K.Responder?.respondOpinion){
+            const op=K.Responder.respondOpinion({target:label,isAbout:true,state,engine:this.engine,questionsPaused:state.context.questionsPaused});
+            for(const k of op.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+            plan.text+=prefix+op.text;
+          }else{
+            const taste=K.Responder?.respondKiraTaste
+              ?K.Responder.respondKiraTaste({kind,target:label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
+              :{text:generic('honest',{questionsPaused:true}),topic:null};
+            const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(label,this.engine):null)||'general';
+            plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,label)).trim();
+          }
         }else plan.text+=prefix+generic('about');
       };
       state.context.pending=null;
@@ -7766,7 +8107,9 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
               plan.text=((lead?lead.text:interact('social',{questionsPaused:true}))+' '+ask(topicCue,startStep,undefined,parsed.text,[])).trim();
             }
             else if(K.Responder?.respondNovelFallback){
-              plan.text=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              const fb=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              if(typeof fb==='string')plan.text=fb;
+              else{plan.text=fb.text;for(const k of fb.keys||[])state.usage[k]=(state.usage[k]||0)+1;}
             }
             else if(misses===1)plan.text='I caught the drift of that, even if it sits outside my structured memory commands — tell me a little more about what you mean?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
             else plan.text='Let me make sure I follow where you want to go — what part of that matters most to you right now?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
@@ -7820,9 +8163,28 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
               else{plan.text=picked.item.prompt;state.context.pending={kind:'dilemma',dilemmaId:picked.item.id,question:picked.item.prompt,questionMessage:aid};}
               break;
             }
+            if(na.kind==='invite_share'&&K.Responder?.respondInviteShare){
+              const res=K.Responder.respondInviteShare({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='help_request'&&K.Responder?.respondHelpRequest){
+              const res=K.Responder.respondHelpRequest({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='opinion_question'&&K.Responder?.respondOpinion){
+              const res=K.Responder.respondOpinion({target:na.target,isAbout:na.isAbout,state,engine:this.engine,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
             if(na.kind==='recommend'){
               const rec=K.Knowledge.recommend(na.target,state);state.usage[rec.key]=(state.usage[rec.key]||0)+1;
-              plan.text=rec.text+(paused?'':` Want another option in a different mood, or does ${rec.topic} sound right tonight?`);
+              const recFollow=rec.topic&&rec.topic!=='general'?` Want another option in a different mood, or does ${rec.topic} sound right tonight?`:' Want another idea, or something else entirely?';
+              plan.text=rec.text+(paused?'':recFollow);
               break;
             }
             if(na.kind==='decide'){
@@ -7855,7 +8217,8 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,{purpose:'start'});}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,{purpose:'detail'});}
             else{
-              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(cue&&cue!==f?.topic),questionsPaused:state.context.questionsPaused}):null;
+              const prevTopic=f?.topic||previous.context.field?.topic;
+              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(prevTopic&&prevTopic!=='general'&&cue&&cue!==prevTopic),questionsPaused:state.context.questionsPaused}):null;
               if(reflection?.key)state.usage[reflection.key]=(state.usage[reflection.key]||0)+1;
               const lead=reflection?reflection.text:interact('social',{questionsPaused:true}),asked=cue&&cue!==f?.topic?[]:f?.asked;
               const move=f?this.field.nextMove({ctx:state.context.field,topic,step,ladderLength:(K.conversationQuestions[topic]||[]).length,answer,memories:state.memories.filter(m=>!(state.context.declinedTopics||[]).includes(memoryTopic(m))),turn:state.turn}):{kind:'ladder'};
@@ -7897,10 +8260,15 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
         }
         case 'social':{
           const paused=state.context.questionsPaused||!allowQuestions;
-          if(parsed.nluAct?.kind==='reaction'&&K.Responder?.respondReaction){
+          const priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const isJokeOrPromptLaugh=parsed.socialKind==='laugh'&&['joke','prompt'].includes(priorAct);
+          const isBareAck=/^(?:ok|okay|alright)[.!]*$/i.test(parsed.text.trim());
+          const reactionKind=!isJokeOrPromptLaugh&&!isBareAck?(parsed.nluAct?.kind==='reaction'?parsed.nluAct.reaction:parsed.nlu?.act?.kind==='reaction'?parsed.nlu.act.reaction:null):null;
+          if(reactionKind&&K.Responder?.respondReaction){
             const topic=previous.context.pending?.topic||previous.context.field?.topic;
-            const res=K.Responder.respondReaction({reaction:parsed.nluAct.reaction,topic,state,questionsPaused:paused});
+            const res=K.Responder.respondReaction({reaction:reactionKind,topic,state,questionsPaused:paused});
             if(res.key)state.usage[res.key]=(state.usage[res.key]||0)+1;
+            if(res.followUpKey)state.usage[res.followUpKey]=(state.usage[res.followUpKey]||0)+1;
             plan.text=res.followUp?res.text+' '+res.followUp:res.text;
             break;
           }
@@ -7910,7 +8278,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
             plan.text=lead+picked.item.fact+(paused?'':' Want a quick riddle, a warm micro-story, or just someone to vent to?');
             break;
           }
-          const kind=parsed.socialKind,priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const kind=parsed.socialKind;
           if(kind==='laugh'&&['joke','prompt'].includes(priorAct)){plan.text=generic('laugh');if(!state.context.questionsPaused)state.context.pending={kind:'offer',act:priorAct};}
           else{const hook=kind==='ack'||kind==='decline'?recallHook():null;if(hook){plan.text=hook.text+' '+ask(hook.topic,0);}else{plan.text=generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}}
           break;
@@ -7976,7 +8344,7 @@ Kira.THEME_PACKS={"art":{"open":[],"ask":[],"cue":[],"phrase":[],"words":[],"gro
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"143ec67a775f4fd1ceabaed889b5fc5a20ced0824c366793f4870c7d48938cc3","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.7.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f23d194a8547abcbd944cea4b600b0aecae91e4a0347d43cf596eb66001c5c11","unicode":"15.0.0","profile":"EXPERIMENTAL"};
 
 'use strict';
 const semanticModel=new Kira.SemanticEngine(Kira.ARTIFACT);
@@ -7998,7 +8366,7 @@ self.onmessage=event=>{
 <script>'use strict';
 // Adapter: one atomic localStorage value holds the complete version-pinned event log.
 (function(K){
-  const KEY='kira_rse_4_6_0',MAX_SESSION_BYTES=4500000;
+  const KEY='kira_rse_4_7_0',MAX_SESSION_BYTES=4500000;
   const sessionBytes=text=>new TextEncoder().encode(text).length;
   function encodeSession(envelope){const encoded=JSON.stringify(envelope);K.assert(sessionBytes(encoded)<MAX_SESSION_BYTES,'Session is approaching the storage limit. Export it and begin a new conversation.');return encoded;}
   function pack(events,state,meta){const payload={format:'kira-session/4.1',assets:meta,events,stateDigest:K.hash(state)};return {...payload,checksum:K.hash(payload)};}
@@ -8112,7 +8480,7 @@ self.onmessage=event=>{
   function download(name,text){if(window.KiraHost&&KiraHost.saveFile){KiraHost.saveFile(name,text);return false;}const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}
   function detail(label,data){const d=el('details');d.append(el('summary','',label),el('pre','',typeof data==='string'?data:JSON.stringify(data,null,2)));return d;}
   const KIND_HELP={subsumes:'Checks whether the first concept is provably a kind of the second, using the bundled axioms and their closure.',existential:'Checks a typed part or role relation between two concepts.',relation:'Computes the set of possible basic lexical relations between two word senses.',entails:'Projects lexical edits through an extensional context and reports the surviving relations.',shift:'Finds an approved wording in the same meaning that moves register and affect in the requested directions.',realize:'Chooses the approved wording closest to an absolute register and affect target.'};
-  const DRAFT_KEY='kira_rse_draft_4_6_0';
+  const DRAFT_KEY='kira_rse_draft_4_7_0';
   function yesterdayKey(now){const d=new Date(now);d.setDate(d.getDate()-1);return dayKey(d);}
   function timeLabel(time){try{const d=new Date(time),now=Date.now();if(!Number.isFinite(d.getTime()))return '';if(dayKey(now)!==dayKey(time))return yesterdayKey(now)===dayKey(time)?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric'});return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch{return '';}}
   function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}

@@ -112,7 +112,7 @@ test('answering a support follow-up keeps attribution to the source message', ()
 });
 
 test('the new model rejects an older version-pinned session', () => {
-  assert.equal(K.STORE_KEY, 'kira_rse_4_6_0');
+  assert.equal(K.STORE_KEY, 'kira_rse_4_7_0');
   const oldMetadata = K.clone({...K.APP_META, version: '4.3.0', modelHash: 'old-model-hash'});
   const envelope = K.packSession([], K.initialState(), oldMetadata);
   assert.throws(() => K.inspectEnvelope(envelope, K.APP_META), /different version of Kira/);

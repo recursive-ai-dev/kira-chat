@@ -145,6 +145,14 @@
     }
     const parsed=base();
     if(parsed.supported||parsed.ambiguity)return finish(parsed);
+    if(!protectedText&&parsed.reasonCode==='unparsed'&&K.NLU?.stripPreambles){
+      const stripped=K.NLU.stripPreambles(text);
+      if(stripped.preambles.length&&stripped.core){
+        const offset=text.length-stripped.core.length;
+        const pr=base(stripped.core);
+        if(pr.supported||pr.ambiguity)return finish(relocate(pr,offset));
+      }
+    }
     if(!protectedText&&pending?.kind==='riddle'&&!isRepairFeedback(text)){
       return finish({intent:'c:topic',speechAct:'answer',supported:true,frames:[],quoted:[],nluAct:{kind:'riddle_answer',answer:raw},reason:null});
     }
@@ -170,9 +178,13 @@
       const ak=nlu.act?.kind;
       const route=(intent,speechAct='statement')=>finish({intent,speechAct,supported:true,frames:[],quoted:[],nluAct:nlu.act,reason:null});
       if(ak==='reaction'&&!(pending?.kind==='detail'&&yesNo))return route('c:social','reaction');
+      if(ak==='social_how')return route('c:how','question');
+      if(ak==='social_thanks')return route('c:thanks','statement');
+      if(ak==='social_farewell')return route('c:farewell','statement');
       if(ak==='clarify_last')return route('c:clarify','question');
       if(ak==='episodic_recall')return route('c:recall','question');
       if(ak==='kira_persona'||ak==='kira_taste'||ak==='live_world')return route('c:about','question');
+      if(ak==='invite_share'||ak==='help_request'||ak==='opinion_question')return route('c:topic','question');
       if(ak==='story'||ak==='fun_fact'||ak==='riddle'||ak==='dilemma'||ak==='recommend'||ak==='decide')return route('c:topic','request');
       if(ak==='cheer_up')return route('c:social','request');
       if(ak==='compare'||ak==='knowledge')return route('c:topic','question');
@@ -216,18 +228,19 @@
   function focusPhrase(answer){
     if(typeof answer!=='string')return null;
     if(K.NLU?.classifyReaction?.(answer))return null;
-    let t=answer.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
+    const raw=K.NLU?.normalize?K.NLU.normalize(answer):answer;
+    let t=raw.trim().replace(/[.!?,;:]+$/,'').replace(/^(?:well|so|um|uh|honestly|mostly|just|really|basically|mainly)[, ]+/i,'');
     if(K.NLU?.classifyReaction?.(t))return null;
-    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:making|building|working on|writing|creating|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying)\s+/i,'');
+    t=t.replace(/^(?:i(?:'m| am| have been|'ve been| have)?\s+)?(?:currently |mostly |just |really |also )*(?:trying to |attempting to )?(?:making|make|building|build|working on|writing|write|creating|create|playing|learning|studying|doing|designing|drawing|painting|listening to|reading|using|trying|testing|test)\s+/i,'');
     t=t.replace(/\s+(?:with|using|in|on|for|at|from|because|but|and|so|that|which|when|while|since)\s+.*$/i,'').replace(/\s+(?:mostly|mainly|lately|now|these days|right now|a lot|at the moment|too)$/i,'').trim();
     const words=t.split(/\s+/).filter(Boolean);
     if(words.length<1||words.length>4||t.length>32)return null;
     // Places, reasons, reactions and time/frequency answers are useful discourse, but cannot fill a noun slot.
     if(/^(?:at|in|on|to|from|with|without|by|for|about|because|during|after|before|under|over|around|through|every|each|all|once|twice)\b/i.test(t)||/^(?:usually|sometimes|often|always|never|daily|weekly|recently|yesterday|today|tomorrow|tonight)$/i.test(t))return null;
-    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure)$/i.test(t))return null;
-    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say)\b/i.test(t))return null;
-    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did)\b/i.test(t))return null;
-    if(/\b(?:i|i'm|i've|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|can't|won't|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
+    if(/^(?:yes|yeah|yep|no|nope|nothing|something|anything|everything|it|that|this|them|stuff|things?|idk|maybe|sure|not sure|thanks|thank you|hello|hi|hey|bye|goodbye)$/i.test(t))return null;
+    if(/^(?:haha+|hahaha+|hehe+|lol|lmao|rofl|oof|ugh|yikes|ouch|damn|welp|sigh|man|oh|ah|wow|ooh|nice|cool|awesome|sweet|lovely|interesting|totally|definitely|absolutely|probably|possibly|mostly|partly|for real|for sure|fair enough|makes sense|i guess|i suppose|sort of|kind of|hard to say|ok|okay|alright|no worries|all good)\b/i.test(t))return null;
+    if(/^(?:had|ate|got|went|made|kept|bought|saw|heard|took|spent|started|finished|did|working|trying|building|making|doing|going|getting|looking|helping|testing|telling|saying|focusing)\b/i.test(t))return null;
+    if(/\b(?:i|i'm|im|i've|ive|i'll|ill|i'd|id|me|my|you|your|we|is|are|was|were|be|do|does|did|not|don't|dont|can't|cant|won't|wont|matters?|means?|helps?|works?|feels?|gets?|seems?|looks?|makes?|goes|takes?|keeps?|needs?|wants?|loves?|likes?|haha+|lol|lmao)\b/i.test(t))return null;
     // A sentence-initial capital is only lowercased when the next word is lowercase ("Pixel platformers", not "Stardew Valley" or "Godot").
     return words.length>1&&/^\p{Lu}\p{Ll}+$/u.test(words[0])&&/^\p{Ll}/u.test(words[1])?t[0].toLowerCase()+t.slice(1):t;
   }

@@ -1,7 +1,7 @@
 'use strict';
 // Adapter: one atomic localStorage value holds the complete version-pinned event log.
 (function(K){
-  const KEY='kira_rse_4_6_0',MAX_SESSION_BYTES=4500000;
+  const KEY='kira_rse_4_7_0',MAX_SESSION_BYTES=4500000;
   const sessionBytes=text=>new TextEncoder().encode(text).length;
   function encodeSession(envelope){const encoded=JSON.stringify(envelope);K.assert(sessionBytes(encoded)<MAX_SESSION_BYTES,'Session is approaching the storage limit. Export it and begin a new conversation.');return encoded;}
   function pack(events,state,meta){const payload={format:'kira-session/4.1',assets:meta,events,stateDigest:K.hash(state)};return {...payload,checksum:K.hash(payload)};}

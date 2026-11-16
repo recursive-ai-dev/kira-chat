@@ -16,7 +16,7 @@
     [/\btbh\b/gi,'to be honest'],[/\bngl\b/gi,'not going to lie'],[/\brn\b/gi,'right now'],
     [/\bits\b(?=\s+(?:a|an|the|so|very|pretty|really|kind|sort|not|been|just|actually|honestly|getting|hard|easy|good|bad|great|nice|tough|late|early|cold|hot|warm|raining|snowing))/gi,"it's"]
   ];
-  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
+  const PREAMBLE=/^(?:(?:oh|ah|aw|aww|ooh|hm+|hmm+|well|so|honestly|truthfully|to be honest|not going to lie|frankly|actually|anyway|by the way|btw|for what it's worth|fwiw|on another note|speaking of which|wait|man|dude|oof|ugh|yay|woohoo|nice|cool|haha+|hahaha+|lol|lmao|hehe+|yeah|yep|yup|nah|no|ok|okay|i mean|you know|basically|literally|seriously)[,!.\s]+)+/i;
   const STOP_ENTITIES=new Set(['i','me','my','mine','you','your','we','our','us','they','them','their','he','him','his','she','her','it','its','this','that','these','those','something','anything','everything','nothing','someone','anyone','everyone','stuff','thing','things','lot','bit','kind','sort','part','way','time','day','today','tonight','yesterday','tomorrow','now','here','there','home','work','school','life','world','haha','yeah','lol','lmao','okay','ok','yes','no','sure','maybe','really','mostly','just','actually','honestly','pretty','very','quite','good','bad','great','nice','long','rough','hard','little','more','much','many','some']);
 
   // Normalize casual English without mutating user-quoted spans when building discourse features.
@@ -71,9 +71,9 @@
 
   // Reactions and backchannels that should never be parsed as noun-phrase topics.
   function classifyReaction(text){
-    const c=K.fold(text).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well),?\s+/,'').trim();
+    const c=K.fold(normalize(text)).replace(/[.!?\s]+$/,'').replace(/^(?:oh|ah|well|yeah|yep|yup|ok|okay|alright),?\s+(?=(?:fair|true|that's|good|no worries|all good|makes sense|i agree|got|sounds))?/,'').trim();
     if(/^(?:(?:haha+|hahaha+|hehe+|lol|lmao|rofl)(?:\s+(?:yeah|yep|yup|true|right|fair|same|totally|i know|for real|fr|man|seriously))?|(?:yeah|yep|yup|oh)\s+(?:haha+|lol|lmao|that's funny|too funny))$/.test(c))return 'laugh';
-    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|fair|fair enough|pretty much|mostly|right|exactly|i know|i get that|makes sense|good point|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course)$/.test(c))return 'agree';
+    if(/^(?:yeah|yep|yup|for sure|definitely|totally|absolutely|same|true|true enough|that's true|so true|totally true|fair|fair enough|fair point|good point|pretty much|mostly|right|exactly|i know|i get that|i agree|agreed|makes sense|makes total sense|for real|fr|no kidding|tell me about it|you know it|word|bet|same here|i hear you|sounds good|sounds right|of course|gotcha|got it|understood|no worries|all good|okay|ok|alright)$/.test(c))return 'agree';
     if(/^(?:kind of|kinda|sort of|sorta|a bit|a little|maybe|i guess|i suppose|hard to say|not really sure|not sure|depends|sometimes|a mix|both|neither|either way|who knows|probably|possibly|to some extent)$/.test(c))return 'hedge';
     if(/^(?:oof|ugh|yikes|ouch|damn|welp|sigh|man|oh man|oh no|rough|rip)$/.test(c))return 'empathy_cue';
     if(/^(?:wait what|really\??|no way|seriously\??|wait really\??|oh really\??|huh\??|what\??)$/.test(c))return 'surprise';
@@ -180,7 +180,7 @@
     if(!s)return null;
     let m;
     if((m=s.match(/^i\s+(?:just\s+)?(?:really\s+)?wanted to\s+(.+)$/i)))return {pattern:'desire',phrase:m[1].trim()};
-    if((m=s.match(/^i(?:'m| am)\s+(?:just\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
+    if((m=s.match(/^(?:i(?:'m| am)\s+)?(?:just\s+|mostly\s+)?(?:trying to|attempting to)\s+(.+)$/i)))return {pattern:'effort',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:spent|wasted|took)\s+(?:the\s+\w+\s+|all\s+\w+\s+)?([a-z]+ing\b.*)$/i)))return {pattern:'activity',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(?:had|just had|have)\s+(.+)$/i)))return {pattern:'experience',phrase:m[1].trim()};
     if((m=s.match(/^i\s+(went|got|made|built|wrote|finished|started|tried|found|learned|saw|heard|read|watched|played)\s+(.+)$/i)))return {pattern:'action',verb:m[1].toLowerCase(),phrase:m[2].trim()};
@@ -210,6 +210,17 @@
       return {kind:'clarify_last',preambles};
     }
 
+    // 2b. Casual social variants after preamble stripping
+    if(/^(?:how are you(?: doing| holding up| feeling)?|how's it going|how are things|how have you been)(?:\s+today|\s+tonight)?$/i.test(folded)){
+      return {kind:'social_how',preambles};
+    }
+    if(/^(?:thanks|thank you)(?: so much| a lot| again)?(?:\s+for\s+(?:the\s+)?(?:help|listening|chatting|talking|that|everything|this|your help|being here))?$/i.test(folded)){
+      return {kind:'social_thanks',preambles};
+    }
+    if(/^(?:see you(?: later| soon| around)?|catch you later|talk to you later|gotta go|got to go|have a good (?:one|night|day|evening)|good ?night|bye for now)$/i.test(folded)){
+      return {kind:'social_farewell',preambles};
+    }
+
     // 3. Creative, games, stories, facts, advice, recommendations
     if(/^(?:tell me|spin me|give me|write me|share)?\s*(?:a )?(?:short |bedtime |little |quick )?story\b/i.test(folded))return {kind:'story',preambles};
     if(/^(?:tell me|give me|share)?\s*(?:a )?(?:fun |random |interesting |cool )?(?:fact|trivia)\b|^tell me something (?:interesting|cool|weird|random|surprising|new)$|^surprise me$/i.test(folded)){
@@ -220,8 +231,9 @@
     if((m=trimmed.match(/^(?:help me (?:decide|choose)|should i)\s+(.+?)\s+or\s+(.+)$/i))){
       return {kind:'decide',a:m[1].trim(),b:m[2].trim(),preambles};
     }
-    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas|what should i)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))){
-      const target=(m[1]||'').replace(/^(?:a|an|some)\s+/,'').trim();
+    if((m=folded.match(/^(?:recommend|suggest|give me an idea|any ideas)\s*(?:me\s+)?(?:for\s+|to\s+)?(.+)?$/i))
+      ||(m=folded.match(/^what should i\s+(read|watch|play|listen to|cook|make|eat|drink|try|do tonight)(?:\s+(.+))?$/i))){
+      const target=((m[1]||'')+(m[2]?' '+m[2]:'')).replace(/^(?:a|an|some)\s+/,'').trim();
       return {kind:'recommend',target,preambles};
     }
     if(/^(?:cheer me up|make me smile|i need a distraction|distract me|say something nice|compliment me)$/i.test(folded)){
@@ -249,6 +261,20 @@
     }
     if((m=folded.match(/^(?:what kind of|what sort of|what type of)\s+(.+?)\s+do you (?:like|love|enjoy|listen to|read|watch|play|prefer)$/i))){
       return {kind:'kira_taste',target:m[1].trim(),preambles};
+    }
+
+    // 6b. Invitations to share, help requests, and opinion questions
+    if((m=trimmed.match(/^(?:do you )?(?:want|would you like) to (?:hear|know)(?: more)?(?: about)?\s+(.+)$/i))
+      ||(m=trimmed.match(/^(?:can|could|may|should) i tell you (?:about|more about)\s+(.+)$/i))){
+      return {kind:'invite_share',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:can|could|would) you help(?: me)?(?:\s+(?:with|to))?\s+(.+)$/i))
+      ||(m=trimmed.match(/^help me(?:\s+(?:with|to))?\s+(.+)$/i))){
+      return {kind:'help_request',target:m[1].trim(),preambles};
+    }
+    if((m=trimmed.match(/^(?:what do you think(?:\s+(about|of))?|what's your take (on)|how do you feel (about))\s+(.+)$/i))){
+      const isAbout=!!(m[1]||m[2]||m[3]),target=m[4].trim();
+      if(target&&!/^(?:of me|about me)$/i.test(target))return {kind:'opinion_question',target,isAbout,preambles};
     }
 
     // 7. Comparisons ("what's the difference between X and Y?", "compare X and Y", "X vs Y")

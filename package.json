@@ -1,6 +1,6 @@
 {
   "name": "kira-chat",
-  "version": "4.6.0",
+  "version": "4.7.0",
   "private": true,
   "description": "Offline dialogue and a deterministic multi-character narrative SDK with attributed memory, knowledge, and replay.",
   "license": "Apache-2.0",

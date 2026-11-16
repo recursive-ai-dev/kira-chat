@@ -218,11 +218,20 @@
         if(kind==='capabilities'||kind==='honest'){plan.text+=prefix+generic(kind);askLastQuestion('general',0);}
         else if(kind==='taste'||kind==='favorite'){
           const topic=o?.candidates?.length===1?this.engine.topicFor(o.concept):null;
-          const taste=K.Responder?.respondKiraTaste
-            ?K.Responder.respondKiraTaste({kind,target:o?.label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
-            :{text:generic('honest',{questionsPaused:true}),topic:null};
-          const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(o?.label||'',this.engine):null)||'general';
-          plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,o?.label)).trim();
+          const label=o?.label||'';
+          const exactEntry=K.Knowledge?.lookupEntry?K.Knowledge.lookupEntry(label,{exact:true}):null;
+          const isCategoryTaste=/\b(?:music|band|song|album|book|novel|author|genre|read|food|eat|cuisine|dish|drink|tea|coffee|movie|film|show|game|games)\b/i.test(label);
+          if(kind==='taste'&&!exactEntry&&!isCategoryTaste&&K.Responder?.respondOpinion){
+            const op=K.Responder.respondOpinion({target:label,isAbout:true,state,engine:this.engine,questionsPaused:state.context.questionsPaused});
+            for(const k of op.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+            plan.text+=prefix+op.text;
+          }else{
+            const taste=K.Responder?.respondKiraTaste
+              ?K.Responder.respondKiraTaste({kind,target:label,state,engine:this.engine,questionsPaused:state.context.questionsPaused})
+              :{text:generic('honest',{questionsPaused:true}),topic:null};
+            const resolvedTopic=topic||taste.topic||(K.conversationTopic?K.conversationTopic(label,this.engine):null)||'general';
+            plan.text+=prefix+(taste.text+' '+ask(resolvedTopic,0,undefined,label)).trim();
+          }
         }else plan.text+=prefix+generic('about');
       };
       state.context.pending=null;
@@ -347,7 +356,9 @@
               plan.text=((lead?lead.text:interact('social',{questionsPaused:true}))+' '+ask(topicCue,startStep,undefined,parsed.text,[])).trim();
             }
             else if(K.Responder?.respondNovelFallback){
-              plan.text=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              const fb=K.Responder.respondNovelFallback({nlu:parsed.nlu,rawText:parsed.text,state,engine:this.engine,questionsPaused:state.context.questionsPaused||!allowQuestions,misses});
+              if(typeof fb==='string')plan.text=fb;
+              else{plan.text=fb.text;for(const k of fb.keys||[])state.usage[k]=(state.usage[k]||0)+1;}
             }
             else if(misses===1)plan.text='I caught the drift of that, even if it sits outside my structured memory commands — tell me a little more about what you mean?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
             else plan.text='Let me make sure I follow where you want to go — what part of that matters most to you right now?'.replace(/\?/g,state.context.questionsPaused?'.':'?');
@@ -401,9 +412,28 @@
               else{plan.text=picked.item.prompt;state.context.pending={kind:'dilemma',dilemmaId:picked.item.id,question:picked.item.prompt,questionMessage:aid};}
               break;
             }
+            if(na.kind==='invite_share'&&K.Responder?.respondInviteShare){
+              const res=K.Responder.respondInviteShare({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='help_request'&&K.Responder?.respondHelpRequest){
+              const res=K.Responder.respondHelpRequest({target:na.target,state,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
+            if(na.kind==='opinion_question'&&K.Responder?.respondOpinion){
+              const res=K.Responder.respondOpinion({target:na.target,isAbout:na.isAbout,state,engine:this.engine,questionsPaused:paused});
+              for(const k of res.keys||[])state.usage[k]=(state.usage[k]||0)+1;
+              plan.text=res.text;
+              break;
+            }
             if(na.kind==='recommend'){
               const rec=K.Knowledge.recommend(na.target,state);state.usage[rec.key]=(state.usage[rec.key]||0)+1;
-              plan.text=rec.text+(paused?'':` Want another option in a different mood, or does ${rec.topic} sound right tonight?`);
+              const recFollow=rec.topic&&rec.topic!=='general'?` Want another option in a different mood, or does ${rec.topic} sound right tonight?`:' Want another idea, or something else entirely?';
+              plan.text=rec.text+(paused?'':recFollow);
               break;
             }
             if(na.kind==='decide'){
@@ -436,7 +466,8 @@
             if(/^(?:no|nope|not really)[.!]*$/i.test(answer)){plan.text='That’s fine. '+ask('general',0,{purpose:'start'});}
             else if(/^(?:yes|yeah|yep|sure|okay|ok)[.!]*$/i.test(answer)){plan.text='Go ahead. '+ask(topic,step,{purpose:'detail'});}
             else{
-              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(cue&&cue!==f?.topic),questionsPaused:state.context.questionsPaused}):null;
+              const prevTopic=f?.topic||previous.context.field?.topic;
+              const reflection=K.Responder?.reflectTopic?K.Responder.reflectTopic({nlu:parsed.nlu,rawText:answer,state,topic,isTopicShift:!!(prevTopic&&prevTopic!=='general'&&cue&&cue!==prevTopic),questionsPaused:state.context.questionsPaused}):null;
               if(reflection?.key)state.usage[reflection.key]=(state.usage[reflection.key]||0)+1;
               const lead=reflection?reflection.text:interact('social',{questionsPaused:true}),asked=cue&&cue!==f?.topic?[]:f?.asked;
               const move=f?this.field.nextMove({ctx:state.context.field,topic,step,ladderLength:(K.conversationQuestions[topic]||[]).length,answer,memories:state.memories.filter(m=>!(state.context.declinedTopics||[]).includes(memoryTopic(m))),turn:state.turn}):{kind:'ladder'};
@@ -478,10 +509,15 @@
         }
         case 'social':{
           const paused=state.context.questionsPaused||!allowQuestions;
-          if(parsed.nluAct?.kind==='reaction'&&K.Responder?.respondReaction){
+          const priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const isJokeOrPromptLaugh=parsed.socialKind==='laugh'&&['joke','prompt'].includes(priorAct);
+          const isBareAck=/^(?:ok|okay|alright)[.!]*$/i.test(parsed.text.trim());
+          const reactionKind=!isJokeOrPromptLaugh&&!isBareAck?(parsed.nluAct?.kind==='reaction'?parsed.nluAct.reaction:parsed.nlu?.act?.kind==='reaction'?parsed.nlu.act.reaction:null):null;
+          if(reactionKind&&K.Responder?.respondReaction){
             const topic=previous.context.pending?.topic||previous.context.field?.topic;
-            const res=K.Responder.respondReaction({reaction:parsed.nluAct.reaction,topic,state,questionsPaused:paused});
+            const res=K.Responder.respondReaction({reaction:reactionKind,topic,state,questionsPaused:paused});
             if(res.key)state.usage[res.key]=(state.usage[res.key]||0)+1;
+            if(res.followUpKey)state.usage[res.followUpKey]=(state.usage[res.followUpKey]||0)+1;
             plan.text=res.followUp?res.text+' '+res.followUp:res.text;
             break;
           }
@@ -491,7 +527,7 @@
             plan.text=lead+picked.item.fact+(paused?'':' Want a quick riddle, a warm micro-story, or just someone to vent to?');
             break;
           }
-          const kind=parsed.socialKind,priorAct=previous.lastPlan?.policy.secondaryActs?.at(-1)||previous.lastPlan?.act;
+          const kind=parsed.socialKind;
           if(kind==='laugh'&&['joke','prompt'].includes(priorAct)){plan.text=generic('laugh');if(!state.context.questionsPaused)state.context.pending={kind:'offer',act:priorAct};}
           else{const hook=kind==='ack'||kind==='decline'?recallHook():null;if(hook){plan.text=hook.text+' '+ask(hook.topic,0);}else{plan.text=generic(kind==='decline'?'decline':'social');askLastQuestion('general',0);}}
           break;
@@ -557,4 +593,4 @@
   Object.assign(K,{DialogueModel,initialState,describeMemory,relationshipStage:stage,validateEvent,MAX_EVENTS,supportedImage});
 })(Kira);
 
-Kira.APP_META={"version":"4.6.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"143ec67a775f4fd1ceabaed889b5fc5a20ced0824c366793f4870c7d48938cc3","unicode":"15.0.0","profile":"EXPERIMENTAL"};
+Kira.APP_META={"version":"4.7.0","artifactHash":"e0161a12cde6f8c7f33a21c30543ce71d936e70caff323cd766c5ebce7ccf571","modelHash":"f23d194a8547abcbd944cea4b600b0aecae91e4a0347d43cf596eb66001c5c11","unicode":"15.0.0","profile":"EXPERIMENTAL"};
